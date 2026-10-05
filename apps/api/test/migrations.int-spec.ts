@@ -15,6 +15,7 @@ const EXPECTED_TABLES = [
   'households',
   'insights',
   'member_access_codes',
+  'member_credentials',
   'member_default_accounts',
   'members',
   'monthly_reports',

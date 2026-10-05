@@ -1,4 +1,4 @@
-import { signIn, signOut } from './actions';
+import { setUpAccess, signIn, signOut } from './actions';
 
 interface CookieOptions {
   readonly httpOnly: boolean;
@@ -34,9 +34,18 @@ jest.mock('next/navigation', () => ({
   redirect: (path: string): never => redirect(path),
 }));
 
-function form(accessCode: string): FormData {
+function form(password: string, email = ' member@example.com '): FormData {
+  const data = new FormData();
+  data.set('email', email);
+  data.set('password', password);
+  return data;
+}
+
+function setUpForm(accessCode: string, password = 'a long passphrase'): FormData {
   const data = new FormData();
   data.set('accessCode', accessCode);
+  data.set('email', 'member@example.com');
+  data.set('password', password);
   return data;
 }
 
@@ -64,7 +73,9 @@ describe('sign-in action', () => {
       'redirected to /',
     );
 
-    expect(fetchMock.mock.calls[0]?.[1].body).toBe(JSON.stringify({ accessCode: 'a-valid-code' }));
+    expect(fetchMock.mock.calls[0]?.[1].body).toBe(
+      JSON.stringify({ email: 'member@example.com', password: '  a-valid-code  ' }),
+    );
     expect(setCookie).toHaveBeenCalledWith('cfo_session', 'new-session-token', {
       httpOnly: true,
       sameSite: 'lax',
@@ -88,7 +99,7 @@ describe('sign-in action', () => {
     });
   });
 
-  it('gives the same message for any refused code and sets no cookie', async () => {
+  it('gives the same message for a wrong password and an empty one, and sets no cookie', async () => {
     fetchMock.mockResolvedValue(respond(401));
 
     const wrong = await signIn({ error: null }, form('wrong'));
@@ -111,15 +122,64 @@ describe('sign-in action', () => {
 
     const state = await signIn({ error: null }, form('a-valid-code'));
 
-    expect(state).toEqual({ error: 'UNAVAILABLE' });
+    expect(state).toEqual({ error: 'UNAVAILABLE', email: 'member@example.com' });
   });
 
-  it('puts the access code in the request body, never in the address', async () => {
+  it('puts the email and password in the request body, never in the address', async () => {
     fetchMock.mockResolvedValue(respond(401));
 
     await signIn({ error: null }, form('secret-code'));
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:3000/auth/sessions');
+  });
+});
+
+describe('first-access action', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    stored.clear();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it('exchanges the access code for a password and signs in', async () => {
+    fetchMock.mockResolvedValue(respond(201, ISSUED));
+
+    await expect(setUpAccess({ error: null }, setUpForm(' a-code '))).rejects.toThrow(
+      'redirected to /',
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:3000/auth/credentials');
+    expect(fetchMock.mock.calls[0]?.[1].body).toBe(
+      JSON.stringify({
+        accessCode: 'a-code',
+        email: 'member@example.com',
+        password: 'a long passphrase',
+      }),
+    );
+    expect(stored.get('cfo_session')).toBe('new-session-token');
+  });
+
+  it.each([
+    [401, 'INVALID_SETUP'],
+    [422, 'WEAK_PASSWORD'],
+    [429, 'TOO_MANY'],
+    [500, 'UNAVAILABLE'],
+  ] as const)('reports status %d as %s and sets no cookie', async (status, error) => {
+    fetchMock.mockResolvedValue(respond(status));
+
+    expect(await setUpAccess({ error: null }, setUpForm('a-code'))).toEqual({
+      error,
+      email: 'member@example.com',
+    });
+    expect(setCookie).not.toHaveBeenCalled();
+  });
+
+  it('does not call the service without a code', async () => {
+    expect(await setUpAccess({ error: null }, setUpForm('   '))).toEqual({
+      error: 'INVALID_SETUP',
+      email: 'member@example.com',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

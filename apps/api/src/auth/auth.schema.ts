@@ -1,5 +1,16 @@
-import { foreignKey, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
-import { creationTimestamp, identifier } from '../database/columns.js';
+import { sql } from 'drizzle-orm';
+import {
+  check,
+  foreignKey,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { auditTimestamps, creationTimestamp, identifier } from '../database/columns.js';
 import { members } from '../households/households.schema.js';
 
 export const memberAccessCodes = pgTable(
@@ -38,5 +49,28 @@ export const dashboardSessions = pgTable(
     }),
     unique('dashboard_sessions_token_hash_unique').on(table.tokenHash),
     index('dashboard_sessions_expires_at_index').on(table.expiresAt),
+  ],
+);
+
+export const memberCredentials = pgTable(
+  'member_credentials',
+  {
+    memberId: uuid('member_id').primaryKey(),
+    householdId: uuid('household_id').notNull(),
+    email: text('email').notNull(),
+    passwordHash: text('password_hash'),
+    ...auditTimestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: 'member_credentials_member_fk',
+      columns: [table.householdId, table.memberId],
+      foreignColumns: [members.householdId, members.id],
+    }).onDelete('cascade'),
+    uniqueIndex('member_credentials_email_unique').on(sql`lower(${table.email})`),
+    check(
+      'member_credentials_email_shape',
+      sql`${table.email} = lower(trim(${table.email})) and position('@' in ${table.email}) > 1`,
+    ),
   ],
 );

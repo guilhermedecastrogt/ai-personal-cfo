@@ -8,18 +8,37 @@ import {
   Post,
   Req,
   UnauthorizedException,
+  UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { RateLimit, RateLimitGuard } from '../security/rate-limit.guard.js';
-import { AuthService } from './auth.service.js';
+import { AuthService, type IssuedSession } from './auth.service.js';
+import { MAXIMUM_PASSWORD_LENGTH } from './passwords.js';
 import { bearerTokenOf } from './session.guard.js';
 
 const MAXIMUM_ACCESS_CODE_LENGTH = 200;
+const MAXIMUM_EMAIL_LENGTH = 254;
 const ACCESS_CODE = /^[A-Za-z0-9_-]+$/;
 
-const signInSchema = z.object({
-  accessCode: z.string().trim().min(1).max(MAXIMUM_ACCESS_CODE_LENGTH).regex(ACCESS_CODE),
+const accessCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAXIMUM_ACCESS_CODE_LENGTH)
+  .regex(ACCESS_CODE);
+const emailSchema = z.string().trim().pipe(z.email().max(MAXIMUM_EMAIL_LENGTH));
+const passwordSchema = z.string().min(1).max(MAXIMUM_PASSWORD_LENGTH);
+
+const signInSchema = z.union([
+  z.object({ accessCode: accessCodeSchema }),
+  z.object({ email: emailSchema, password: passwordSchema }),
+]);
+
+const setUpSchema = z.object({
+  accessCode: accessCodeSchema,
+  email: emailSchema,
+  password: passwordSchema,
 });
 
 export interface SessionResponse {
@@ -28,30 +47,58 @@ export interface SessionResponse {
   readonly member: string;
 }
 
-@Controller('auth/sessions')
+function responseOf(session: IssuedSession): SessionResponse {
+  return {
+    token: session.token,
+    expiresAt: session.expiresAt.toISOString(),
+    member: session.memberName,
+  };
+}
+
+@Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  @Post()
+  @Post('sessions')
   @UseGuards(RateLimitGuard)
   @RateLimit('AUTHENTICATION')
   @HttpCode(HttpStatus.CREATED)
   async signIn(@Body() body: unknown): Promise<SessionResponse> {
     const parsed = signInSchema.safeParse(body);
-    const session = parsed.success
-      ? await this.auth.signIn(parsed.data.accessCode, new Date())
-      : undefined;
+    if (!parsed.success) {
+      throw new UnauthorizedException();
+    }
+    const session =
+      'accessCode' in parsed.data
+        ? await this.auth.signIn(parsed.data.accessCode, new Date())
+        : await this.auth.signInWithPassword(parsed.data.email, parsed.data.password, new Date());
     if (session === undefined) {
       throw new UnauthorizedException();
     }
-    return {
-      token: session.token,
-      expiresAt: session.expiresAt.toISOString(),
-      member: session.memberName,
-    };
+    return responseOf(session);
   }
 
-  @Delete('current')
+  @Post('credentials')
+  @UseGuards(RateLimitGuard)
+  @RateLimit('AUTHENTICATION')
+  @HttpCode(HttpStatus.CREATED)
+  async setUpAccess(@Body() body: unknown): Promise<SessionResponse> {
+    const parsed = setUpSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new UnauthorizedException();
+    }
+    const { accessCode, email, password } = parsed.data;
+    const setup = await this.auth.setUpAccess(accessCode, email, password, new Date());
+    if (setup.status === 'WEAK_PASSWORD') {
+      throw new UnprocessableEntityException({ code: 'WEAK_PASSWORD' });
+    }
+    if (setup.status === 'REFUSED') {
+      throw new UnauthorizedException();
+    }
+    return responseOf(setup.session);
+  }
+
+  @Delete('sessions/current')
   @UseGuards(RateLimitGuard)
   @RateLimit('DASHBOARD')
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -292,12 +292,30 @@ export const PT_BR: Dictionary = {
   },
   login: {
     headline: 'Entre para ver para onde foi o dinheiro.',
-    intro: 'Informe o código de acesso que você recebeu. Todos na casa veem os mesmos números.',
+    intro: 'Entre com seu e-mail e senha. Todos na casa veem os mesmos números.',
+    email: 'E-mail',
+    password: 'Senha',
+    newPassword: 'Nova senha',
+    passwordHint: 'Pelo menos 10 caracteres. O celular pode sugerir uma senha forte e guardá-la.',
+    firstAccess: 'Primeiro acesso ou esqueci a senha',
+    setUpHeadline: 'Crie seu acesso.',
+    setUpIntro:
+      'Informe uma única vez o código de acesso que você recebeu, com seu e-mail e uma senha. Depois disso, basta entrar com e-mail e senha.',
+    saveAndEnter: 'Salvar e entrar',
+    saving: 'Salvando…',
+    backToSignIn: 'Voltar para o login',
     accessCode: 'Código de acesso',
     signIn: 'Entrar',
     signingIn: 'Entrando…',
     errors: {
-      INVALID: 'Código de acesso não reconhecido. Confira e tente novamente.',
+      INVALID: 'E-mail e senha não conferem. Confira e tente novamente.',
+      UNAVAILABLE: 'Não foi possível falar com o serviço. Tente novamente em instantes.',
+      TOO_MANY: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
+    },
+    setUpErrors: {
+      INVALID_SETUP:
+        'O código de acesso ou o e-mail não conferem. Confira os dois ou peça um novo código.',
+      WEAK_PASSWORD: 'Escolha uma senha com pelo menos 10 caracteres.',
       UNAVAILABLE: 'Não foi possível falar com o serviço. Tente novamente em instantes.',
       TOO_MANY: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
     },

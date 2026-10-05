@@ -7,10 +7,26 @@ import {
   SECURITY_POLICY_TOKEN,
   type SecurityPolicy,
 } from '../security/security-policy.js';
-import { AuthRepository } from './auth.repository.js';
+import { AuthRepository, type SessionOwner } from './auth.repository.js';
+import {
+  hashPassword,
+  MAXIMUM_PASSWORD_LENGTH,
+  MINIMUM_PASSWORD_LENGTH,
+  spendTimeLikeAVerification,
+  verifyPassword,
+} from './passwords.js';
 
 const SECRET_BYTES = 32;
 const MILLISECONDS_PER_DAY = 86_400_000;
+
+export type AccessSetup =
+  | { readonly status: 'SIGNED_IN'; readonly session: IssuedSession }
+  | { readonly status: 'REFUSED' }
+  | { readonly status: 'WEAK_PASSWORD' };
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 export interface IssuedSession {
   readonly token: string;
@@ -43,11 +59,60 @@ export class AuthService {
     await this.repository.revokeAccess(householdId, memberId);
   }
 
+  async registerEmail(householdId: string, memberId: string, email: string): Promise<void> {
+    await this.repository.registerEmail(householdId, memberId, normalizeEmail(email));
+  }
+
   async signIn(accessCode: string, instant: Date): Promise<IssuedSession | undefined> {
     const owner = await this.repository.findOwnerOfAccessCode(hashOf(accessCode));
-    if (owner === undefined) {
+    return owner === undefined ? undefined : this.openSession(owner, instant);
+  }
+
+  async signInWithPassword(
+    email: string,
+    password: string,
+    instant: Date,
+  ): Promise<IssuedSession | undefined> {
+    const owner = await this.repository.findOwnerOfEmail(normalizeEmail(email));
+    if (owner?.passwordHash === null || owner?.passwordHash === undefined) {
+      await spendTimeLikeAVerification(password);
       return undefined;
     }
+    return (await verifyPassword(password, owner.passwordHash))
+      ? this.openSession(owner, instant)
+      : undefined;
+  }
+
+  async setUpAccess(
+    accessCode: string,
+    email: string,
+    password: string,
+    instant: Date,
+  ): Promise<AccessSetup> {
+    if (password.length < MINIMUM_PASSWORD_LENGTH || password.length > MAXIMUM_PASSWORD_LENGTH) {
+      return { status: 'WEAK_PASSWORD' };
+    }
+    const owner = await this.repository.findOwnerOfAccessCode(hashOf(accessCode));
+    const normalized = normalizeEmail(email);
+    if (owner === undefined) {
+      await spendTimeLikeAVerification(password);
+      return { status: 'REFUSED' };
+    }
+    const registered = await this.repository.findEmailOf(owner.memberId);
+    if (registered !== undefined && registered !== normalized) {
+      return { status: 'REFUSED' };
+    }
+    const stored = await this.repository.setPasswordAndConsumeCode(
+      owner,
+      normalized,
+      await hashPassword(password),
+    );
+    return stored
+      ? { status: 'SIGNED_IN', session: await this.openSession(owner, instant) }
+      : { status: 'REFUSED' };
+  }
+
+  private async openSession(owner: SessionOwner, instant: Date): Promise<IssuedSession> {
     const token = newSecret();
     const { lifetimeInDays, maximumPerMember } = this.policy.sessions;
     const expiresAt = new Date(instant.getTime() + lifetimeInDays * MILLISECONDS_PER_DAY);

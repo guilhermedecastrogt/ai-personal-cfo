@@ -33,16 +33,18 @@ The web application contains no financial calculation, no threshold, no currency
 
 ## Authentication and authorization
 
-A member signs in with an access code and receives a session ([ADR-022](adr/ADR-022-dashboard-sessions.md)).
+A member signs in with an email and a password and receives a session ([ADR-022](adr/ADR-022-dashboard-sessions.md), [ADR-028](adr/ADR-028-email-and-password-sign-in.md)).
 
-1. An operator issues an access code for a member. The code is shown once and only its hash is stored.
-2. The member enters the code on the sign-in page. The Next.js server exchanges it with the API for a session token.
-3. The token is set as an http-only, same-site cookie. Browser scripts cannot read it.
-4. On every page request the Next.js server sends the token to the API as a bearer token.
-5. The API's session guard resolves the token to a household and a member, the same request context the WhatsApp flow uses.
+1. An operator registers the member's email and issues an access code. The code is shown once and only its hash is stored.
+2. On the first access page the member enters the code, their email and a new password. The code is then used up. Afterwards they sign in with email and password, which the phone saves and fills.
+3. The Next.js server exchanges the credentials with the API for a session token.
+4. The token is set as an http-only, same-site cookie. Browser scripts cannot read it.
+5. On every page request the Next.js server sends the token to the API as a bearer token.
+6. The API's session guard resolves the token to a household and a member, the same request context the WhatsApp flow uses.
 
 ```sh
 cd apps/api
+HOUSEHOLD_NAME="Demo Household" MEMBER_NAME="Member A" EMAIL="a@example.com" npm run auth:register-email
 HOUSEHOLD_NAME="Demo Household" MEMBER_NAME="Member A" npm run auth:issue-access-code
 ```
 

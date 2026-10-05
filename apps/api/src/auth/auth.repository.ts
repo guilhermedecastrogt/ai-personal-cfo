@@ -2,7 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, lte, notInArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { households, members } from '../households/households.schema.js';
-import { dashboardSessions, memberAccessCodes } from './auth.schema.js';
+import { dashboardSessions, memberAccessCodes, memberCredentials } from './auth.schema.js';
+
+const UNIQUE_VIOLATION = '23505';
 
 export interface SessionOwner {
   readonly householdId: string;
@@ -49,7 +51,90 @@ export class AuthRepository {
             eq(dashboardSessions.memberId, memberId),
           ),
         );
+      await transaction
+        .delete(memberCredentials)
+        .where(
+          and(
+            eq(memberCredentials.householdId, householdId),
+            eq(memberCredentials.memberId, memberId),
+          ),
+        );
     });
+  }
+
+  async registerEmail(householdId: string, memberId: string, email: string): Promise<void> {
+    await this.database
+      .insert(memberCredentials)
+      .values({ householdId, memberId, email })
+      .onConflictDoUpdate({
+        target: memberCredentials.memberId,
+        set: { email, updatedAt: new Date() },
+      });
+  }
+
+  async findEmailOf(memberId: string): Promise<string | undefined> {
+    const [credential] = await this.database
+      .select({ email: memberCredentials.email })
+      .from(memberCredentials)
+      .where(eq(memberCredentials.memberId, memberId));
+    return credential?.email;
+  }
+
+  async findOwnerOfEmail(
+    email: string,
+  ): Promise<(SessionOwner & { passwordHash: string | null }) | undefined> {
+    const [owner] = await this.database
+      .select({
+        householdId: members.householdId,
+        memberId: members.id,
+        memberName: members.name,
+        passwordHash: memberCredentials.passwordHash,
+      })
+      .from(memberCredentials)
+      .innerJoin(members, eq(members.id, memberCredentials.memberId))
+      .where(eq(memberCredentials.email, email));
+    return owner;
+  }
+
+  async setPasswordAndConsumeCode(
+    owner: SessionOwner,
+    email: string,
+    passwordHash: string,
+  ): Promise<boolean> {
+    try {
+      await this.database.transaction(async (transaction) => {
+        await transaction
+          .insert(memberCredentials)
+          .values({ householdId: owner.householdId, memberId: owner.memberId, email, passwordHash })
+          .onConflictDoUpdate({
+            target: memberCredentials.memberId,
+            set: { email, passwordHash, updatedAt: new Date() },
+          });
+        await transaction
+          .delete(memberAccessCodes)
+          .where(
+            and(
+              eq(memberAccessCodes.householdId, owner.householdId),
+              eq(memberAccessCodes.memberId, owner.memberId),
+            ),
+          );
+        await transaction
+          .delete(dashboardSessions)
+          .where(
+            and(
+              eq(dashboardSessions.householdId, owner.householdId),
+              eq(dashboardSessions.memberId, owner.memberId),
+            ),
+          );
+      });
+      return true;
+    } catch (error) {
+      const failure = error as { code?: unknown; cause?: { code?: unknown } };
+      if (failure.code === UNIQUE_VIOLATION || failure.cause?.code === UNIQUE_VIOLATION) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async keepNewestSessions(memberId: string, maximum: number): Promise<void> {

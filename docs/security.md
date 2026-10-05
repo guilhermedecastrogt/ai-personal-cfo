@@ -25,7 +25,18 @@ There are no other routes. Migrations, seeding, access codes and proactive evalu
 
 A member signs in with an access code issued by an operator and receives a session ([ADR-022](adr/ADR-022-dashboard-sessions.md)).
 
+### Email and password
+
+Members sign in with an email and a password ([ADR-028](adr/ADR-028-email-and-password-sign-in.md)).
+
+- Passwords are stored only as scrypt hashes with a per-password salt, and must have at least 10 characters.
+- An email belongs to one member at most, compared without case.
+- A wrong password, an unknown email and a malformed request all get the same `401`. An unknown email still spends the time of a password check.
+- The sign-in and first-access forms use `username`, `current-password` and `new-password`, so phones save and fill the credentials.
+
 ### Access codes
+
+An access code is now a one-time invitation: the member uses it on the first access page to set their password, and it is deleted when used. A new code resets a forgotten password and ends the member's sessions.
 
 - 32 random bytes from the operating system, encoded as 43 URL-safe characters. Guessing one is not feasible, so brute-force resistance does not depend on rate limiting.
 - Only the SHA-256 hash is stored. The code is printed once when issued and cannot be recovered.
@@ -36,7 +47,8 @@ A member signs in with an access code issued by an operator and receives a sessi
 | Command                                      | Effect                                                                       |
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | `npm run auth:issue-access-code -w apps/api` | Issues a new code, replaces the old one and ends every session of the member |
-| `npm run auth:revoke-access -w apps/api`     | Removes the code and ends every session of the member                        |
+| `npm run auth:revoke-access -w apps/api`     | Removes the code, the email and password, and every session of the member    |
+| `npm run auth:register-email -w apps/api`    | Registers the email the member must use on first access. Also takes `EMAIL`  |
 
 Both take `HOUSEHOLD_NAME` and `MEMBER_NAME` from the environment.
 

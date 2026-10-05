@@ -127,6 +127,7 @@ free -h
 These run inside the API container, which has the compiled scripts but not `npm`.
 
 ```sh
+cfo exec -e HOUSEHOLD_NAME="…" -e MEMBER_NAME="…" -e EMAIL="…" api node dist/auth/register-email.js
 cfo exec -e HOUSEHOLD_NAME="…" -e MEMBER_NAME="…" api node dist/auth/issue-access-code.js
 cfo exec -e HOUSEHOLD_NAME="…" -e MEMBER_NAME="…" api node dist/auth/revoke-access.js
 cfo exec api node dist/proactive/run-proactive-evaluation.js

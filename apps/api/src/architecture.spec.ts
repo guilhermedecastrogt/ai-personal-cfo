@@ -599,6 +599,7 @@ describe('architecture', () => {
   it('reads the environment only in the configuration loader and the entry scripts', () => {
     expect(offenders(files, (file) => file.text.includes('process.env')).sort()).toEqual([
       'auth/issue-access-code.ts',
+      'auth/register-email.ts',
       'auth/revoke-access.ts',
       'config/config.module.ts',
       'database/run-migrations.ts',

@@ -281,12 +281,30 @@ export const EN = {
   },
   login: {
     headline: 'Sign in to see where the money went.',
-    intro: 'Enter the access code issued to you. Everyone in a household sees the same figures.',
+    intro: 'Sign in with your email and password. Everyone in a household sees the same figures.',
+    email: 'Email',
+    password: 'Password',
+    newPassword: 'New password',
+    passwordHint: 'At least 10 characters. Your phone can suggest a strong one and remember it.',
+    firstAccess: 'First access or forgotten password',
+    setUpHeadline: 'Create your access.',
+    setUpIntro:
+      'Enter the access code you received once, with your email and a password. From then on, sign in with email and password.',
+    saveAndEnter: 'Save and sign in',
+    saving: 'Saving…',
+    backToSignIn: 'Back to sign in',
     accessCode: 'Access code',
     signIn: 'Sign in',
     signingIn: 'Signing in…',
     errors: {
-      INVALID: 'That access code was not recognised. Check it and try again.',
+      INVALID: 'That email and password do not match. Check them and try again.',
+      UNAVAILABLE: 'The service could not be reached. Try again in a moment.',
+      TOO_MANY: 'Too many attempts. Wait a minute and try again.',
+    },
+    setUpErrors: {
+      INVALID_SETUP:
+        'The access code or the email does not match. Check both, or ask for a new code.',
+      WEAK_PASSWORD: 'Choose a password of at least 10 characters.',
       UNAVAILABLE: 'The service could not be reached. Try again in a moment.',
       TOO_MANY: 'Too many attempts. Wait a minute and try again.',
     },
