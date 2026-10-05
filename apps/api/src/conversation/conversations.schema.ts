@@ -1,4 +1,14 @@
-import { foreignKey, index, pgEnum, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  foreignKey,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { auditTimestamps, creationTimestamp, identifier } from '../database/columns.js';
 import { households, members } from '../households/households.schema.js';
 
@@ -15,6 +25,8 @@ export const aiConversations = pgTable(
       .references(() => households.id),
     memberId: uuid('member_id').notNull(),
     channel: conversationChannel('channel').notNull(),
+    state: jsonb('state').notNull().default({}),
+    stateUpdatedAt: timestamp('state_updated_at', { withTimezone: true }),
     ...auditTimestamps,
   },
   (table) => [
@@ -23,7 +35,11 @@ export const aiConversations = pgTable(
       columns: [table.householdId, table.memberId],
       foreignColumns: [members.householdId, members.id],
     }),
-    index('ai_conversations_household_member_index').on(table.householdId, table.memberId),
+    unique('ai_conversations_household_member_channel_unique').on(
+      table.householdId,
+      table.memberId,
+      table.channel,
+    ),
   ],
 );
 

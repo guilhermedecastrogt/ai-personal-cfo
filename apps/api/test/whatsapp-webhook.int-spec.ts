@@ -659,6 +659,87 @@ describe('WhatsApp webhook', () => {
     });
   });
 
+  describe('conversations over WhatsApp', () => {
+    const followUp = questionInterpretation({
+      period: { kind: 'PREVIOUS_MONTH', days: null, year: null, month: null },
+      inheritFromPrevious: ['INTENT'],
+    });
+
+    it('handles two messages sent together by one sender in order, so the second can follow the first', async () => {
+      const { phones } = await householdWithSenders('Same Sender');
+      const sender = phones[0] ?? '';
+      ai.willInterpretAs(questionInterpretation(), followUp);
+
+      const responses = await Promise.all([
+        post(kapsoTextEvent({ id: nextMessageId(), from: sender }, 'Quanto gastamos?')),
+        post(kapsoTextEvent({ id: nextMessageId(), from: sender }, 'E no mês passado?')),
+      ]);
+      await dispatcher.whenIdle();
+
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
+      expect(ai.interpretationRequests).toHaveLength(2);
+      expect(ai.interpretationRequests[1]?.conversation).toMatchObject({
+        lastOutcome: 'QUESTION_ANSWERED',
+        previousQuestion: { intent: 'SPENDING_TOTAL' },
+      });
+      expect(repliesTo(sender)).toEqual(['[QUESTION_ANSWERED]', '[QUESTION_ANSWERED]']);
+    });
+
+    it('keeps the conversations of different households apart when their messages arrive together', async () => {
+      const first = await householdWithSenders('Together First');
+      const second = await householdWithSenders('Together Second');
+      ai.willInterpretAs(transactionInterpretation());
+      await deliver(
+        kapsoTextEvent({ id: nextMessageId(), from: first.phones[0] ?? '' }, MESSAGE_TEXT),
+      );
+      ai.interpretationRequests.length = 0;
+      ai.replyRequests.length = 0;
+      ai.willInterpretAs(questionInterpretation(), questionInterpretation());
+
+      await Promise.all([
+        post(
+          kapsoTextEvent({ id: nextMessageId(), from: first.phones[0] ?? '' }, 'Quanto gastamos?'),
+        ),
+        post(
+          kapsoTextEvent({ id: nextMessageId(), from: second.phones[0] ?? '' }, 'Quanto gastamos?'),
+        ),
+      ]);
+      await dispatcher.whenIdle();
+      const totals = ai.replyRequests.map(
+        (reply) => (reply.facts as { result: { householdTotal: string } }).result.householdTotal,
+      );
+
+      expect(totals.sort()).toEqual(['€0.00', '€23.00']);
+      expect(repliesTo(first.phones[0] ?? '')).toHaveLength(2);
+      expect(repliesTo(second.phones[0] ?? '')).toHaveLength(1);
+      expect(
+        ai.interpretationRequests.filter((sent) => sent.conversation.recentUserMessages.length > 0),
+      ).toHaveLength(1);
+    });
+
+    it('does not advance the conversation for a redelivered message', async () => {
+      const { phones } = await householdWithSenders('Redelivered Follow Up');
+      const sender = phones[0] ?? '';
+      const event = kapsoTextEvent(
+        { id: nextMessageId(), from: sender },
+        'Pergunta entregue duas vezes',
+      );
+      ai.willInterpretAs(questionInterpretation(), questionInterpretation());
+
+      await deliver(event);
+      await deliver(event);
+
+      expect(ai.interpretationRequests).toHaveLength(1);
+      expect(repliesTo(sender)).toHaveLength(1);
+      expect(
+        await testDatabase.database.$count(
+          aiMessages,
+          eq(aiMessages.content, 'Pergunta entregue duas vezes'),
+        ),
+      ).toBe(1);
+    });
+  });
+
   describe('authorization', () => {
     it('ignores household, member and account identifiers placed in the payload', async () => {
       const own = await householdWithSenders('Payload Own');

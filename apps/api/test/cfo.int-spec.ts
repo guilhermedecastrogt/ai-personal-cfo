@@ -239,10 +239,13 @@ describe('CFO monthly review', () => {
         trend.differenceMinor,
       ]);
 
-      expect(increases).toEqual([
-        [category('Food'), 20700],
-        [category('Restaurants'), 20700],
-      ]);
+      expect(increases).toHaveLength(2);
+      expect(increases).toEqual(
+        expect.arrayContaining([
+          [category('Food'), 20700],
+          [category('Restaurants'), 20700],
+        ]),
+      );
     });
 
     it('includes budget status, the forecast, recurring expenses, anomalies and goals', () => {

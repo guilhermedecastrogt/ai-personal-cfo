@@ -1,3 +1,4 @@
+import { EMPTY_CONVERSATION } from '../src/ai/testing/fake-ai-provider.fixture.js';
 import { MessageInterpreter } from '../src/ai/interpretation/message-interpreter.js';
 import { OpenAIProvider } from '../src/ai/openai/openai-provider.js';
 import { findUnverifiedFigures } from '../src/ai/reply/reply-guard.js';
@@ -6,7 +7,7 @@ import { loadAppConfig } from '../src/config/app-config.js';
 const LIVE_TIMEOUT_IN_MILLISECONDS = 60_000;
 
 const REQUEST = {
-  history: [],
+  conversation: EMPTY_CONVERSATION,
   senderName: 'Member A',
   memberNames: ['Member A', 'Member B'],
   accountNames: ['Joint Account', 'Savings'],

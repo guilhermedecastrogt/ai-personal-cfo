@@ -1,7 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { AI_UNAVAILABLE_REPLY } from '../src/ai/reply/fallback-reply.js';
-import { imageReading, UNSPECIFIED_DATE } from '../src/ai/testing/fake-ai-provider.fixture.js';
+import {
+  completionOf,
+  imageReading,
+  OTHER_INTERPRETATION,
+  UNSPECIFIED_DATE,
+} from '../src/ai/testing/fake-ai-provider.fixture.js';
 import { categories } from '../src/categories/categories.schema.js';
 import { aiMessages } from '../src/conversation/conversations.schema.js';
 import type { AssistantResponse } from '../src/conversation/financial-assistant.service.js';
@@ -441,20 +446,35 @@ describe('financial image extraction', () => {
       expect(await recorded(fixture)).toEqual([]);
     });
 
-    it('keeps what it identified in the conversation so a text answer can complete it', async () => {
+    it('completes a pending image transaction from the stored reading, not from the reply', async () => {
       const fixture = await household('Image Follow Up');
-      harness.provider.willReply('I identified €43.27 at Tesco. Which category?');
+      harness.provider.willReply('I identified €99.99 at Somewhere Else. Which category?');
       await sendImage(
         fixture,
         imageReading({ amount: '43.27', merchant: 'Tesco', category: null }),
+        { sourceMessageId: 'wamid.image-pending' },
       );
-      harness.provider.willInterpretAs({ kind: 'OTHER', transaction: null, question: null });
+      harness.provider.willInterpretAs(completionOf({ category: 'Groceries' }));
 
       await harness.assistant.handle(contextOf(fixture), { text: 'Groceries' }, INSTANT);
+      const request = harness.provider.interpretationRequests.at(-1);
 
-      expect(harness.provider.interpretationRequests.at(-1)?.history).toEqual([
-        { role: 'USER', content: '[image]' },
-        { role: 'ASSISTANT', content: 'I identified €43.27 at Tesco. Which category?' },
+      expect(request?.conversation).toMatchObject({
+        recentUserMessages: ['[image]'],
+        lastOutcome: 'TRANSACTION_PENDING',
+        pendingTransaction: {
+          understood: { amount: '43.27', merchant: 'Tesco', category: null },
+          stillNeeded: ['MISSING_CATEGORY'],
+        },
+      });
+      expect(JSON.stringify(request)).not.toContain('99.99');
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({
+          amountMinor: 4327,
+          merchant: 'Tesco',
+          source: 'WHATSAPP_IMAGE',
+          sourceMessageId: 'wamid.image-pending',
+        }),
       ]);
     });
   });
@@ -554,7 +574,7 @@ describe('financial image extraction', () => {
 
     it('sends the model the image, the caption and the names of accounts and categories only', async () => {
       const fixture = await household('Image Privacy', 3);
-      harness.provider.willInterpretAs({ kind: 'OTHER', transaction: null, question: null });
+      harness.provider.willInterpretAs(OTHER_INTERPRETATION);
       await harness.assistant.handle(
         contextOf(fixture),
         { text: 'an earlier private message' },

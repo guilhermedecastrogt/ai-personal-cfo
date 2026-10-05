@@ -73,9 +73,9 @@ export class OpenAIProvider implements AIProvider {
     const output = await this.respond('interpretMessage', {
       instructions: buildInterpretationInstructions(request),
       input: [
-        ...request.history.map((turn) => ({
-          role: turn.role === 'USER' ? ('user' as const) : ('assistant' as const),
-          content: turn.content,
+        ...request.conversation.recentUserMessages.map((content) => ({
+          role: 'user' as const,
+          content,
         })),
         { role: 'user' as const, content: request.message },
       ],

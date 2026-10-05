@@ -23,12 +23,12 @@ export class MessageInterpreter {
     }
     const { kind, transaction, question } = parsed.data;
     if (kind === 'TRANSACTION' && transaction !== null) {
-      return { kind, transaction };
+      return { kind, transaction, completesPending: parsed.data.completesPendingTransaction };
     }
     if (kind === 'QUESTION' && question !== null) {
       return { kind, question };
     }
-    if (kind === 'OTHER') {
+    if (kind === 'OTHER' || kind === 'CORRECTION' || kind === 'UNCLEAR') {
       return { kind };
     }
     throw new AIProviderError('INVALID_RESPONSE');

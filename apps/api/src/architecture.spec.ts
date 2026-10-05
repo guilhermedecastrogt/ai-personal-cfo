@@ -80,6 +80,64 @@ describe('architecture', () => {
     ).toEqual([]);
   });
 
+  it('lets the conversation layer reach data only through application services', () => {
+    const conversation = within('conversation/');
+    const ownRepository = './conversations.repository.js';
+
+    expect(
+      offenders(conversation, (file) =>
+        importsOf(file).some((name) => name.endsWith('.repository.js') && name !== ownRepository),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(conversation, (file) =>
+        importsOf(file).some((name) => /drizzle-orm|^pg$/.test(name)),
+      ).sort(),
+    ).toEqual(['conversation/conversations.repository.ts', 'conversation/conversations.schema.ts']);
+  });
+
+  it('does no financial arithmetic in conversation code', () => {
+    const arithmetic =
+      /money-math|sumMinor|multiplyThenDivide|divideRounded|Minor\s*[-+*/]\s*\w|\w\s*[-+*/]\s*\w+Minor/;
+
+    expect(offenders(within('conversation/'), (file) => arithmetic.test(file.text))).toEqual([]);
+  });
+
+  it('never gives the model earlier assistant replies', () => {
+    const provider = files.find((file) => file.path === 'ai/ai-provider.ts');
+    const repository = files.find(
+      (file) => file.path === 'conversation/conversations.repository.ts',
+    );
+    const adapter = files.find((file) => file.path === 'ai/openai/openai-provider.ts');
+
+    expect(provider?.text).toContain('readonly recentUserMessages: readonly string[];');
+    expect(provider?.text).not.toMatch(/history|ConversationTurn\[\]/);
+    expect(repository?.text).toContain("eq(aiMessages.role, 'USER')");
+    expect(adapter?.text).not.toContain("'assistant'");
+  });
+
+  it('keeps conversation state free of figures and identifiers', () => {
+    const state = files.find((file) => file.path === 'conversation/conversation-state.ts');
+
+    expect(state?.text).not.toMatch(/Minor|BasisPoints|householdId|memberId|accountId|uuid/);
+  });
+
+  it('resolves the household from the request context before any financial operation', () => {
+    const assistant = files.find(
+      (file) => file.path === 'conversation/financial-assistant.service.ts',
+    );
+    const queries = files.find(
+      (file) => file.path === 'conversation/queries/financial-query.service.ts',
+    );
+
+    expect(assistant?.text).toContain('this.finance.currentDate(context.householdId, instant)');
+    expect(assistant?.text).not.toMatch(
+      /householdId:\s*(interpretation|question|frame|candidate|state)\./,
+    );
+    expect(queries?.text).toContain('this.directories.load(context.householdId)');
+    expect(queries?.text).not.toMatch(/householdId:\s*(frame|filters|resolution)\./);
+  });
+
   it('gives the AI layer no access to repositories, services or the finance engine', () => {
     const reachesData = /\.repository\.js|\.service\.js|\/finance\/|\/cfo\/|\/conversation\//;
 

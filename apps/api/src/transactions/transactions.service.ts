@@ -17,6 +17,8 @@ export type TransactionRejectionReason =
   | 'UNKNOWN_TRANSFER_ACCOUNT'
   | 'UNKNOWN_CATEGORY';
 
+export type { Transaction };
+
 export class TransactionRejectedError extends Error {
   constructor(readonly reasons: readonly TransactionRejectionReason[]) {
     super(`Transaction rejected: ${reasons.join(', ')}`);
@@ -67,6 +69,13 @@ export class TransactionsService {
       throw new TransactionRejectedError(violations);
     }
     return this.transactions.create(householdId, transaction);
+  }
+
+  async findBySourceMessage(
+    householdId: string,
+    sourceMessageId: string,
+  ): Promise<Transaction | undefined> {
+    return this.transactions.findBySourceMessage(householdId, sourceMessageId);
   }
 
   private async findOptionalAccount(

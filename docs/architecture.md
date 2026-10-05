@@ -85,22 +85,23 @@ flowchart TD
     Domain --> DB[(PostgreSQL)]
 ```
 
-| Module         | Owns                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------- |
-| `households`   | Households, members, WhatsApp identities and resolution of the request context                     |
-| `accounts`     | Accounts and balances                                                                              |
-| `categories`   | The category tree and mapping of names to categories                                               |
-| `transactions` | Transaction validation, creation and querying, including transfers                                 |
-| `budgets`      | Budget definitions                                                                                 |
-| `goals`        | Goal definitions and progress inputs                                                               |
-| `finance`      | The finance engine: pure calculations, and the service that feeds them                             |
-| `ai`           | The `AIProvider` interface, its OpenAI implementation, interpretation and reply composition        |
-| `whatsapp`     | The webhook, idempotent event claiming, sender resolution, and the provider adapter for Kapso      |
-| `conversation` | Orchestration of a message: transaction extraction, financial questions and the reply              |
-| `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily |
-| `insights`     | Rules that decide whether something deserves the household's attention                             |
-| `cfo`          | The deterministic monthly review, its context for the model, and the checked narrative             |
-| `reports`      | Monthly report generation                                                                          |
+| Module         | Owns                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `households`   | Households, members, WhatsApp identities and resolution of the request context                                         |
+| `accounts`     | Accounts and balances                                                                                                  |
+| `categories`   | The category tree and mapping of names to categories                                                                   |
+| `transactions` | Transaction validation, creation and querying, including transfers                                                     |
+| `budgets`      | Budget definitions                                                                                                     |
+| `goals`        | Goal definitions and progress inputs                                                                                   |
+| `finance`      | The finance engine: pure calculations, and the service that feeds them                                                 |
+| `ai`           | The `AIProvider` interface, its OpenAI implementation, interpretation and reply composition                            |
+| `whatsapp`     | The webhook, idempotent event claiming, sender resolution, and the provider adapter for Kapso                          |
+| `conversation` | Multi-turn orchestration of a message: conversation state, follow-ups, transaction extraction, questions and the reply |
+| `directory`    | Names of a household's members, accounts, categories and goals for the layers above                                    |
+| `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily                     |
+| `insights`     | Rules that decide whether something deserves the household's attention                                                 |
+| `cfo`          | The deterministic monthly review, its context for the model, and the checked narrative                                 |
+| `reports`      | Monthly report generation                                                                                              |
 
 ### Dependency rules
 

@@ -24,3 +24,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [018](ADR-018-temporary-media.md)                             | Media is fetched through an opaque reference and held only in a temporary directory  | Accepted |
 | [019](ADR-019-webhook-processing.md)                          | Webhooks are claimed by message, acknowledged, then processed in the background      | Accepted |
 | [020](ADR-020-deterministic-review-with-checked-narrative.md) | The monthly review is deterministic, and the model's narrative is checked against it | Accepted |
+| [021](ADR-021-structured-conversation-state.md)               | Conversations carry structured state, and the model never sees its earlier replies   | Accepted |

@@ -1,29 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { AccountsRepository } from '../../accounts/accounts.repository.js';
 import type { ReplyFacts } from '../../ai/ai-provider.js';
-import type {
-  FinancialIntent,
-  FinancialQuestion,
-} from '../../ai/interpretation/message-interpretation.schema.js';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
+import type { FinancialIntent } from '../../ai/interpretation/message-interpretation.schema.js';
+import { describeResult, type NameDirectory } from '../../cfo/context/result-description.js';
+import {
+  HouseholdDirectoryService,
+  type HouseholdDirectory,
+  type NamedEntry,
+} from '../../directory/household-directory.service.js';
 import { FinanceService, type PeriodFlow } from '../../finance/application/finance.service.js';
-import { monthToDate, type DateRange, type IsoDate } from '../../finance/domain/period/period.js';
-import { GoalsRepository } from '../../goals/goals.repository.js';
-import { HouseholdsRepository } from '../../households/households.repository.js';
+import {
+  contains,
+  monthToDate,
+  type DateRange,
+  type IsoDate,
+} from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
+import type { QuestionFrame } from '../conversation-state.js';
 import { normalizeName, resolveMentionedAccount } from '../extraction/account-resolution.js';
 import { resolvePeriodReference } from './period-reference.js';
-import { describeResult, type NameDirectory } from '../../cfo/context/result-description.js';
 
 export type QueryIntent = Exclude<FinancialIntent, 'MONTHLY_REVIEW'>;
 
-export type QueryQuestion = FinancialQuestion & { readonly intent: QueryIntent };
+export type QueryFrame = QuestionFrame & { readonly intent: QueryIntent };
 
-export function isQueryQuestion(question: FinancialQuestion): question is QueryQuestion {
-  return question.intent !== 'MONTHLY_REVIEW';
+export function isQueryFrame(frame: QuestionFrame): frame is QueryFrame {
+  return frame.intent !== 'MONTHLY_REVIEW';
 }
 
 export type QueryProblem =
+  | 'NO_PREVIOUS_QUESTION'
   | 'UNRESOLVABLE_PERIOD'
   | 'UNKNOWN_CATEGORY'
   | 'UNKNOWN_MEMBER'
@@ -36,11 +41,13 @@ export type QueryOutcome =
       readonly intent: QueryIntent;
       readonly result: unknown;
       readonly facts: ReplyFacts;
+      readonly frame: QuestionFrame;
     }
   | {
       readonly status: 'NEEDS_CLARIFICATION';
       readonly reasons: readonly QueryProblem[];
       readonly facts: ReplyFacts;
+      readonly frame: QuestionFrame | null;
     };
 
 interface Filters {
@@ -50,107 +57,61 @@ interface Filters {
   readonly accountId: string | undefined;
 }
 
-interface Named {
-  readonly id: string;
-  readonly name: string;
+interface Resolution {
+  readonly problems: QueryProblem[];
+  readonly period: DateRange | undefined;
+  readonly category: NamedEntry | undefined;
+  readonly member: NamedEntry | undefined;
+  readonly account: NamedEntry | undefined;
 }
 
 @Injectable()
 export class FinancialQueryService {
   constructor(
     private readonly finance: FinanceService,
-    private readonly households: HouseholdsRepository,
-    private readonly categories: CategoriesRepository,
-    private readonly accounts: AccountsRepository,
-    private readonly goals: GoalsRepository,
+    private readonly directories: HouseholdDirectoryService,
   ) {}
 
-  async answer(
-    context: RequestContext,
-    question: QueryQuestion,
-    today: IsoDate,
-  ): Promise<QueryOutcome> {
-    const { householdId } = context;
-    const [members, categories, accounts, goals] = await Promise.all([
-      this.households.listMembers(householdId),
-      this.categories.list(),
-      this.accounts.list(householdId),
-      this.goals.list(householdId),
-    ]);
-    const problems: QueryProblem[] = [];
-    const period = resolvePeriodReference(question.period, today);
-    if (period === undefined) {
-      problems.push('UNRESOLVABLE_PERIOD');
-    }
-    const category = findByName(categories, question.category);
-    if (question.category !== null && category === undefined) {
-      problems.push('UNKNOWN_CATEGORY');
-    }
-    const memberId = this.resolveMember(context, question, members, problems);
-    const account =
-      question.account === null
-        ? undefined
-        : resolveMentionedAccount(question.account, accounts, context.memberId);
-    if (account !== undefined && account.status !== 'RESOLVED') {
-      problems.push(account.status === 'UNKNOWN' ? 'UNKNOWN_ACCOUNT' : 'AMBIGUOUS_ACCOUNT');
-    }
-    if (period === undefined || problems.length > 0) {
+  async answer(context: RequestContext, frame: QueryFrame, today: IsoDate): Promise<QueryOutcome> {
+    const directory = await this.directories.load(context.householdId);
+    const resolution = resolve(context, frame, directory, today);
+    const resolvedFrame = canonicalFrame(frame, resolution);
+    if (resolution.period === undefined || resolution.problems.length > 0) {
       return {
         status: 'NEEDS_CLARIFICATION',
-        reasons: problems,
+        reasons: resolution.problems,
+        frame: resolvedFrame,
         facts: {
-          reasons: problems,
-          memberOptions: members.map((member) => member.name),
-          categoryOptions: categories.map((option) => option.name),
-          accountOptions: accounts.map((option) => option.name),
+          reasons: resolution.problems,
+          memberOptions: directory.members.map((member) => member.name),
+          categoryOptions: directory.categories.map((category) => category.name),
+          accountOptions: directory.accounts.map((account) => account.name),
         },
       };
     }
-    const result = await this.compute(householdId, question.intent, today, {
-      period,
-      categoryId: category?.id,
-      memberId,
-      accountId: account?.status === 'RESOLVED' ? account.account.id : undefined,
+    const result = await this.compute(context.householdId, frame, today, directory, {
+      period: resolution.period,
+      categoryId: resolution.category?.id,
+      memberId: resolution.member?.id,
+      accountId: resolution.account?.id,
     });
-    const directory: NameDirectory = {
-      members: namesById(members),
-      categories: namesById(categories),
-      accounts: namesById(accounts),
-      goals: namesById(goals),
-    };
     return {
       status: 'ANSWERED',
-      intent: question.intent,
+      intent: frame.intent,
       result,
-      facts: { intent: question.intent, today, result: describeResult(result, directory) },
+      frame: resolvedFrame,
+      facts: { intent: frame.intent, today, result: describeResult(result, namesOf(directory)) },
     };
-  }
-
-  private resolveMember(
-    context: RequestContext,
-    question: FinancialQuestion,
-    members: readonly Named[],
-    problems: QueryProblem[],
-  ): string | undefined {
-    if (question.memberScope === 'SENDER') {
-      return context.memberId;
-    }
-    if (question.memberScope === 'HOUSEHOLD') {
-      return undefined;
-    }
-    const member = findByName(members, question.memberName);
-    if (member === undefined) {
-      problems.push('UNKNOWN_MEMBER');
-    }
-    return member?.id;
   }
 
   private async compute(
     householdId: string,
-    intent: QueryIntent,
+    frame: QueryFrame,
     today: IsoDate,
+    directory: HouseholdDirectory,
     filters: Filters,
   ): Promise<unknown> {
+    const { intent } = frame;
     switch (intent) {
       case 'SPENDING_TOTAL':
       case 'SPENDING_BY_CATEGORY':
@@ -170,9 +131,13 @@ export class FinancialQueryService {
         return this.finance.goals(householdId, today);
       case 'SPENDING_TREND':
         return focusTrends(
-          await this.finance.spendingTrends(householdId, monthToDate(today)),
+          await this.finance.spendingTrends(householdId, comparisonPeriod(frame, filters, today)),
           filters,
         );
+      case 'SPENDING_CHANGE':
+        return this.explainChange(householdId, frame, today, directory, filters);
+      case 'LARGEST_EXPENSES':
+        return this.finance.largestExpenses(householdId, filters.period, filters);
       case 'RECURRING_EXPENSES':
         return this.finance.recurringExpenses(householdId, today);
       case 'ACCOUNT_BALANCE':
@@ -183,6 +148,118 @@ export class FinancialQueryService {
         return this.finance.insights(householdId, today);
     }
   }
+
+  private async explainChange(
+    householdId: string,
+    frame: QueryFrame,
+    today: IsoDate,
+    directory: HouseholdDirectory,
+    filters: Filters,
+  ): Promise<unknown> {
+    const period = comparisonPeriod(frame, filters, today);
+    const [trends, anomalies] = await Promise.all([
+      this.finance.spendingTrends(householdId, period),
+      contains(period, today) ? this.finance.anomalies(householdId, today) : Promise.resolve([]),
+    ]);
+    const { categoryId, memberId } = filters;
+    const withinSubject = new Set(
+      directory.categories
+        .filter((category) => category.parentId === (categoryId ?? null))
+        .map((category) => category.id),
+    );
+    const subject =
+      categoryId === undefined
+        ? trends.total
+        : (trends.byCategory.find((trend) => trend.categoryId === categoryId) ?? null);
+    return {
+      currency: trends.currency,
+      currentPeriod: trends.currentPeriod,
+      previousPeriod: trends.previousPeriod,
+      ...(categoryId === undefined ? {} : { categoryId }),
+      change: subject,
+      breakdown: trends.byCategory.filter(
+        (trend) => trend.categoryId !== null && withinSubject.has(trend.categoryId),
+      ),
+      byMember:
+        categoryId === undefined
+          ? trends.byMember.filter((trend) => memberId === undefined || trend.memberId === memberId)
+          : [],
+      unusual: anomalies.filter(
+        (anomaly) =>
+          categoryId === undefined ||
+          anomaly.categoryId === categoryId ||
+          withinSubject.has(anomaly.categoryId),
+      ),
+    };
+  }
+}
+
+function resolve(
+  context: RequestContext,
+  frame: QuestionFrame,
+  directory: HouseholdDirectory,
+  today: IsoDate,
+): Resolution {
+  const problems: QueryProblem[] = [];
+  const period = resolvePeriodReference(frame.period, today);
+  if (period === undefined) {
+    problems.push('UNRESOLVABLE_PERIOD');
+  }
+  const category = findByName(directory.categories, frame.category);
+  if (frame.category !== null && category === undefined) {
+    problems.push('UNKNOWN_CATEGORY');
+  }
+  const member = resolveMember(context, frame, directory.members);
+  if (frame.memberScope === 'NAMED_MEMBER' && member === undefined) {
+    problems.push('UNKNOWN_MEMBER');
+  }
+  const account =
+    frame.account === null
+      ? undefined
+      : resolveMentionedAccount(frame.account, directory.accounts, context.memberId);
+  if (account !== undefined && account.status !== 'RESOLVED') {
+    problems.push(account.status === 'UNKNOWN' ? 'UNKNOWN_ACCOUNT' : 'AMBIGUOUS_ACCOUNT');
+  }
+  return {
+    problems,
+    period,
+    category,
+    member,
+    account: account?.status === 'RESOLVED' ? account.account : undefined,
+  };
+}
+
+function resolveMember(
+  context: RequestContext,
+  frame: QuestionFrame,
+  members: readonly NamedEntry[],
+): NamedEntry | undefined {
+  if (frame.memberScope === 'SENDER') {
+    return members.find((member) => member.id === context.memberId);
+  }
+  return frame.memberScope === 'NAMED_MEMBER' ? findByName(members, frame.memberName) : undefined;
+}
+
+function canonicalFrame(frame: QuestionFrame, resolution: Resolution): QuestionFrame {
+  const namesMember = frame.memberScope === 'NAMED_MEMBER' && resolution.member !== undefined;
+  return {
+    intent: frame.intent,
+    period:
+      resolution.period === undefined ? { ...frame.period, kind: 'UNSPECIFIED' } : frame.period,
+    category: resolution.category?.name ?? null,
+    account: resolution.account?.name ?? null,
+    memberScope:
+      frame.memberScope === 'NAMED_MEMBER' && !namesMember ? 'HOUSEHOLD' : frame.memberScope,
+    memberName: namesMember ? resolution.member.name : null,
+  };
+}
+
+function comparisonPeriod(frame: QuestionFrame, filters: Filters, today: IsoDate): DateRange {
+  if (frame.period.kind === 'UNSPECIFIED') {
+    return monthToDate(today);
+  }
+  const { period } = filters;
+  return period.start <= today && today < period.end ? { start: period.start, end: today } : period;
 }
 
 function focusFlow(flow: PeriodFlow, intent: QueryIntent, filters: Filters): unknown {
@@ -263,7 +340,7 @@ function focusBalances(
     : { accounts: balances.accounts.filter((account) => account.accountId === filters.accountId) };
 }
 
-function findByName<Item extends Named>(
+function findByName<Item extends NamedEntry>(
   items: readonly Item[],
   name: string | null,
 ): Item | undefined {
@@ -273,6 +350,13 @@ function findByName<Item extends Named>(
   return items.find((item) => normalizeName(item.name) === normalizeName(name));
 }
 
-function namesById(items: readonly Named[]): Map<string, string> {
-  return new Map(items.map((item) => [item.id, item.name]));
+function namesOf(directory: HouseholdDirectory): NameDirectory {
+  const byId = (items: readonly NamedEntry[]): Map<string, string> =>
+    new Map(items.map((item) => [item.id, item.name]));
+  return {
+    members: byId(directory.members),
+    categories: byId(directory.categories),
+    accounts: byId(directory.accounts),
+    goals: byId(directory.goals),
+  };
 }

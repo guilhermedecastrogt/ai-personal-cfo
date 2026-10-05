@@ -1,82 +1,113 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, notInArray } from 'drizzle-orm';
-import type { ConversationTurn } from '../ai/ai-provider.js';
 import { DATABASE, type Database } from '../database/database.js';
 import { requireRow } from '../database/require-row.js';
 import type { RequestContext } from '../households/request-context.js';
+import { CONVERSATION_POLICY } from './conversation-policy.js';
+import { readConversationState, type ConversationState } from './conversation-state.js';
 import { aiConversations, aiMessages } from './conversations.schema.js';
-
-const RETAINED_MESSAGES = 20;
 
 const CHANNELS = { whatsapp: 'WHATSAPP', web: 'WEB' } as const;
 
+export type MessageRole = 'USER' | 'ASSISTANT';
+
+export interface OpenConversation {
+  readonly id: string;
+  readonly state: ConversationState;
+  readonly recentUserMessages: readonly string[];
+}
+
 @Injectable()
 export class ConversationsRepository {
+  private readonly policy = CONVERSATION_POLICY;
+
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
-  async open(context: RequestContext): Promise<string> {
-    const channel = CHANNELS[context.channel];
-    const [existing] = await this.database
-      .select({ id: aiConversations.id })
-      .from(aiConversations)
-      .where(
-        and(
-          eq(aiConversations.householdId, context.householdId),
-          eq(aiConversations.memberId, context.memberId),
-          eq(aiConversations.channel, channel),
-        ),
-      )
-      .orderBy(desc(aiConversations.createdAt))
-      .limit(1);
-    if (existing !== undefined) {
-      return existing.id;
-    }
-    const created = await this.database
-      .insert(aiConversations)
-      .values({ householdId: context.householdId, memberId: context.memberId, channel })
-      .returning({ id: aiConversations.id });
-    return requireRow(created).id;
+  async open(context: RequestContext, instant: Date): Promise<OpenConversation> {
+    const scope = {
+      householdId: context.householdId,
+      memberId: context.memberId,
+      channel: CHANNELS[context.channel],
+    };
+    const conversation = requireRow(
+      await this.database
+        .insert(aiConversations)
+        .values(scope)
+        .onConflictDoUpdate({
+          target: [aiConversations.householdId, aiConversations.memberId, aiConversations.channel],
+          set: { updatedAt: new Date() },
+        })
+        .returning(),
+    );
+    return {
+      id: conversation.id,
+      state: readConversationState(
+        conversation.state,
+        conversation.stateUpdatedAt,
+        instant,
+        this.policy.stateLifetimeInMinutes,
+      ),
+      recentUserMessages: await this.recentUserMessages(context.householdId, conversation.id),
+    };
   }
 
-  async recentTurns(
-    householdId: string,
+  async append(
     conversationId: string,
-    limit: number,
-  ): Promise<ConversationTurn[]> {
+    role: MessageRole,
+    content: string,
+    sourceMessageId?: string,
+  ): Promise<void> {
+    await this.database.insert(aiMessages).values({
+      conversationId,
+      role,
+      content: content.slice(0, this.policy.maximumMessageLength),
+      sourceMessageId: sourceMessageId ?? null,
+    });
+    const retained = this.database
+      .select({ id: aiMessages.id })
+      .from(aiMessages)
+      .where(eq(aiMessages.conversationId, conversationId))
+      .orderBy(desc(aiMessages.createdAt), desc(aiMessages.id))
+      .limit(this.policy.retainedMessages);
+    await this.database
+      .delete(aiMessages)
+      .where(
+        and(eq(aiMessages.conversationId, conversationId), notInArray(aiMessages.id, retained)),
+      );
+  }
+
+  async saveState(
+    context: RequestContext,
+    conversationId: string,
+    state: ConversationState,
+    instant: Date,
+  ): Promise<void> {
+    await this.database
+      .update(aiConversations)
+      .set({ state, stateUpdatedAt: instant })
+      .where(
+        and(
+          eq(aiConversations.id, conversationId),
+          eq(aiConversations.householdId, context.householdId),
+          eq(aiConversations.memberId, context.memberId),
+        ),
+      );
+  }
+
+  private async recentUserMessages(householdId: string, conversationId: string): Promise<string[]> {
     const rows = await this.database
-      .select({ role: aiMessages.role, content: aiMessages.content })
+      .select({ content: aiMessages.content })
       .from(aiMessages)
       .innerJoin(aiConversations, eq(aiConversations.id, aiMessages.conversationId))
       .where(
         and(
           eq(aiConversations.householdId, householdId),
           eq(aiMessages.conversationId, conversationId),
+          eq(aiMessages.role, 'USER'),
         ),
       )
       .orderBy(desc(aiMessages.createdAt), desc(aiMessages.id))
-      .limit(limit);
-    return rows.reverse();
-  }
-
-  async append(
-    conversationId: string,
-    role: ConversationTurn['role'],
-    content: string,
-    sourceMessageId?: string,
-  ): Promise<void> {
-    await this.database
-      .insert(aiMessages)
-      .values({ conversationId, role, content, sourceMessageId: sourceMessageId ?? null });
-    const retained = this.database
-      .select({ id: aiMessages.id })
-      .from(aiMessages)
-      .where(eq(aiMessages.conversationId, conversationId))
-      .orderBy(desc(aiMessages.createdAt), desc(aiMessages.id))
-      .limit(RETAINED_MESSAGES);
-    await this.database
-      .delete(aiMessages)
-      .where(
-        and(eq(aiMessages.conversationId, conversationId), notInArray(aiMessages.id, retained)),
-      );
+      .limit(this.policy.recentUserMessages);
+    return rows.map((row) => row.content).reverse();
   }
 }

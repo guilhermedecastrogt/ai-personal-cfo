@@ -14,6 +14,13 @@ import type {
   TransactionCandidate,
 } from '../interpretation/message-interpretation.schema.js';
 
+export const EMPTY_CONVERSATION = {
+  recentUserMessages: [],
+  lastOutcome: 'NONE',
+  previousQuestion: null,
+  pendingTransaction: null,
+};
+
 export const UNSPECIFIED_DATE: DateReference = {
   kind: 'UNSPECIFIED',
   daysAgo: null,
@@ -33,6 +40,7 @@ export function transactionInterpretation(overrides: Partial<TransactionCandidat
   return {
     kind: 'TRANSACTION',
     question: null,
+    completesPendingTransaction: false,
     transaction: {
       type: 'EXPENSE',
       amount: '23',
@@ -54,6 +62,7 @@ export function questionInterpretation(overrides: Partial<FinancialQuestion> = {
   return {
     kind: 'QUESTION',
     transaction: null,
+    completesPendingTransaction: false,
     question: {
       intent: 'SPENDING_TOTAL',
       period: UNSPECIFIED_PERIOD,
@@ -61,6 +70,7 @@ export function questionInterpretation(overrides: Partial<FinancialQuestion> = {
       account: null,
       memberScope: 'HOUSEHOLD',
       memberName: null,
+      inheritFromPrevious: [],
       ...overrides,
     },
   };
@@ -74,7 +84,35 @@ export function imageReading(overrides: Partial<TransactionCandidate> = {}): unk
   };
 }
 
-export const OTHER_INTERPRETATION: unknown = { kind: 'OTHER', transaction: null, question: null };
+export function completionOf(overrides: Partial<TransactionCandidate> = {}): unknown {
+  return {
+    kind: 'TRANSACTION',
+    question: null,
+    completesPendingTransaction: true,
+    transaction: {
+      type: null,
+      amount: null,
+      currency: null,
+      merchant: null,
+      description: null,
+      category: null,
+      account: null,
+      transferAccount: null,
+      paymentMethod: null,
+      date: UNSPECIFIED_DATE,
+      confidence: 0.95,
+      ...overrides,
+    },
+  };
+}
+
+function bareInterpretation(kind: 'OTHER' | 'CORRECTION' | 'UNCLEAR'): unknown {
+  return { kind, transaction: null, question: null, completesPendingTransaction: false };
+}
+
+export const OTHER_INTERPRETATION = bareInterpretation('OTHER');
+export const CORRECTION_INTERPRETATION = bareInterpretation('CORRECTION');
+export const UNCLEAR_INTERPRETATION = bareInterpretation('UNCLEAR');
 
 type ScriptedInterpretation =
   { readonly output: unknown } | { readonly failure: AIFailureCategory };

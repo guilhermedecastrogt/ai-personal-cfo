@@ -1,5 +1,5 @@
 import type { CategoryOption } from '../ai/ai-provider.js';
-import type { Category } from '../categories/categories.repository.js';
+import type { Category } from '../directory/household-directory.service.js';
 
 export function toCategoryOptions(categories: readonly Category[]): CategoryOption[] {
   const names = new Map(categories.map((category) => [category.id, category.name]));

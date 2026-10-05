@@ -32,6 +32,7 @@ import {
 import { calculateGoalProgress, type GoalProgress } from '../domain/goals/goal-progress.js';
 import { evaluateInsights, type Insight } from '../domain/insights/insight-engine.js';
 import { within, type FlowType, type LedgerEntry } from '../domain/ledger/ledger-entry.js';
+import { selectLargestExpenses, type ExpenseItem } from '../domain/listing/largest-expenses.js';
 import {
   addDays,
   currentDateIn,
@@ -68,6 +69,18 @@ export interface CashFlowSummary {
   readonly period: DateRange;
   readonly cashFlow: CashFlow;
   readonly savings: Savings;
+}
+
+export interface ExpenseFilter {
+  readonly categoryId?: string | undefined;
+  readonly memberId?: string | undefined;
+  readonly accountId?: string | undefined;
+}
+
+export interface LargestExpenses {
+  readonly period: DateRange;
+  readonly currency: string;
+  readonly expenses: readonly ExpenseItem[];
 }
 
 export interface HouseholdBalances {
@@ -225,6 +238,35 @@ export class FinanceService {
         policy: this.policy.anomaly,
       }),
     ];
+  }
+
+  async largestExpenses(
+    householdId: string,
+    period: DateRange,
+    filter: ExpenseFilter = {},
+    currency?: string,
+  ): Promise<LargestExpenses> {
+    const scope = await this.scopeOf(householdId, currency);
+    const entries = await this.ledger.findEntries(householdId, {
+      currency: scope.currency,
+      period,
+    });
+    const { categoryId, memberId, accountId } = filter;
+    const matching = entries.filter(
+      (entry) =>
+        (categoryId === undefined || scope.categories.isWithin(entry.categoryId, categoryId)) &&
+        (memberId === undefined || entry.memberId === memberId) &&
+        (accountId === undefined || entry.accountId === accountId),
+    );
+    return {
+      period,
+      currency: scope.currency,
+      expenses: selectLargestExpenses(
+        matching,
+        scope.currency,
+        this.policy.listing.largestExpenses,
+      ),
+    };
   }
 
   async accountBalances(householdId: string): Promise<HouseholdBalances> {

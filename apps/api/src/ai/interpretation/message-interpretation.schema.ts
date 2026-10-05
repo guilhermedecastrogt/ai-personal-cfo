@@ -27,7 +27,11 @@ export const FINANCIAL_INTENTS = [
   'FORECAST',
   'INSIGHTS',
   'MONTHLY_REVIEW',
+  'SPENDING_CHANGE',
+  'LARGEST_EXPENSES',
 ] as const;
+
+export const QUESTION_SLOTS = ['INTENT', 'PERIOD', 'CATEGORY', 'ACCOUNT', 'MEMBER'] as const;
 
 export const dateReferenceSchema = z.object({
   kind: z.enum([
@@ -82,11 +86,13 @@ export const financialQuestionSchema = z.object({
   account: z.string().nullable(),
   memberScope: z.enum(['HOUSEHOLD', 'SENDER', 'NAMED_MEMBER']),
   memberName: z.string().nullable(),
+  inheritFromPrevious: z.array(z.enum(QUESTION_SLOTS)),
 });
 
 export const messageInterpretationWireSchema = z.object({
-  kind: z.enum(['TRANSACTION', 'QUESTION', 'OTHER']),
+  kind: z.enum(['TRANSACTION', 'QUESTION', 'CORRECTION', 'UNCLEAR', 'OTHER']),
   transaction: transactionCandidateSchema.nullable(),
+  completesPendingTransaction: z.boolean(),
   question: financialQuestionSchema.nullable(),
 });
 
@@ -97,9 +103,17 @@ export type FinancialQuestion = z.infer<typeof financialQuestionSchema>;
 export type FinancialIntent = (typeof FINANCIAL_INTENTS)[number];
 export type Weekday = (typeof WEEKDAYS)[number];
 
+export type QuestionSlot = (typeof QUESTION_SLOTS)[number];
+
 export type MessageInterpretation =
-  | { readonly kind: 'TRANSACTION'; readonly transaction: TransactionCandidate }
+  | {
+      readonly kind: 'TRANSACTION';
+      readonly transaction: TransactionCandidate;
+      readonly completesPending: boolean;
+    }
   | { readonly kind: 'QUESTION'; readonly question: FinancialQuestion }
+  | { readonly kind: 'CORRECTION' }
+  | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' };
 
 export const MESSAGE_INTERPRETATION_SCHEMA_NAME = 'message_interpretation';

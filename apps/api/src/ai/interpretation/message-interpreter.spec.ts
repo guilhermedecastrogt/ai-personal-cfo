@@ -1,6 +1,10 @@
 import { AIProviderError } from '../ai-provider.js';
 import {
+  CORRECTION_INTERPRETATION,
+  EMPTY_CONVERSATION,
   FakeAIProvider,
+  UNCLEAR_INTERPRETATION,
+  completionOf,
   OTHER_INTERPRETATION,
   questionInterpretation,
   transactionInterpretation,
@@ -9,7 +13,7 @@ import { MessageInterpreter } from './message-interpreter.js';
 
 const REQUEST = {
   message: 'I spent 23 at Lidl',
-  history: [],
+  conversation: EMPTY_CONVERSATION,
   senderName: 'Member A',
   memberNames: ['Member A'],
   accountNames: ['Joint Account'],
@@ -47,6 +51,36 @@ describe('MessageInterpreter', () => {
 
   it('returns other for anything else', async () => {
     expect(await interpret(OTHER_INTERPRETATION)).toEqual({ kind: 'OTHER' });
+  });
+
+  it.each([
+    ['CORRECTION', CORRECTION_INTERPRETATION],
+    ['UNCLEAR', UNCLEAR_INTERPRETATION],
+  ])('returns %s without a candidate or a question', async (kind, output) => {
+    expect(await interpret(output)).toEqual({ kind });
+  });
+
+  it('says whether a transaction completes the pending one', async () => {
+    expect(await interpret(completionOf({ category: 'Groceries' }))).toMatchObject({
+      kind: 'TRANSACTION',
+      completesPending: true,
+      transaction: { category: 'Groceries', amount: null },
+    });
+    expect(await interpret(transactionInterpretation())).toMatchObject({ completesPending: false });
+  });
+
+  it('carries the slots a follow-up question inherits', async () => {
+    const output = questionInterpretation({ inheritFromPrevious: ['INTENT', 'CATEGORY'] });
+
+    expect(await interpret(output)).toMatchObject({
+      question: { inheritFromPrevious: ['INTENT', 'CATEGORY'] },
+    });
+  });
+
+  it('rejects a follow-up that names a slot that does not exist', async () => {
+    const output = questionInterpretation({ inheritFromPrevious: ['HOUSEHOLD'] as never });
+
+    expect(await failureOf(output)).toBe('INVALID_RESPONSE');
   });
 
   it('drops properties the schema does not define', async () => {

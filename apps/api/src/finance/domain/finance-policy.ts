@@ -32,6 +32,9 @@ export interface FinancePolicy {
     readonly sharpSpendingIncreaseBasisPoints: number;
     readonly minimumSpendingIncreaseMinor: number;
   };
+  readonly listing: {
+    readonly largestExpenses: number;
+  };
   readonly review: {
     readonly healthySavingsRateBasisPoints: number;
     readonly lowSavingsRateBasisPoints: number;
@@ -70,6 +73,9 @@ export const DEFAULT_FINANCE_POLICY: FinancePolicy = {
     spendingIncreaseBasisPoints: 2_500,
     sharpSpendingIncreaseBasisPoints: 5_000,
     minimumSpendingIncreaseMinor: 2_000,
+  },
+  listing: {
+    largestExpenses: 5,
   },
   review: {
     healthySavingsRateBasisPoints: 2_000,

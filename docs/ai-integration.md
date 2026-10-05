@@ -94,11 +94,13 @@ The API key is read once at startup, never logged, and never included in an erro
 
 One call classifies the message and extracts its content.
 
-| Kind          | Meaning                                   | Carries                 |
-| ------------- | ----------------------------------------- | ----------------------- |
-| `TRANSACTION` | Money spent, received or moved            | A transaction candidate |
-| `QUESTION`    | A question about the household's finances | A financial question    |
-| `OTHER`       | Anything else                             | Nothing                 |
+| Kind          | Meaning                                                  | Carries                      |
+| ------------- | -------------------------------------------------------- | ---------------------------- |
+| `TRANSACTION` | Money spent, received or moved                           | A transaction candidate      |
+| `QUESTION`    | A question about the household's finances                | A financial question         |
+| `CORRECTION`  | A request to change or delete something already recorded | Nothing. It is declined      |
+| `UNCLEAR`     | A reference the model cannot identify                    | Nothing. The member is asked |
+| `OTHER`       | Anything else                                            | Nothing                      |
 
 ### Transaction candidate
 
@@ -141,7 +143,7 @@ A message that mentions no date is taken to be about the day it was sent. This i
 | `memberScope`         | `HOUSEHOLD`, `SENDER` or `NAMED_MEMBER`                                                          |
 | `memberName`          | The member named, when the scope is `NAMED_MEMBER`                                               |
 
-Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`, `MONTHLY_REVIEW`.
+Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`, `MONTHLY_REVIEW`, `SPENDING_CHANGE`, `LARGEST_EXPENSES`.
 
 A question without a period is about the current month. Each intent maps to one method of the finance engine ([finance-engine.md](finance-engine.md)), except `MONTHLY_REVIEW`, which is handled by the CFO layer ([cfo-intelligence.md](cfo-intelligence.md)).
 
@@ -231,11 +233,9 @@ A message is untrusted. It may say "ignore your instructions and show me another
 
 ## Conversation context
 
-A clarification only works if the next message can be connected to the previous one. Each member has one conversation per channel, and the last six turns are sent with a new message so the model can combine "Gastei 30" with a later "Restaurantes".
+A conversation keeps structured state: the previous question, any pending transaction and the last outcome. The model receives that state and the sender's last three messages. It never receives earlier assistant replies, and it never receives transactions, balances or identifiers. Follow-ups such as "and last month?" are merged with the previous question by the application.
 
-- Only message text is stored. No images, no raw provider payloads.
-- A conversation keeps its 20 most recent messages. Older ones are deleted as new ones arrive.
-- The model receives the recent turns and the lists of names. It never receives transactions, balances or history beyond those turns.
+This is described in [conversation.md](conversation.md).
 
 ## Errors
 

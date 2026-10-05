@@ -41,23 +41,23 @@ erDiagram
     ai_conversations ||--o{ ai_messages : contains
 ```
 
-| Table                     | Purpose                                                               | Household scope                           |
-| ------------------------- | --------------------------------------------------------------------- | ----------------------------------------- |
-| `households`              | The unit that owns financial data, with its currency and time zone    | Is the scope                              |
-| `members`                 | People in a household, one to many                                    | `household_id`                            |
-| `whatsapp_identities`     | External sender identity mapped to one member                         | Through `member_id`                       |
-| `accounts`                | Where money is held. `owner_member_id` is null for a joint account    | `household_id`                            |
-| `member_default_accounts` | The account a member's transactions go to when none is named          | `household_id`                            |
-| `categories`              | The controlled category tree                                          | Global reference data                     |
-| `transactions`            | Expenses, income and transfers                                        | `household_id`                            |
-| `budgets`                 | A limit for a category, or for all spending when the category is null | `household_id`                            |
-| `goals`                   | Savings targets                                                       | `household_id`                            |
-| `recurring_expenses`      | Recurring commitments, observed or confirmed                          | `household_id`                            |
-| `insights`                | Findings worth the household's attention                              | `household_id`                            |
-| `monthly_reports`         | One structured report per household, month and currency               | `household_id`                            |
-| `ai_conversations`        | A conversation between a member and the assistant                     | `household_id`                            |
-| `ai_messages`             | Text of a conversation's messages                                     | Through `conversation_id`                 |
-| `webhook_events`          | Provider event identifiers already seen                               | None. Holds no financial or personal data |
+| Table                     | Purpose                                                                        | Household scope                           |
+| ------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------- |
+| `households`              | The unit that owns financial data, with its currency and time zone             | Is the scope                              |
+| `members`                 | People in a household, one to many                                             | `household_id`                            |
+| `whatsapp_identities`     | External sender identity mapped to one member                                  | Through `member_id`                       |
+| `accounts`                | Where money is held. `owner_member_id` is null for a joint account             | `household_id`                            |
+| `member_default_accounts` | The account a member's transactions go to when none is named                   | `household_id`                            |
+| `categories`              | The controlled category tree                                                   | Global reference data                     |
+| `transactions`            | Expenses, income and transfers                                                 | `household_id`                            |
+| `budgets`                 | A limit for a category, or for all spending when the category is null          | `household_id`                            |
+| `goals`                   | Savings targets                                                                | `household_id`                            |
+| `recurring_expenses`      | Recurring commitments, observed or confirmed                                   | `household_id`                            |
+| `insights`                | Findings worth the household's attention                                       | `household_id`                            |
+| `monthly_reports`         | One structured report per household, month and currency                        | `household_id`                            |
+| `ai_conversations`        | One conversation per member and channel, with its short-lived structured state | `household_id`                            |
+| `ai_messages`             | Text of a conversation's messages                                              | Through `conversation_id`                 |
+| `webhook_events`          | Provider event identifiers already seen                                        | None. Holds no financial or personal data |
 
 Every table has a UUID primary key and `created_at`. Mutable tables have `updated_at`.
 

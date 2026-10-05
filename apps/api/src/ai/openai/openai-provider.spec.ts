@@ -20,10 +20,12 @@ interface StubResponse {
 
 const INTERPRETATION_REQUEST = {
   message: 'Gastei €23 no Lidl',
-  history: [
-    { role: 'USER' as const, content: 'Gastei 23' },
-    { role: 'ASSISTANT' as const, content: 'Onde foi?' },
-  ],
+  conversation: {
+    recentUserMessages: ['Gastei 23'],
+    lastOutcome: 'TRANSACTION_PENDING',
+    previousQuestion: null,
+    pendingTransaction: { understood: { amount: '23' }, stillNeeded: ['MISSING_CATEGORY'] },
+  },
   senderName: 'Member A',
   memberNames: ['Member A', 'Member B', 'Member C'],
   accountNames: ['Joint Account'],
@@ -144,7 +146,7 @@ describe('OpenAIProvider', () => {
       });
     });
 
-    it('sends the conversation and the latest message as input, and the options as instructions', async () => {
+    it('sends earlier messages of the sender and the latest message as input', async () => {
       responses.push(completed(JSON.stringify(transactionInterpretation())));
 
       await provider().interpretMessage(INTERPRETATION_REQUEST);
@@ -152,14 +154,22 @@ describe('OpenAIProvider', () => {
 
       expect(body?.input).toEqual([
         { role: 'user', content: 'Gastei 23' },
-        { role: 'assistant', content: 'Onde foi?' },
         { role: 'user', content: 'Gastei €23 no Lidl' },
       ]);
-      expect(body?.instructions).toEqual(
-        expect.stringContaining('- Groceries (expense, under Food)'),
-      );
-      expect(body?.instructions).toEqual(expect.stringContaining('- Member C'));
-      expect(body?.instructions).not.toEqual(expect.stringContaining('Gastei €23 no Lidl'));
+      expect(JSON.stringify(body?.input)).not.toContain('assistant');
+    });
+
+    it('sends the conversation state and the options as instructions', async () => {
+      responses.push(completed(JSON.stringify(transactionInterpretation())));
+
+      await provider().interpretMessage(INTERPRETATION_REQUEST);
+      const instructions = requests[0]?.body.instructions;
+
+      expect(instructions).toEqual(expect.stringContaining('"lastOutcome": "TRANSACTION_PENDING"'));
+      expect(instructions).toEqual(expect.stringContaining('"stillNeeded"'));
+      expect(instructions).toEqual(expect.stringContaining('- Groceries (expense, under Food)'));
+      expect(instructions).toEqual(expect.stringContaining('- Member C'));
+      expect(instructions).not.toEqual(expect.stringContaining('Gastei €23 no Lidl'));
     });
 
     it('returns the parsed structured output', async () => {

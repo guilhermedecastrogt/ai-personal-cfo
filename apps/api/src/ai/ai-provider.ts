@@ -13,9 +13,16 @@ export interface CategoryOption {
   readonly parent: string | null;
 }
 
+export interface ConversationContext {
+  readonly recentUserMessages: readonly string[];
+  readonly lastOutcome: string;
+  readonly previousQuestion: Readonly<Record<string, unknown>> | null;
+  readonly pendingTransaction: Readonly<Record<string, unknown>> | null;
+}
+
 export interface InterpretationRequest {
   readonly message: string;
-  readonly history: readonly ConversationTurn[];
+  readonly conversation: ConversationContext;
   readonly senderName: string;
   readonly memberNames: readonly string[];
   readonly accountNames: readonly string[];
@@ -34,6 +41,7 @@ export type ReplySituation =
   | 'CLARIFICATION_NEEDED'
   | 'QUESTION_ANSWERED'
   | 'IMAGE_NOT_USABLE'
+  | 'EDIT_NOT_SUPPORTED'
   | 'OUT_OF_SCOPE';
 
 export type ReplyFacts = Readonly<Record<string, unknown>>;

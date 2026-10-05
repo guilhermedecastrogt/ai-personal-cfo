@@ -12,6 +12,7 @@ Documents are added as the corresponding part of the system is built.
 | [`vision-extraction.md`](vision-extraction.md)       | Image flow, temporary storage, validation and limitations               | Written                                 |
 | [`whatsapp-integration.md`](whatsapp-integration.md) | Webhook flow, Kapso adapter, idempotency and identity resolution        | Written                                 |
 | [`cfo-intelligence.md`](cfo-intelligence.md)         | Monthly review, findings, model context and the numeric-truth check     | Written                                 |
+| [`conversation.md`](conversation.md)                 | Multi-turn conversations, follow-ups, trusted and untrusted context     | Written                                 |
 | `deployment.md`                                      | Oracle Cloud provisioning and release process                           | Planned                                 |
 | [`adr/`](adr/README.md)                              | Architecture decision records                                           | Written, extended as decisions are made |
 

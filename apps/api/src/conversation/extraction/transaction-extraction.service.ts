@@ -1,17 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AccountsRepository } from '../../accounts/accounts.repository.js';
 import type { ReplyFacts } from '../../ai/ai-provider.js';
 import type { TransactionCandidate } from '../../ai/interpretation/message-interpretation.schema.js';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
+import { HouseholdDirectoryService } from '../../directory/household-directory.service.js';
 import type { IsoDate } from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
 import { formatMoney } from '../../money/format-money.js';
 import type { TransactionSource } from '../../transactions/transaction-vocabulary.js';
-import type { Transaction } from '../../transactions/transactions.repository.js';
 import {
   TransactionRejectedError,
   TransactionsService,
+  type Transaction,
   type TransactionRejectionReason,
 } from '../../transactions/transactions.service.js';
 import {
@@ -33,6 +32,7 @@ export type ExtractionOutcome =
   | {
       readonly status: 'NEEDS_CLARIFICATION';
       readonly reasons: readonly ClarificationReason[];
+      readonly candidate: TransactionCandidate;
       readonly facts: ReplyFacts;
     };
 
@@ -63,17 +63,15 @@ const ACCOUNT_REASONS: readonly ClarificationReason[] = [
 export class TransactionExtractionService {
   constructor(
     private readonly transactions: TransactionsService,
-    private readonly accounts: AccountsRepository,
-    private readonly categories: CategoriesRepository,
+    private readonly directory: HouseholdDirectoryService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   async extract(request: ExtractionRequest): Promise<ExtractionOutcome> {
     const { context, candidate, today } = request;
-    const [accounts, defaultAccount, categories] = await Promise.all([
-      this.accounts.list(context.householdId),
-      this.accounts.findDefaultAccount(context.householdId, context.memberId),
-      this.categories.list(),
+    const [{ accounts, categories }, defaultAccount] = await Promise.all([
+      this.directory.load(context.householdId),
+      this.directory.defaultAccount(context.householdId, context.memberId),
     ]);
     const draft = draftTransaction(candidate, {
       senderId: context.memberId,
@@ -84,7 +82,7 @@ export class TransactionExtractionService {
       confidenceThreshold: this.config.aiConfidenceThreshold,
     });
     if (draft.fields === undefined) {
-      return clarification(draft.problems, draft.understood, accounts, categories);
+      return clarification(draft.problems, candidate, draft.understood, accounts, categories);
     }
     try {
       const transaction = await this.transactions.record(context.householdId, {
@@ -98,7 +96,7 @@ export class TransactionExtractionService {
       return { status: 'RECORDED', transaction, facts: describe(draft.understood) };
     } catch (error) {
       if (error instanceof TransactionRejectedError) {
-        return clarification(error.reasons, draft.understood, accounts, categories);
+        return clarification(error.reasons, candidate, draft.understood, accounts, categories);
       }
       throw error;
     }
@@ -114,6 +112,7 @@ function sourceOf(context: RequestContext, medium: ExtractionRequest['medium']):
 
 function clarification(
   reasons: readonly ClarificationReason[],
+  candidate: TransactionCandidate,
   understood: Understood,
   accounts: readonly AccountOption[],
   categories: readonly CategoryOption[],
@@ -124,6 +123,7 @@ function clarification(
   return {
     status: 'NEEDS_CLARIFICATION',
     reasons,
+    candidate,
     facts: {
       reasons,
       understood: describe(understood),

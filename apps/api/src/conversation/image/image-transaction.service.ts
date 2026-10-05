@@ -1,22 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { AccountsRepository } from '../../accounts/accounts.repository.js';
 import type { ReplyFacts } from '../../ai/ai-provider.js';
 import type { ImageReading } from '../../ai/vision/image-extraction.schema.js';
 import { ImageTransactionReader } from '../../ai/vision/image-transaction-reader.js';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
+import { HouseholdDirectoryService } from '../../directory/household-directory.service.js';
 import type { IsoDate } from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
 import { MediaError, type MediaProblem, type MediaReference } from '../../media/media-source.js';
 import { TemporaryMediaStore } from '../../media/temporary-media-store.js';
 import { formatMoney } from '../../money/format-money.js';
-import {
-  TransactionsRepository,
-  type Transaction,
-} from '../../transactions/transactions.repository.js';
+import { TransactionsService, type Transaction } from '../../transactions/transactions.service.js';
 import { toCategoryOptions } from '../category-options.js';
 import {
   TransactionExtractionService,
-  type ClarificationReason,
   type ExtractionOutcome,
 } from '../extraction/transaction-extraction.service.js';
 
@@ -35,9 +30,11 @@ export type ImageOutcome =
       readonly transaction: Transaction;
       readonly facts: ReplyFacts;
     }
+  | Extract<ExtractionOutcome, { status: 'NEEDS_CLARIFICATION' }>
   | {
       readonly status: 'NEEDS_CLARIFICATION';
-      readonly reasons: readonly (ClarificationReason | 'MULTIPLE_TRANSACTIONS')[];
+      readonly reasons: readonly ['MULTIPLE_TRANSACTIONS'];
+      readonly candidate: null;
       readonly facts: ReplyFacts;
     }
   | {
@@ -54,9 +51,8 @@ export class ImageTransactionService {
     private readonly media: TemporaryMediaStore,
     private readonly reader: ImageTransactionReader,
     private readonly extraction: TransactionExtractionService,
-    private readonly transactions: TransactionsRepository,
-    private readonly accounts: AccountsRepository,
-    private readonly categories: CategoriesRepository,
+    private readonly transactions: TransactionsService,
+    private readonly directory: HouseholdDirectoryService,
   ) {}
 
   async extract(
@@ -79,6 +75,7 @@ export class ImageTransactionService {
         return {
           status: 'NEEDS_CLARIFICATION',
           reasons: ['MULTIPLE_TRANSACTIONS'],
+          candidate: null,
           facts: {
             reasons: ['MULTIPLE_TRANSACTIONS'],
             transactionsSeen: reading.transactionCount,
@@ -107,10 +104,7 @@ export class ImageTransactionService {
   }
 
   private async read(context: RequestContext, message: ImageMessage): Promise<MediaReading> {
-    const [accounts, categories] = await Promise.all([
-      this.accounts.list(context.householdId),
-      this.categories.list(),
-    ]);
+    const { accounts, categories } = await this.directory.load(context.householdId);
     try {
       return await this.media.withImage(message.media, ({ mimeType, bytes }) =>
         this.reader.read({

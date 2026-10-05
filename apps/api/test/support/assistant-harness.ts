@@ -18,6 +18,7 @@ import { FinancialAssistant } from '../../src/conversation/financial-assistant.s
 import { ImageTransactionService } from '../../src/conversation/image/image-transaction.service.js';
 import { FinancialQueryService } from '../../src/conversation/queries/financial-query.service.js';
 import type { Database } from '../../src/database/database.js';
+import { HouseholdDirectoryService } from '../../src/directory/household-directory.service.js';
 import { FinanceService } from '../../src/finance/application/finance.service.js';
 import { LedgerRepository } from '../../src/finance/infrastructure/ledger.repository.js';
 import { GoalsRepository } from '../../src/goals/goals.repository.js';
@@ -84,12 +85,8 @@ export async function createAssistantHarness(
   );
   const provider = new FakeAIProvider();
   const mediaSource = new FakeMediaSource();
-  const extraction = new TransactionExtractionService(
-    transactionsService,
-    accounts,
-    categories,
-    TEST_CONFIG,
-  );
+  const directory = new HouseholdDirectoryService(households, accounts, categories, goals);
+  const extraction = new TransactionExtractionService(transactionsService, directory, TEST_CONFIG);
   const cfo = new CfoService(
     new FinancialSnapshotBuilder(finance),
     new ReviewExplainer(provider),
@@ -102,21 +99,18 @@ export async function createAssistantHarness(
     new MessageInterpreter(provider),
     new ReplyComposer(provider),
     extraction,
-    new FinancialQueryService(finance, households, categories, accounts, goals),
+    new FinancialQueryService(finance, directory),
     new ImageTransactionService(
       new TemporaryMediaStore(mediaSource, mediaRoot, mediaPolicy),
       new ImageTransactionReader(provider),
       extraction,
-      transactions,
-      accounts,
-      categories,
+      transactionsService,
+      directory,
     ),
     cfo,
     finance,
     new ConversationsRepository(database),
-    households,
-    accounts,
-    categories,
+    directory,
   );
   return {
     assistant,

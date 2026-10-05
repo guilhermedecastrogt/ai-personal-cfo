@@ -12,7 +12,6 @@ import {
 } from '../src/ai/testing/fake-ai-provider.fixture.js';
 import { BudgetsRepository } from '../src/budgets/budgets.repository.js';
 import { categories } from '../src/categories/categories.schema.js';
-import { aiMessages } from '../src/conversation/conversations.schema.js';
 import type {
   AssistantResponse,
   FinancialAssistant,
@@ -327,31 +326,6 @@ describe('financial assistant', () => {
       expect((await transactions.list(fixture.household.id))[0]?.accountId).toBe(
         fixture.jointAccount.id,
       );
-    });
-
-    it('carries the earlier exchange into the next interpretation so an answer can complete it', async () => {
-      const fixture = await householdWithDefaultAccount('Follow Up');
-      provider.willReply('Which category should I use?');
-      await send(
-        fixture,
-        'Gastei 30',
-        transactionInterpretation({ category: null, merchant: null }),
-      );
-
-      await send(
-        fixture,
-        'Restaurantes',
-        transactionInterpretation({ amount: '30', category: 'Restaurants' }),
-      );
-
-      expect(provider.interpretationRequests[1]).toMatchObject({
-        message: 'Restaurantes',
-        history: [
-          { role: 'USER', content: 'Gastei 30' },
-          { role: 'ASSISTANT', content: 'Which category should I use?' },
-        ],
-      });
-      expect(await transactions.list(fixture.household.id)).toHaveLength(1);
     });
   });
 
@@ -809,32 +783,6 @@ describe('financial assistant', () => {
 
       expect(response.outcome).toEqual({ kind: 'OTHER' });
       expect(provider.replyRequests[0]).toMatchObject({ situation: 'OUT_OF_SCOPE', facts: {} });
-    });
-
-    it('keeps the conversations of different members apart', async () => {
-      const fixture = await householdWithDefaultAccount('Separate Conversations', 2);
-      await send(fixture, 'Mensagem do primeiro', OTHER_INTERPRETATION, 0);
-
-      await send(fixture, 'Mensagem do segundo', OTHER_INTERPRETATION, 1);
-
-      expect(provider.interpretationRequests[1]?.history).toEqual([]);
-    });
-
-    it('sends only the most recent turns and keeps a bounded number of messages', async () => {
-      const fixture = await householdWithDefaultAccount('Bounded History');
-      for (let turn = 1; turn <= 14; turn += 1) {
-        await send(fixture, `mensagem ${String(turn)}`, OTHER_INTERPRETATION);
-      }
-
-      const stored = await testDatabase.database.$count(aiMessages);
-      const lastRequest = provider.interpretationRequests.at(-1);
-
-      expect(lastRequest?.history).toHaveLength(6);
-      expect(lastRequest?.history.at(-1)).toEqual({ role: 'ASSISTANT', content: '[OUT_OF_SCOPE]' });
-      expect(stored).toBeLessThanOrEqual(20 * 40);
-      expect(
-        await testDatabase.database.$count(aiMessages, eq(aiMessages.content, 'mensagem 1')),
-      ).toBe(0);
     });
   });
 });
