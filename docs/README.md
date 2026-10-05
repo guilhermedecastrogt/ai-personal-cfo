@@ -4,12 +4,12 @@ Documents are added as the corresponding part of the system is built.
 
 | Document | Purpose | Status |
 | --- | --- | --- |
-| `architecture.md` | System structure, module boundaries and data flow | Planned |
+| [`architecture.md`](architecture.md) | System structure, module boundaries and data flow | Written |
 | `development.md` | Local setup, commands and conventions | Planned |
 | `database.md` | Schema, constraints and migration workflow | Planned |
 | `ai.md` | Extraction pipeline, validation and advisor boundaries | Planned |
 | `deployment.md` | Oracle Cloud provisioning and release process | Planned |
-| [`adr/`](adr/README.md) | Architecture decision records | In progress |
+| [`adr/`](adr/README.md) | Architecture decision records | Written, extended as decisions are made |
 
 ## Conventions
 

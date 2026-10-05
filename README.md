@@ -63,7 +63,7 @@ docs/           Architecture, guides and decision records
 
 - [x] Repository initialization
 - [x] Household, identity and AI provider decisions
-- [ ] Architecture documentation and decision records
+- [x] Architecture documentation and decision records
 - [ ] Backend bootstrap with health and readiness checks
 - [ ] Database schema and core domain
 - [ ] Finance engine
@@ -80,7 +80,7 @@ Out of scope for the first version: open banking and bank synchronization, perma
 
 ## Documentation
 
-See [docs/](docs/README.md) and the [architecture decision records](docs/adr/README.md).
+See the [architecture document](docs/architecture.md), the rest of [docs/](docs/README.md) and the [architecture decision records](docs/adr/README.md).
 
 ## License
 
