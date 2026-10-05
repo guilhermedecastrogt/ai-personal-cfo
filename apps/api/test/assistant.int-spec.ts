@@ -776,13 +776,78 @@ describe('financial assistant', () => {
   });
 
   describe('conversation', () => {
-    it('explains what it can do when the message is neither a transaction nor a question', async () => {
-      const fixture = await householdWithDefaultAccount('Other');
+    it('introduces itself the first time a member writes, with names and examples only', async () => {
+      const fixture = await householdWithDefaultAccount('Welcome', 3);
 
-      const response = await send(fixture, 'Bom dia!', OTHER_INTERPRETATION);
+      const response = await send(fixture, 'Oi!', OTHER_INTERPRETATION, 1);
 
-      expect(response.outcome).toEqual({ kind: 'OTHER' });
-      expect(provider.replyRequests[0]).toMatchObject({ situation: 'OUT_OF_SCOPE', facts: {} });
+      expect(response.outcome.kind).toBe('WELCOME');
+      expect(provider.replyRequests.at(-1)).toMatchObject({
+        situation: 'WELCOME',
+        senderName: 'Welcome Member 2',
+        facts: {
+          member: 'Welcome Member 2',
+          otherMembers: ['Welcome Member 1', 'Welcome Member 3'],
+          defaultAccount: null,
+        },
+      });
+      expect(JSON.stringify(provider.replyRequests.at(-1)?.facts)).not.toMatch(UUID);
+    });
+
+    it('names the default account of the member in the welcome', async () => {
+      const fixture = await householdWithDefaultAccount('Welcome Account');
+
+      await send(fixture, 'Olá', OTHER_INTERPRETATION);
+
+      expect(provider.replyRequests.at(-1)?.facts).toMatchObject({
+        defaultAccount: 'Joint Account',
+        otherMembers: ['Welcome Account Member 2'],
+      });
+    });
+
+    it('welcomes a member only once, and answers later greetings normally', async () => {
+      const fixture = await householdWithDefaultAccount('Greeted');
+
+      await send(fixture, 'Oi', OTHER_INTERPRETATION);
+      const again = await send(fixture, 'Bom dia!', OTHER_INTERPRETATION);
+
+      expect(again.outcome).toEqual({ kind: 'OTHER' });
+      expect(provider.replyRequests.at(-1)).toMatchObject({ situation: 'OUT_OF_SCOPE', facts: {} });
+    });
+
+    it('records a transaction sent as the first message without a welcome', async () => {
+      const fixture = await householdWithDefaultAccount('Straight To It');
+
+      const response = await send(fixture, 'Gastei €23 no Lidl', transactionInterpretation());
+
+      expect(response.outcome.kind).toBe('TRANSACTION');
+      expect(provider.replyRequests.at(-1)?.situation).toBe('TRANSACTION_RECORDED');
+    });
+
+    it('accepts a welcome that uses the example amounts, and falls back when one is invented', async () => {
+      const first = await householdWithDefaultAccount('Welcome Wording');
+      const second = await householdWithDefaultAccount('Welcome Invented');
+
+      provider.willReply(
+        'Olá! Experimente: "Gastei 12 euros no Tesco" ou "Recebi meu salário de 2500 euros".',
+      );
+      const grounded = await send(first, 'Oi', OTHER_INTERPRETATION);
+      provider.willReply('Olá! Você já economizou 300 euros este mês.');
+      const invented = await send(second, 'Oi', OTHER_INTERPRETATION);
+
+      expect(grounded.reply).toContain('2500 euros');
+      expect(invented.reply).not.toContain('300');
+      expect(invented.reply).toContain('Welcome. I am your household CFO');
+    });
+
+    it('still welcomes the member when the model cannot write the reply', async () => {
+      const fixture = await householdWithDefaultAccount('Welcome Offline');
+      provider.willFailToReply('UNAVAILABLE');
+
+      const response = await send(fixture, 'Oi', OTHER_INTERPRETATION);
+
+      expect(response.reply).toContain('Welcome. I am your household CFO');
+      expect(response.reply).toContain('member: Welcome Offline Member 1');
     });
   });
 });

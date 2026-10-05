@@ -43,6 +43,7 @@ export type ReplySituation =
   | 'IMAGE_NOT_USABLE'
   | 'EDIT_NOT_SUPPORTED'
   | 'PROACTIVE_NOTIFICATION'
+  | 'WELCOME'
   | 'OUT_OF_SCOPE';
 
 export type ReplyFacts = Readonly<Record<string, unknown>>;

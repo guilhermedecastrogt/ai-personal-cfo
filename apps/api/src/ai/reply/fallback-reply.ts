@@ -6,6 +6,8 @@ const HEADLINES: Record<ReplySituation, string> = {
   QUESTION_ANSWERED: 'Here is what I found.',
   IMAGE_NOT_USABLE: 'I could not record anything from that image.',
   EDIT_NOT_SUPPORTED: 'I cannot change or delete a recorded transaction yet. Nothing was changed.',
+  WELCOME:
+    'Welcome. I am your household CFO on WhatsApp: tell me what you spend or receive, send a photo of a receipt, or ask me about your money.',
   PROACTIVE_NOTIFICATION: 'A note about your household finances.',
   OUT_OF_SCOPE:
     'I can record expenses and income, and answer questions about spending, budgets, goals and balances.',

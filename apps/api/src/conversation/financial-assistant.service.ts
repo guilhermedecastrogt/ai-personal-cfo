@@ -45,6 +45,23 @@ import { resolvePeriodReference } from './queries/period-reference.js';
 
 const IMAGE_PLACEHOLDER = '[image]';
 
+const WELCOME_CAPABILITIES = [
+  'Records expenses and income written naturally, in any language, with category and account',
+  'Reads a photo of a receipt and records it',
+  'Answers questions about spending, income, budgets, goals and balances, from the household records',
+  'Reviews the month: what changed, what went well and where to pay attention',
+  'Tracks subscriptions and recurring payments, including price increases',
+  'Keeps a private web dashboard for the household, opened with a personal access code',
+];
+
+const WELCOME_EXAMPLES = [
+  'Spent 12 euros at Tesco',
+  'Received my salary of 2500 euros',
+  'How much did we spend this month?',
+  'How was our month?',
+  'What subscriptions do we have?',
+];
+
 export interface IncomingMessage {
   readonly text: string;
   readonly sourceMessageId?: string;
@@ -58,6 +75,7 @@ export type AssistantOutcome =
   | { readonly kind: 'CORRECTION' }
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' }
+  | { readonly kind: 'WELCOME'; readonly facts: ReplyFacts }
   | { readonly kind: 'AI_UNAVAILABLE'; readonly category: AIFailureCategory };
 
 export interface AssistantResponse {
@@ -169,12 +187,35 @@ export class FinancialAssistant {
     if (outcome.kind === 'REVIEW') {
       return { response: { reply: formatNarrative(outcome.review.narrative), outcome }, state };
     }
+    const settled =
+      outcome.kind === 'OTHER' && conversation.recentUserMessages.length === 0
+        ? await this.welcome(context)
+        : outcome;
     const reply = await this.replies.compose({
-      ...planReply(outcome),
+      ...planReply(settled),
       userMessage: message.text,
       senderName: context.memberName,
     });
-    return { response: { reply, outcome }, state };
+    return { response: { reply, outcome: settled }, state };
+  }
+
+  private async welcome(context: RequestContext): Promise<AssistantOutcome & { kind: 'WELCOME' }> {
+    const [directory, account] = await Promise.all([
+      this.directories.load(context.householdId),
+      this.directories.defaultAccount(context.householdId, context.memberId),
+    ]);
+    return {
+      kind: 'WELCOME',
+      facts: {
+        member: context.memberName,
+        otherMembers: directory.members
+          .filter((member) => member.id !== context.memberId)
+          .map((member) => member.name),
+        defaultAccount: account?.name ?? null,
+        capabilities: WELCOME_CAPABILITIES,
+        examples: WELCOME_EXAMPLES,
+      },
+    };
   }
 
   private async respondToImage(
@@ -418,6 +459,8 @@ function planReply(
       return { situation: 'CLARIFICATION_NEEDED', facts: { reasons: ['AMBIGUOUS_REFERENCE'] } };
     case 'OTHER':
       return { situation: 'OUT_OF_SCOPE', facts: {} };
+    case 'WELCOME':
+      return { situation: 'WELCOME', facts: outcome.facts };
   }
 }
 
