@@ -15,14 +15,14 @@ Identity is resolved by lookup, before any AI processing, from the sender identi
 
 A `whatsapp_identities` table maps an external identity to a member:
 
-| Column | Purpose |
-| --- | --- |
-| `id` | UUID primary key |
-| `member_id` | The member this identity belongs to |
-| `provider` | The WhatsApp provider that issued the identifier |
-| `external_user_id` | The provider's stable identifier for the sender |
-| `phone_number` | The sender's number in E.164 form |
-| `created_at` | Creation timestamp |
+| Column             | Purpose                                          |
+| ------------------ | ------------------------------------------------ |
+| `id`               | UUID primary key                                 |
+| `member_id`        | The member this identity belongs to              |
+| `provider`         | The WhatsApp provider that issued the identifier |
+| `external_user_id` | The provider's stable identifier for the sender  |
+| `phone_number`     | The sender's number in E.164 form                |
+| `created_at`       | Creation timestamp                               |
 
 `(provider, external_user_id)` is unique. The exact columns may be adjusted to the provider's API when the integration is built.
 

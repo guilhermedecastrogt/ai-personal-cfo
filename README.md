@@ -39,14 +39,14 @@ flowchart TD
 
 ## Tech stack
 
-| Area | Choice |
-| --- | --- |
-| Backend | Node.js, TypeScript, NestJS, Drizzle ORM, Zod, Jest |
-| Database | PostgreSQL |
-| AI | OpenAI, isolated behind an internal `AIProvider` interface |
-| Frontend | Next.js, TypeScript, Tailwind CSS, Recharts |
+| Area           | Choice                                                             |
+| -------------- | ------------------------------------------------------------------ |
+| Backend        | Node.js, TypeScript, NestJS, Drizzle ORM, Zod, Jest                |
+| Database       | PostgreSQL                                                         |
+| AI             | OpenAI, isolated behind an internal `AIProvider` interface         |
+| Frontend       | Next.js, TypeScript, Tailwind CSS, Recharts                        |
 | Infrastructure | Docker Compose, Caddy, Terraform, Oracle Cloud Always Free (ARM64) |
-| CI | GitHub Actions |
+| CI             | GitHub Actions                                                     |
 
 ## Repository layout
 
@@ -59,12 +59,25 @@ infra/
 docs/           Architecture, guides and decision records
 ```
 
+## Local development
+
+Requires Node.js 22 and Docker.
+
+```sh
+npm install
+docker compose -f docker-compose.dev.yml up -d --wait
+cp apps/api/.env.example apps/api/.env
+npm run start:dev --workspace apps/api
+```
+
+The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the [development guide](docs/development.md) for the full set of commands and conventions.
+
 ## Roadmap
 
 - [x] Repository initialization
 - [x] Household, identity and AI provider decisions
 - [x] Architecture documentation and decision records
-- [ ] Backend bootstrap with health and readiness checks
+- [x] Backend bootstrap with health and readiness checks
 - [ ] Database schema and core domain
 - [ ] Finance engine
 - [ ] AI transaction extraction from text

@@ -22,14 +22,14 @@ flowchart TD
     API -->|extraction and narration| OpenAI
 ```
 
-| Component | Responsibility |
-| --- | --- |
-| Caddy | TLS termination and routing. The only container with a published port. |
+| Component         | Responsibility                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| Caddy             | TLS termination and routing. The only container with a published port.                 |
 | Next.js dashboard | Presentation of household data. Holds no business logic and no financial calculations. |
-| NestJS backend | All domain logic, persistence, AI orchestration and the WhatsApp webhook. |
-| PostgreSQL | The persisted financial record. Reachable only from the backend container. |
-| WhatsApp provider | Delivery of inbound messages and outbound replies. |
-| OpenAI | Language and vision models, reached through one adapter. |
+| NestJS backend    | All domain logic, persistence, AI orchestration and the WhatsApp webhook.              |
+| PostgreSQL        | The persisted financial record. Reachable only from the backend container.             |
+| WhatsApp provider | Delivery of inbound messages and outbound replies.                                     |
+| OpenAI            | Language and vision models, reached through one adapter.                               |
 
 ## Guiding constraints
 
@@ -85,21 +85,21 @@ flowchart TD
     Domain --> DB[(PostgreSQL)]
 ```
 
-| Module | Owns |
-| --- | --- |
-| `households` | Households, members, WhatsApp identities and resolution of the request context |
-| `accounts` | Accounts and balances |
-| `categories` | The category tree and mapping of names to categories |
-| `transactions` | Transaction validation, creation and querying, including transfers |
-| `budgets` | Budget definitions |
-| `goals` | Goal definitions and progress inputs |
-| `finance` | The finance engine: pure calculators with no I/O |
-| `ai` | The `AIProvider` interface, its OpenAI implementation and transaction extraction |
-| `whatsapp` | Webhook handling, signature verification, idempotency and the provider adapter |
-| `conversation` | Orchestration of an inbound message from intent to reply |
-| `insights` | Rules that decide whether something deserves the household's attention |
-| `advisor` | Phrasing of verified facts into replies, and answering questions through tools |
-| `reports` | Monthly report generation |
+| Module         | Owns                                                                             |
+| -------------- | -------------------------------------------------------------------------------- |
+| `households`   | Households, members, WhatsApp identities and resolution of the request context   |
+| `accounts`     | Accounts and balances                                                            |
+| `categories`   | The category tree and mapping of names to categories                             |
+| `transactions` | Transaction validation, creation and querying, including transfers               |
+| `budgets`      | Budget definitions                                                               |
+| `goals`        | Goal definitions and progress inputs                                             |
+| `finance`      | The finance engine: pure calculators with no I/O                                 |
+| `ai`           | The `AIProvider` interface, its OpenAI implementation and transaction extraction |
+| `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter   |
+| `conversation` | Orchestration of an inbound message from intent to reply                         |
+| `insights`     | Rules that decide whether something deserves the household's attention           |
+| `advisor`      | Phrasing of verified facts into replies, and answering questions through tools   |
+| `reports`      | Monthly report generation                                                        |
 
 ### Dependency rules
 
@@ -249,16 +249,16 @@ Supporting tables for conversations, messages and webhook events sit outside the
 
 The engine is a set of pure calculators:
 
-| Calculator | Produces |
-| --- | --- |
-| `BudgetCalculator` | Spent, remaining, percentage used, days remaining, projected spending |
-| `CashFlowCalculator` | Income, expenses and net flow for a period |
-| `SavingsCalculator` | Savings and savings rate |
-| `ForecastCalculator` | Projected month-end spending and savings from historical averages and current velocity |
-| `GoalCalculator` | Percentage complete, remaining amount, required saving rate, deadline risk |
-| `RecurringExpenseDetector` | Expenses that repeat at a regular interval for a similar amount |
-| `SpendingTrendAnalyzer` | Change in category spending between periods |
-| `AnomalyDetector` | Transactions that are unusual against the household's history |
+| Calculator                 | Produces                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `BudgetCalculator`         | Spent, remaining, percentage used, days remaining, projected spending                  |
+| `CashFlowCalculator`       | Income, expenses and net flow for a period                                             |
+| `SavingsCalculator`        | Savings and savings rate                                                               |
+| `ForecastCalculator`       | Projected month-end spending and savings from historical averages and current velocity |
+| `GoalCalculator`           | Percentage complete, remaining amount, required saving rate, deadline risk             |
+| `RecurringExpenseDetector` | Expenses that repeat at a regular interval for a similar amount                        |
+| `SpendingTrendAnalyzer`    | Change in category spending between periods                                            |
+| `AnomalyDetector`          | Transactions that are unusual against the household's history                          |
 
 Each takes transactions and definitions as input and returns values. The same calculator serves household and per-member analytics, since a member's figures are the same calculation over a filtered set. Breakdowns are computed per member over however many members the household has. Calculators operate on one currency at a time. Percentages are derived from integer amounts with explicit rounding rules.
 
@@ -281,18 +281,18 @@ flowchart TD
 
 ## Security
 
-| Concern | Approach |
-| --- | --- |
-| Transport | HTTPS terminated at Caddy with automatically managed certificates |
-| Webhook authenticity | Signature verification on the raw request body before parsing |
-| Replay and duplication | Unique provider event identifiers in `webhook_events` |
-| Sender identity | Deterministic lookup, with unknown senders dropped |
-| Dashboard access | Authenticated session that carries the member and household |
-| Authorization | Household scope from the request context on every query |
-| Input | Schema validation on every request body and on every model output |
-| Prompt injection | Message content can only ever propose a transaction or a tool call. Both are validated and both are confined to the sender's household |
-| Logging | Structured logs without message bodies, amounts, merchants or phone numbers |
-| Data minimisation | Images are deleted after extraction and never stored |
+| Concern                | Approach                                                                                                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport              | HTTPS terminated at Caddy with automatically managed certificates                                                                      |
+| Webhook authenticity   | Signature verification on the raw request body before parsing                                                                          |
+| Replay and duplication | Unique provider event identifiers in `webhook_events`                                                                                  |
+| Sender identity        | Deterministic lookup, with unknown senders dropped                                                                                     |
+| Dashboard access       | Authenticated session that carries the member and household                                                                            |
+| Authorization          | Household scope from the request context on every query                                                                                |
+| Input                  | Schema validation on every request body and on every model output                                                                      |
+| Prompt injection       | Message content can only ever propose a transaction or a tool call. Both are validated and both are confined to the sender's household |
+| Logging                | Structured logs without message bodies, amounts, merchants or phone numbers                                                            |
+| Data minimisation      | Images are deleted after extraction and never stored                                                                                   |
 
 ## What is deliberately absent
 

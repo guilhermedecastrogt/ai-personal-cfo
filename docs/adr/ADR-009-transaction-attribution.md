@@ -19,10 +19,10 @@ A transaction carries both facts as separate fields.
 
 `expense_scope` states who the expense was for:
 
-| Value | Meaning |
-| --- | --- |
-| `HOUSEHOLD` | A shared cost of the household. This is the default. |
-| `INDIVIDUAL` | A cost attributable to the paying member alone. |
+| Value        | Meaning                                              |
+| ------------ | ---------------------------------------------------- |
+| `HOUSEHOLD`  | A shared cost of the household. This is the default. |
+| `INDIVIDUAL` | A cost attributable to the paying member alone.      |
 
 `expense_scope` is an analytical classification. It has no effect on visibility or authorization, in line with [ADR-008](ADR-008-household-authorization-boundary.md). Every member sees every transaction regardless of its scope.
 
