@@ -1,7 +1,4 @@
-import { readdir } from 'node:fs/promises';
 import type { Server } from 'node:http';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { eq } from 'drizzle-orm';
@@ -38,6 +35,7 @@ import {
   memberAt,
   type HouseholdFixture,
 } from './support/household-fixture.js';
+import { remainingTemporaryMedia } from './support/temporary-media.js';
 import { createTestDatabase, type TestDatabase } from './support/test-database.js';
 
 const MESSAGE_TEXT = 'Gastei €23 no Lidl';
@@ -318,10 +316,6 @@ describe('WhatsApp webhook', () => {
   });
 
   describe('image messages', () => {
-    async function leftoverMedia(): Promise<string[]> {
-      return readdir(join(tmpdir(), 'ai-personal-cfo-media')).catch(() => []);
-    }
-
     it('downloads the media by reference, records the transaction and deletes the image', async () => {
       const { fixture, phones } = await householdWithSenders('Image');
       const messageId = nextMessageId();
@@ -342,7 +336,7 @@ describe('WhatsApp webhook', () => {
         }),
       ]);
       expect(repliesTo(phones[0] ?? '')).toEqual(['[TRANSACTION_RECORDED]']);
-      expect(await leftoverMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
 
     it('preserves the caption and sends the image bytes to the reader', async () => {
@@ -411,7 +405,7 @@ describe('WhatsApp webhook', () => {
       expect(ai.imageRequests).toEqual([]);
       expect(repliesTo(phones[0] ?? '')).toEqual(['[IMAGE_NOT_USABLE]']);
       expect(await eventStatus(messageId)).toBe('PROCESSED');
-      expect(await leftoverMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
   });
 

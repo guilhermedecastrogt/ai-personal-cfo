@@ -1,7 +1,4 @@
-import { readdir } from 'node:fs/promises';
 import type { Server } from 'node:http';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { eq } from 'drizzle-orm';
@@ -47,6 +44,7 @@ import {
 } from '../src/whatsapp/testing/kapso-api-stub.fixture.js';
 import { webhookEvents } from '../src/whatsapp/webhook-events.schema.js';
 import { RELAXED_SECURITY_POLICY } from './support/assistant-harness.js';
+import { remainingTemporaryMedia } from './support/temporary-media.js';
 import {
   createHouseholdFixture,
   memberAt,
@@ -266,10 +264,6 @@ describe('security', () => {
       .map((sent) => sent.body as { to: string; text: { body: string } })
       .filter((body) => body.to === phone)
       .map((body) => body.text.body);
-  }
-
-  async function temporaryMedia(): Promise<string[]> {
-    return readdir(join(tmpdir(), 'ai-personal-cfo-media')).catch(() => []);
   }
 
   beforeAll(async () => {
@@ -866,7 +860,7 @@ describe('security', () => {
 
       expect(ai.imageRequests).toEqual([]);
       expect(repliesTo(alpha.phone)).toEqual(['[IMAGE_NOT_USABLE]']);
-      expect(await temporaryMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
 
     it.each([
@@ -880,7 +874,7 @@ describe('security', () => {
       await sendImage('media-fake');
 
       expect(ai.imageRequests).toEqual([]);
-      expect(await temporaryMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
 
     it.each(['../../../../etc/passwd', '..%2F..%2Fsecrets', '/etc/shadow', 'a/../../b'])(
@@ -893,7 +887,7 @@ describe('security', () => {
         expect(lookups[0]?.path.startsWith('/meta/whatsapp/v24.0/')).toBe(true);
         expect(lookups[0]?.path).not.toContain('/../');
         expect(ai.imageRequests).toEqual([]);
-        expect(await temporaryMedia()).toEqual([]);
+        expect(await remainingTemporaryMedia()).toEqual([]);
       },
     );
 
@@ -913,7 +907,7 @@ describe('security', () => {
 
       expect(outsider.requests).toEqual([]);
       expect(ai.imageRequests).toEqual([]);
-      expect(await temporaryMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
 
     it('does not follow a redirect to another host', async () => {
@@ -937,7 +931,7 @@ describe('security', () => {
       expect(download).toBeDefined();
       expect(download?.apiKey).toBeUndefined();
       expect(ai.imageRequests).toHaveLength(1);
-      expect(await temporaryMedia()).toEqual([]);
+      expect(await remainingTemporaryMedia()).toEqual([]);
     });
   });
 
