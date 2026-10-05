@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import { localeOr } from '../i18n/locale.js';
 import type { RequestContext } from '../households/request-context.js';
 import {
   SECURITY_POLICY,
@@ -58,7 +59,9 @@ export class AuthService {
 
   async resolve(token: string, instant: Date): Promise<RequestContext | undefined> {
     const owner = await this.repository.findOwnerOfSession(hashOf(token), instant);
-    return owner === undefined ? undefined : { ...owner, channel: 'web' };
+    return owner === undefined
+      ? undefined
+      : { ...owner, locale: localeOr(owner.locale), channel: 'web' };
   }
 
   async signOut(token: string): Promise<void> {

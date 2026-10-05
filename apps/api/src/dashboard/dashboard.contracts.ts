@@ -159,6 +159,7 @@ export const recurringSchema = z.object({
 });
 
 export const sessionSchema = z.object({
+  locale: z.enum(['en', 'pt-BR']),
   member: z.string(),
   household: z.string(),
   currency: z.string(),

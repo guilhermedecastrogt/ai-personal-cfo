@@ -4,6 +4,7 @@ import {
   type AssistantResponse,
 } from '../conversation/financial-assistant.service.js';
 import type { RequestContext } from '../households/request-context.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.js';
 import { RateLimiter } from '../security/rate-limiter.js';
 import { SECURITY_POLICY_TOKEN, type SecurityPolicy } from '../security/security-policy.js';
 import { WhatsAppIdentityResolver } from '../households/whatsapp-identity-resolver.js';
@@ -16,11 +17,25 @@ import {
   type WhatsAppProvider,
 } from './whatsapp-provider.js';
 
-export const SLOW_DOWN_REPLY =
-  'You are sending messages faster than I can handle. Please wait a minute and try again.';
+const SLOW_DOWN: Readonly<Record<Locale, string>> = {
+  en: 'You are sending messages faster than I can handle. Please wait a minute and try again.',
+  'pt-BR':
+    'Estou recebendo mensagens mais rápido do que consigo atender. Aguarde um minuto, por favor.',
+};
 
-export const PROCESSING_FAILED_REPLY =
-  'Something went wrong on my side and I could not process that. Please try again in a moment.';
+const PROCESSING_FAILED: Readonly<Record<Locale, string>> = {
+  en: 'Something went wrong on my side and I could not process that. Please try again in a moment.',
+  'pt-BR':
+    'Algo deu errado do meu lado e não consegui processar isso. Tente novamente em instantes.',
+};
+
+export const SLOW_DOWN_REPLY = SLOW_DOWN.en;
+
+export const PROCESSING_FAILED_REPLY = PROCESSING_FAILED.en;
+
+interface Conversation {
+  locale: Locale;
+}
 
 type SupportedMessage = InboundMessage & {
   readonly content: Exclude<InboundMessage['content'], { kind: 'UNSUPPORTED' }>;
@@ -40,16 +55,22 @@ export class InboundMessageProcessor {
   ) {}
 
   async process(message: InboundMessage, receivedAt: Date): Promise<void> {
+    const conversation: Conversation = { locale: DEFAULT_LOCALE };
     try {
-      const outcome = await this.handle(message, receivedAt);
+      const outcome = await this.handle(message, receivedAt, conversation);
       await this.finish(message, outcome);
     } catch {
-      await this.recover(message);
+      await this.recover(message, conversation);
     }
   }
 
-  private async handle(message: InboundMessage, receivedAt: Date): Promise<WebhookEventOutcome> {
+  private async handle(
+    message: InboundMessage,
+    receivedAt: Date,
+    conversation: Conversation,
+  ): Promise<WebhookEventOutcome> {
     const context = await this.identities.resolve(this.provider.name, message.sender);
+    conversation.locale = context?.locale ?? DEFAULT_LOCALE;
     if (context === undefined) {
       this.logger.warn(`event=ignored reason=unknown-sender provider=${this.provider.name}`);
       return 'IGNORED';
@@ -67,7 +88,7 @@ export class InboundMessageProcessor {
     if (!allowance.isAllowed) {
       this.logger.warn(`event=ignored reason=rate-limited provider=${this.provider.name}`);
       if (allowance.isFirstRejection) {
-        await this.reply(message.sender, SLOW_DOWN_REPLY);
+        await this.reply(message.sender, SLOW_DOWN[conversation.locale]);
       }
       return 'IGNORED';
     }
@@ -120,14 +141,14 @@ export class InboundMessageProcessor {
     this.logger.log(`event=completed provider=${this.provider.name} outcome=${outcome}`);
   }
 
-  private async recover(message: InboundMessage): Promise<void> {
+  private async recover(message: InboundMessage, conversation: Conversation): Promise<void> {
     this.logger.error(`event=failed provider=${this.provider.name}`);
     try {
       await this.events.complete(this.provider.name, message.eventId, 'FAILED');
     } catch {
       this.logger.error(`event=failure-not-recorded provider=${this.provider.name}`);
     }
-    await this.reply(message.sender, PROCESSING_FAILED_REPLY);
+    await this.reply(message.sender, PROCESSING_FAILED[conversation.locale]);
   }
 }
 

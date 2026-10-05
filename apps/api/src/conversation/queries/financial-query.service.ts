@@ -362,5 +362,6 @@ function namesOf(directory: HouseholdDirectory): NameDirectory {
     categories: byId(directory.categories),
     accounts: byId(directory.accounts),
     goals: byId(directory.goals),
+    locale: directory.locale,
   };
 }

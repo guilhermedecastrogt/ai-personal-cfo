@@ -1,9 +1,8 @@
 import type { ReplyFacts } from '../../ai/ai-provider.js';
 import type { Anomaly } from '../../finance/domain/anomaly/anomaly-detector.js';
 import type { Finding, MonthlyReview } from '../analysis/monthly-review.js';
-import { describeResult, type NameDirectory } from './result-description.js';
-
-export const ALL_SPENDING_LABEL = 'All spending';
+import { describeResult, localeOf, type NameDirectory } from './result-description.js';
+import { allSpendingLabel } from './signal-descriptions.js';
 
 const BUDGET_FINDINGS: readonly string[] = [
   'BUDGET_EXCEEDED',
@@ -12,6 +11,7 @@ const BUDGET_FINDINGS: readonly string[] = [
 ];
 
 export function toReviewContext(review: MonthlyReview, directory: NameDirectory): ReplyFacts {
+  const allSpending = allSpendingLabel(localeOf(directory));
   const { totals, comparison } = review;
   const raw = {
     currency: review.currency,
@@ -41,7 +41,7 @@ export function toReviewContext(review: MonthlyReview, directory: NameDirectory)
     categoryIncreases: review.categoryIncreases,
     categoryDecreases: review.categoryDecreases,
     budgets: review.budgets.map((budget) =>
-      withBudgetScope({
+      withBudgetScope(allSpending, {
         categoryId: budget.categoryId,
         limitMinor: budget.limitMinor,
         spentMinor: budget.spentMinor,
@@ -71,21 +71,22 @@ export function toReviewContext(review: MonthlyReview, directory: NameDirectory)
     },
     unusualSpending: review.anomalies.map(describeAnomaly),
     balances: review.balances,
-    findings: review.findings.map(describeFinding),
+    findings: review.findings.map((finding) => describeFinding(finding, allSpending)),
   };
   return describeResult(raw, directory) as ReplyFacts;
 }
 
 function withBudgetScope(
+  allSpending: string,
   budget: Readonly<Record<string, unknown>> & { readonly categoryId: string | null },
 ): Record<string, unknown> {
   const { categoryId, ...rest } = budget;
-  return categoryId === null ? { category: ALL_SPENDING_LABEL, ...rest } : { categoryId, ...rest };
+  return categoryId === null ? { category: allSpending, ...rest } : { categoryId, ...rest };
 }
 
-function describeFinding(finding: Finding): Record<string, unknown> {
+function describeFinding(finding: Finding, allSpending: string): Record<string, unknown> {
   const facts = BUDGET_FINDINGS.includes(finding.code)
-    ? withBudgetScope({ categoryId: null, ...finding.facts })
+    ? withBudgetScope(allSpending, { categoryId: null, ...finding.facts })
     : finding.facts;
   return { kind: finding.kind, code: finding.code, ...facts };
 }

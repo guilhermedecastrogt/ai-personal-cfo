@@ -46,7 +46,10 @@ export class ReviewExplainer {
 
   private fallback(request: ReviewExplanationRequest, reason: string): ExplainedReview {
     this.logger.warn(`Review narrative replaced by deterministic fallback: reason=${reason}`);
-    return { narrative: renderDeterministicNarrative(request.reviews), source: 'DETERMINISTIC' };
+    return {
+      narrative: renderDeterministicNarrative(request.reviews, request.locale),
+      source: 'DETERMINISTIC',
+    };
   }
 }
 

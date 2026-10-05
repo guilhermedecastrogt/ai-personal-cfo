@@ -30,3 +30,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [024](ADR-024-derived-recurring-expenses.md)                  | Recurring expenses are derived from transactions on every read                                 | Accepted |
 | [025](ADR-025-in-process-security-controls.md)                | Security controls run inside the application, with in-memory rate limiting                     | Accepted |
 | [026](ADR-026-single-vm-compose-deployment.md)                | Production runs as a Compose stack on a shared VM, and Terraform does not own that VM          | Accepted |
+| [027](ADR-027-per-household-display-language.md)              | Each household has a display language, and canonical names stay in English                     | Accepted |

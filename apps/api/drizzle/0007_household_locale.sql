@@ -1,0 +1,2 @@
+ALTER TABLE "households" ADD COLUMN "locale" text DEFAULT 'en' NOT NULL;--> statement-breakpoint
+ALTER TABLE "households" ADD CONSTRAINT "households_locale_supported" CHECK ("households"."locale" in ('en', 'pt-BR'));

@@ -603,6 +603,7 @@ describe('architecture', () => {
       'config/config.module.ts',
       'database/run-migrations.ts',
       'database/seed/run-seed.ts',
+      'households/set-household-locale.ts',
     ]);
   });
 

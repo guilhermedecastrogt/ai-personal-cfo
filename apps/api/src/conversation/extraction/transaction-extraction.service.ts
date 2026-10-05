@@ -5,6 +5,7 @@ import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
 import { HouseholdDirectoryService } from '../../directory/household-directory.service.js';
 import type { IsoDate } from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
+import { DEFAULT_LOCALE, type Locale } from '../../i18n/locale.js';
 import { formatMoney } from '../../money/format-money.js';
 import type { TransactionSource } from '../../transactions/transaction-vocabulary.js';
 import {
@@ -69,6 +70,7 @@ export class TransactionExtractionService {
 
   async extract(request: ExtractionRequest): Promise<ExtractionOutcome> {
     const { context, candidate, today } = request;
+    const locale = context.locale ?? DEFAULT_LOCALE;
     const [{ accounts, categories }, defaultAccount] = await Promise.all([
       this.directory.load(context.householdId),
       this.directory.defaultAccount(context.householdId, context.memberId),
@@ -82,7 +84,14 @@ export class TransactionExtractionService {
       confidenceThreshold: this.config.aiConfidenceThreshold,
     });
     if (draft.fields === undefined) {
-      return clarification(draft.problems, candidate, draft.understood, accounts, categories);
+      return clarification(
+        draft.problems,
+        candidate,
+        draft.understood,
+        accounts,
+        categories,
+        locale,
+      );
     }
     try {
       const transaction = await this.transactions.record(context.householdId, {
@@ -93,10 +102,17 @@ export class TransactionExtractionService {
           ? {}
           : { sourceMessageId: request.sourceMessageId }),
       });
-      return { status: 'RECORDED', transaction, facts: describe(draft.understood) };
+      return { status: 'RECORDED', transaction, facts: describe(draft.understood, locale) };
     } catch (error) {
       if (error instanceof TransactionRejectedError) {
-        return clarification(error.reasons, candidate, draft.understood, accounts, categories);
+        return clarification(
+          error.reasons,
+          candidate,
+          draft.understood,
+          accounts,
+          categories,
+          locale,
+        );
       }
       throw error;
     }
@@ -116,6 +132,7 @@ function clarification(
   understood: Understood,
   accounts: readonly AccountOption[],
   categories: readonly CategoryOption[],
+  locale: Locale,
 ): ExtractionOutcome {
   const needsCategory = reasons.some((reason) => CATEGORY_REASONS.includes(reason));
   const needsAccount = reasons.some((reason) => ACCOUNT_REASONS.includes(reason));
@@ -126,7 +143,7 @@ function clarification(
     candidate,
     facts: {
       reasons,
-      understood: describe(understood),
+      understood: describe(understood, locale),
       ...(needsCategory
         ? {
             categoryOptions: categories
@@ -141,14 +158,14 @@ function clarification(
   };
 }
 
-function describe(understood: Understood): ReplyFacts {
+function describe(understood: Understood, locale: Locale): ReplyFacts {
   const { amountMinor, currency } = understood;
   return {
     type: understood.type,
     amount:
       amountMinor === undefined || currency === undefined
         ? null
-        : formatMoney(amountMinor, currency),
+        : formatMoney(amountMinor, currency, locale),
     merchant: understood.merchant ?? null,
     category: understood.category?.name ?? null,
     account: understood.account?.name ?? null,

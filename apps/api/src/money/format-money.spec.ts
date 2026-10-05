@@ -32,3 +32,24 @@ describe('formatBasisPoints', () => {
     expect(formatBasisPoints(basisPoints)).toBe(expected);
   });
 });
+
+describe('Brazilian Portuguese formatting', () => {
+  it.each([
+    [1200, 'EUR', '€ 12,00'],
+    [182698, 'EUR', '€ 1.826,98'],
+    [-1050, 'EUR', '-€ 10,50'],
+    [5000, 'BRL', 'R$ 50,00'],
+    [1000, 'JPY', 'JP¥ 1.000'],
+  ])('formats %d %s as %s', (amountMinor, currency, expected) => {
+    expect(formatMoney(amountMinor, currency, 'pt-BR').replace(/\s/g, ' ')).toBe(expected);
+  });
+
+  it.each([
+    [1876, '18,76%'],
+    [10000, '100%'],
+    [2500, '25%'],
+    [-3333, '-33,33%'],
+  ])('formats %d basis points as %s', (basisPoints, expected) => {
+    expect(formatBasisPoints(basisPoints, 'pt-BR')).toBe(expected);
+  });
+});

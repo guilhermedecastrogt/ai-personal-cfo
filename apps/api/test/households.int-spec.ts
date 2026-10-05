@@ -95,6 +95,7 @@ describe('households and members', () => {
           memberId: member.id,
           memberName: member.name,
           channel: 'whatsapp',
+          locale: 'en',
         })),
       );
     });

@@ -6,6 +6,8 @@ import { HouseholdNotFoundError } from '../finance/application/finance.service.j
 import { DEFAULT_FINANCE_POLICY } from '../finance/domain/finance-policy.js';
 import type { DateRange, IsoDate } from '../finance/domain/period/period.js';
 import { GoalsRepository } from '../goals/goals.repository.js';
+import { categoryLabel } from '../i18n/category-labels.js';
+import { DEFAULT_LOCALE, localeOr } from '../i18n/locale.js';
 import { HouseholdsRepository } from '../households/households.repository.js';
 import type { RequestContext } from '../households/request-context.js';
 import type { ReplyFacts } from '../ai/ai-provider.js';
@@ -75,6 +77,7 @@ export class CfoService {
       userMessage: request.userMessage ?? null,
       senderName: context.memberName,
       reviews: analysis.analyses.map((currency) => currency.context),
+      locale: analysis.directory.locale ?? DEFAULT_LOCALE,
     });
     return {
       month: request.month,
@@ -108,9 +111,13 @@ export class CfoService {
     const currencies = [
       ...new Set([household.currency, ...accounts.map((account) => account.currency).sort()]),
     ];
+    const locale = localeOr(household.locale);
     const directory: NameDirectory = {
+      locale,
       members: namesById(members),
-      categories: namesById(categories),
+      categories: namesById(
+        categories.map((category) => ({ ...category, name: categoryLabel(category.name, locale) })),
+      ),
       accounts: namesById(accounts),
       goals: namesById(goals),
     };

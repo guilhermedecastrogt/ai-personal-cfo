@@ -1,7 +1,7 @@
 import { assertExactInteger } from './money-math.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.js';
 import { minorUnitDigits } from './money.js';
 
-const DISPLAY_LOCALE = 'en';
 const PERCENT_FRACTION_DIGITS = 2;
 
 type DecimalText = `${number}`;
@@ -14,15 +14,22 @@ function toDecimalText(value: number, fractionDigits: number): DecimalText {
   return (fractionDigits === 0 ? `${sign}${whole}` : `${sign}${whole}.${fraction}`) as DecimalText;
 }
 
-export function formatMoney(amountMinor: number, currency: string): string {
-  return new Intl.NumberFormat(DISPLAY_LOCALE, { style: 'currency', currency }).format(
+const DECIMAL_SEPARATOR: Readonly<Record<Locale, string>> = { en: '.', 'pt-BR': ',' };
+
+export function formatMoney(
+  amountMinor: number,
+  currency: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
     toDecimalText(amountMinor, minorUnitDigits(currency)),
   );
 }
 
-export function formatBasisPoints(basisPoints: number): string {
+export function formatBasisPoints(basisPoints: number, locale: Locale = DEFAULT_LOCALE): string {
   const percent = toDecimalText(basisPoints, PERCENT_FRACTION_DIGITS)
-    .replace(/0+$/, '')
-    .replace(/\.$/, '');
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '')
+    .replace('.', DECIMAL_SEPARATOR[locale]);
   return `${percent}%`;
 }

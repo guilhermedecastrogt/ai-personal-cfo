@@ -33,6 +33,6 @@ export class ReplyComposer {
 
   private fallback(request: ReplyRequest, reason: string): string {
     this.logger.warn(`Reply replaced by fallback: situation=${request.situation} reason=${reason}`);
-    return renderFallbackReply(request.situation, request.facts);
+    return renderFallbackReply(request.situation, request.facts, request.locale);
   }
 }

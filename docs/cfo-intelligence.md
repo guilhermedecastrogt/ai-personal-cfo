@@ -163,7 +163,7 @@ The figure check means the model cannot state a total it added up, a difference 
 - the output exceeds the limits
 - the output contains a number that is not in the review
 
-The fallback narrative is in English and plainer than the model's. Its figures are the same, because both come from the same review.
+The fallback narrative is written in the household's language and is plainer than the model's. Its figures are the same, because both come from the same review.
 
 With no AI provider configured at all, every review is produced this way.
 
@@ -197,7 +197,7 @@ The reply is the narrative as one message: the summary, then strengths, concerns
 - "Can I afford €200 this weekend?" has no dedicated calculation yet. It is interpreted as a forecast question.
 - Reviews are generated on request. They are not scheduled, sent proactively or stored in `monthly_reports`.
 - Insights are computed for each review and not persisted, so nothing yet prevents the same concern from being mentioned in consecutive reviews.
-- The fallback narrative is in English.
+- The fallback narrative has a fixed wording per language, so it reads less naturally than the model's.
 - The figure check occasionally rejects a harmless narrative, for example one that counts items.
 - Account balances are available only for the current month.
 - The model's use of a real figure in the wrong context is not detected.

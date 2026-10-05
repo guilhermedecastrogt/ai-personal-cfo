@@ -74,6 +74,7 @@ export const RESTAURANTS_BUDGET: BudgetView = {
 };
 
 export const SESSION: SessionView = {
+  locale: 'en',
   member: 'Member A',
   household: 'Demo Household',
   currency: 'EUR',

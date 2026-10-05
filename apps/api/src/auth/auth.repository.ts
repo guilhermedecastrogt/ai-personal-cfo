@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, lte, notInArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
-import { members } from '../households/households.schema.js';
+import { households, members } from '../households/households.schema.js';
 import { dashboardSessions, memberAccessCodes } from './auth.schema.js';
 
 export interface SessionOwner {
@@ -88,15 +88,20 @@ export class AuthRepository {
     });
   }
 
-  async findOwnerOfSession(tokenHash: string, instant: Date): Promise<SessionOwner | undefined> {
+  async findOwnerOfSession(
+    tokenHash: string,
+    instant: Date,
+  ): Promise<(SessionOwner & { locale: string }) | undefined> {
     const [owner] = await this.database
       .select({
         householdId: members.householdId,
         memberId: members.id,
         memberName: members.name,
+        locale: households.locale,
       })
       .from(dashboardSessions)
       .innerJoin(members, eq(members.id, dashboardSessions.memberId))
+      .innerJoin(households, eq(households.id, members.householdId))
       .where(
         and(eq(dashboardSessions.tokenHash, tokenHash), gt(dashboardSessions.expiresAt, instant)),
       );

@@ -142,6 +142,16 @@ cfo run --rm --no-deps -v /path/to/household.local.json:/seed.json:ro -e SEED_DE
 
 Always pass `SEED_DEFINITION_FILE`. Without it the script loads the demo household, which does not belong in production. The format of the file is described in [database.md](database.md#seed-data).
 
+## Household language
+
+A household's dashboard, alerts and fixed replies follow its language, English by default. To switch one to Brazilian Portuguese:
+
+```sh
+cfo exec -e HOUSEHOLD_NAME="…" -e LOCALE=pt-BR api node dist/households/set-household-locale.js
+```
+
+It takes effect on the next request. Notifications already raised keep their original wording.
+
 ## Routine maintenance
 
 | Task                          | How                                                                             |

@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from '../i18n/locale.js';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AIProviderError,
@@ -13,7 +14,7 @@ import type {
   TransactionCandidate,
 } from '../ai/interpretation/message-interpretation.schema.js';
 import { MessageInterpreter } from '../ai/interpretation/message-interpreter.js';
-import { AI_UNAVAILABLE_REPLY } from '../ai/reply/fallback-reply.js';
+import { aiUnavailableReply } from '../ai/reply/fallback-reply.js';
 import { ReplyComposer } from '../ai/reply/reply-composer.js';
 import { CfoService, type MonthlyReviewResult } from '../cfo/cfo.service.js';
 import { formatNarrative } from '../cfo/explanation/narrative-format.js';
@@ -173,7 +174,7 @@ export class FinancialAssistant {
       );
     } catch (error) {
       if (error instanceof AIProviderError) {
-        return { response: unavailable(error), state: undefined };
+        return { response: unavailable(error, context), state: undefined };
       }
       throw error;
     }
@@ -195,6 +196,7 @@ export class FinancialAssistant {
       ...planReply(settled),
       userMessage: message.text,
       senderName: context.memberName,
+      locale: context.locale ?? DEFAULT_LOCALE,
     });
     return { response: { reply, outcome: settled }, state };
   }
@@ -230,7 +232,7 @@ export class FinancialAssistant {
       image = await this.images.extract(context, message, today);
     } catch (error) {
       if (error instanceof AIProviderError) {
-        return { response: unavailable(error), state: undefined };
+        return { response: unavailable(error, context), state: undefined };
       }
       throw error;
     }
@@ -239,6 +241,7 @@ export class FinancialAssistant {
       ...planReply(outcome),
       userMessage: caption,
       senderName: context.memberName,
+      locale: context.locale ?? DEFAULT_LOCALE,
     });
     return {
       response: { reply, outcome },
@@ -471,9 +474,9 @@ const IMAGE_SITUATIONS: Record<ImageOutcome['status'], ReplySituation> = {
   IMAGE_NOT_USABLE: 'IMAGE_NOT_USABLE',
 };
 
-function unavailable(error: AIProviderError): AssistantResponse {
+function unavailable(error: AIProviderError, context: RequestContext): AssistantResponse {
   return {
-    reply: AI_UNAVAILABLE_REPLY,
+    reply: aiUnavailableReply(context.locale),
     outcome: { kind: 'AI_UNAVAILABLE', category: error.category },
   };
 }

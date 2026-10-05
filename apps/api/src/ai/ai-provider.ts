@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n/locale.js';
 import type { ImageMimeType } from '../media/image-inspection.js';
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');
@@ -53,12 +54,14 @@ export interface ReplyRequest {
   readonly userMessage: string;
   readonly senderName: string;
   readonly facts: ReplyFacts;
+  readonly locale?: Locale;
 }
 
 export interface ReviewExplanationRequest {
   readonly userMessage: string | null;
   readonly senderName: string;
   readonly reviews: readonly ReplyFacts[];
+  readonly locale?: Locale;
 }
 
 export interface AIProvider {

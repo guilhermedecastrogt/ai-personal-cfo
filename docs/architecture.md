@@ -130,6 +130,10 @@ Every request, from either entry point, is resolved to a context before applicat
 
 For WhatsApp the context comes from a lookup that follows identity to member to household ([ADR-007](adr/ADR-007-whatsapp-identity-resolution.md)). For the dashboard it comes from the authenticated session. Services receive the context explicitly, and repositories require its `householdId` on every query.
 
+## Language
+
+Each household has a display language, `en` or `pt-BR` ([ADR-027](adr/ADR-027-per-household-display-language.md)). It is resolved with the household and carried in the request context and the name directory. Category names stay in English in the database; the household directory shows them under their label for the household's language, and the model is offered those labels. Every text the system writes on its own, and every amount and percentage, is formatted for that language.
+
 ## Inbound message flow
 
 ```mermaid

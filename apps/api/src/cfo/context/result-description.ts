@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, type Locale } from '../../i18n/locale.js';
 import { formatBasisPoints, formatMoney } from '../../money/format-money.js';
 
 export interface NameDirectory {
@@ -5,6 +6,7 @@ export interface NameDirectory {
   readonly categories: ReadonlyMap<string, string>;
   readonly accounts: ReadonlyMap<string, string>;
   readonly goals: ReadonlyMap<string, string>;
+  readonly locale?: Locale;
 }
 
 export interface AmountView {
@@ -23,9 +25,16 @@ interface Presentation {
   ratio(basisPoints: number): unknown;
 }
 
-const UNKNOWN_NAME = 'Unknown';
-const UNCATEGORISED = 'Uncategorised';
-const JOINT_OWNER = 'Joint';
+interface FallbackNames {
+  readonly unknown: string;
+  readonly uncategorised: string;
+  readonly joint: string;
+}
+
+const FALLBACK_NAMES: Readonly<Record<Locale, FallbackNames>> = {
+  en: { unknown: 'Unknown', uncategorised: 'Uncategorised', joint: 'Joint' },
+  'pt-BR': { unknown: 'Desconhecido', uncategorised: 'Sem categoria', joint: 'Conjunta' },
+};
 const MINOR_SUFFIX = 'Minor';
 const BASIS_POINTS_SUFFIX = 'BasisPoints';
 const OMITTED_KEYS: ReadonlySet<string> = new Set([
@@ -35,10 +44,18 @@ const OMITTED_KEYS: ReadonlySet<string> = new Set([
   'key',
 ]);
 
+export function localeOf(directory: NameDirectory): Locale {
+  return directory.locale ?? DEFAULT_LOCALE;
+}
+
 export function describeResult(value: unknown, directory: NameDirectory): unknown {
   return describeValue(
     value,
-    { directory, money: formatMoney, ratio: formatBasisPoints },
+    {
+      directory,
+      money: (minor, currency) => formatMoney(minor, currency, localeOf(directory)),
+      ratio: (basisPoints) => formatBasisPoints(basisPoints, localeOf(directory)),
+    },
     undefined,
   );
 }
@@ -46,8 +63,14 @@ export function describeResult(value: unknown, directory: NameDirectory): unknow
 export function presentResult(value: unknown, directory: NameDirectory): unknown {
   const presentation: Presentation = {
     directory,
-    money: (minor, currency): AmountView => ({ minor, text: formatMoney(minor, currency) }),
-    ratio: (basisPoints): RatioView => ({ basisPoints, text: formatBasisPoints(basisPoints) }),
+    money: (minor, currency): AmountView => ({
+      minor,
+      text: formatMoney(minor, currency, localeOf(directory)),
+    }),
+    ratio: (basisPoints): RatioView => ({
+      basisPoints,
+      text: formatBasisPoints(basisPoints, localeOf(directory)),
+    }),
   };
   return describeValue(value, presentation, undefined);
 }
@@ -92,6 +115,10 @@ function describeField(
   currency: string | undefined,
 ): [string, unknown] {
   const { directory } = presentation;
+  const fallbackNames = FALLBACK_NAMES[localeOf(directory)];
+  const UNKNOWN_NAME = fallbackNames.unknown;
+  const UNCATEGORISED = fallbackNames.uncategorised;
+  const JOINT_OWNER = fallbackNames.joint;
   const nameOf = (names: ReadonlyMap<string, string>, fallback: string): unknown =>
     typeof value === 'string' ? (names.get(value) ?? UNKNOWN_NAME) : fallback;
   switch (key) {

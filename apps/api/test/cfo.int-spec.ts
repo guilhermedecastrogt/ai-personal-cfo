@@ -535,7 +535,13 @@ describe('CFO monthly review', () => {
       const [request] = harness.provider.reviewRequests;
       const sent = JSON.stringify(request);
 
-      expect(Object.keys(request ?? {}).sort()).toEqual(['reviews', 'senderName', 'userMessage']);
+      expect(Object.keys(request ?? {}).sort()).toEqual([
+        'locale',
+        'reviews',
+        'senderName',
+        'userMessage',
+      ]);
+      expect(request?.locale).toBe('en');
       expect(sent).not.toMatch(UUID);
       expect(sent).not.toMatch(/Id"|Minor"|BasisPoints"/);
       expect(sent).not.toContain('353851112222');

@@ -1,7 +1,7 @@
 import type { CurrencyAnalysis } from '../cfo/cfo.service.js';
-import { describeResult, type NameDirectory } from '../cfo/context/result-description.js';
-import { ALL_SPENDING_LABEL } from '../cfo/context/review-context.js';
-import { describeInsights } from '../cfo/context/signal-descriptions.js';
+import { describeResult, localeOf, type NameDirectory } from '../cfo/context/result-description.js';
+import { allSpendingLabel, describeInsights } from '../cfo/context/signal-descriptions.js';
+import type { Locale } from '../i18n/locale.js';
 import type { Insight, InsightSeverity } from '../finance/domain/insights/insight-engine.js';
 import { daysBetween, type IsoDate } from '../finance/domain/period/period.js';
 import { severityRank, type ProactivePolicy } from './proactive-policy.js';
@@ -69,6 +69,30 @@ function identityOf(insight: Insight, policy: ProactivePolicy): { key: string; l
   return { key: insight.key, level: severityRank(insight.severity) + 1 };
 }
 
+interface CandidateWording {
+  forecastTitle(scope: string): string;
+  forecastBody(projected: string, limit: string): string;
+  dueTitle(merchant: string): string;
+  dueBody(amount: string, expected: string): string;
+}
+
+const WORDING: Readonly<Record<Locale, CandidateWording>> = {
+  en: {
+    forecastTitle: (scope) => `${scope} budget is projected to run over`,
+    forecastBody: (projected, limit) =>
+      `At the current pace it would reach ${projected} against a limit of ${limit}.`,
+    dueTitle: (merchant) => `${merchant} is expected soon`,
+    dueBody: (amount, expected) => `Usually ${amount}, expected around ${expected}.`,
+  },
+  'pt-BR': {
+    forecastTitle: (scope) => `Orçamento de ${scope} deve estourar`,
+    forecastBody: (projected, limit) =>
+      `No ritmo atual chegaria a ${projected}, para um limite de ${limit}.`,
+    dueTitle: (merchant) => `${merchant} deve ser cobrado em breve`,
+    dueBody: (amount, expected) => `Normalmente ${amount}, previsto para ${expected}.`,
+  },
+};
+
 export function buildCandidates(
   analysis: CurrencyAnalysis,
   directory: NameDirectory,
@@ -76,6 +100,7 @@ export function buildCandidates(
   policy: ProactivePolicy,
 ): NotificationCandidate[] {
   const { review } = analysis;
+  const words = WORDING[localeOf(directory)];
   const period = review.month.start.slice(0, MONTH_KEY_LENGTH);
   const shared = { currency: review.currency, period };
   const descriptions = describeInsights(review.insights, directory);
@@ -95,15 +120,18 @@ export function buildCandidates(
     .filter((budget) => budget.isProjectedOverLimit && budget.status === 'ON_TRACK')
     .map((budget): NotificationCandidate => {
       const facts = describeResult({ currency: review.currency, ...budget }, directory) as Facts;
-      const scope = budget.categoryId === null ? ALL_SPENDING_LABEL : text(facts, 'category');
+      const scope =
+        budget.categoryId === null
+          ? allSpendingLabel(localeOf(directory))
+          : text(facts, 'category');
       return {
         ...shared,
         eventKey: `${review.currency}:BUDGET_FORECAST:${budget.budgetId}:${review.month.start}`,
         type: 'BUDGET_FORECAST_RISK',
         severity: 'MEDIUM',
         level: severityRank('MEDIUM') + 1,
-        title: `${scope} budget is projected to run over`,
-        body: `At the current pace it would reach ${text(facts, 'projectedTotal')} against a limit of ${text(facts, 'limit')}.`,
+        title: words.forecastTitle(scope),
+        body: words.forecastBody(text(facts, 'projectedTotal'), text(facts, 'limit')),
       };
     });
   const dueSoon = review.recurring.commitments
@@ -122,8 +150,8 @@ export function buildCandidates(
         type: 'RECURRING_EXPENSE_DUE',
         severity: 'LOW',
         level: severityRank('LOW') + 1,
-        title: `${commitment.merchant} is expected soon`,
-        body: `Usually ${text(facts, 'typicalAmount')}, expected around ${commitment.nextExpectedDate}.`,
+        title: words.dueTitle(commitment.merchant),
+        body: words.dueBody(text(facts, 'typicalAmount'), commitment.nextExpectedDate),
       };
     });
   return [...fromInsights, ...forecastRisks, ...dueSoon];

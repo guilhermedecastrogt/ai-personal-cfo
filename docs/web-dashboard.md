@@ -155,7 +155,7 @@ The web application runs on port 3001 and reads the API's address from `API_URL`
 - Read-only for financial data. There is no editing of transactions, budgets, goals or accounts. Marking a notification as read is the only write.
 - Access codes are issued by an operator with a script. There is no self-service sign-up, code rotation screen or sign-in rate limiting yet.
 - The review is generated on each visit and is not stored.
-- Text is in English. Amounts are formatted in one locale.
+- Text produced by the API follows the household's language; the dashboard's own labels are covered by the web dictionary.
 - Signals and findings are not persisted, so they are not marked as seen.
 - Proportion bars are the only charts.
 - Exercised end to end locally against the seeded demo household. The web tests render views from fixtures and do not drive a browser.

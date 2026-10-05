@@ -7,6 +7,7 @@ import type { IsoDate } from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
 import { MediaError, type MediaProblem, type MediaReference } from '../../media/media-source.js';
 import { TemporaryMediaStore } from '../../media/temporary-media-store.js';
+import { DEFAULT_LOCALE, type Locale } from '../../i18n/locale.js';
 import { formatMoney } from '../../money/format-money.js';
 import { TransactionsService, type Transaction } from '../../transactions/transactions.service.js';
 import { toCategoryOptions } from '../category-options.js';
@@ -62,7 +63,7 @@ export class ImageTransactionService {
   ): Promise<ImageOutcome> {
     const existing = await this.findRecorded(context, message);
     if (existing !== undefined) {
-      return alreadyRecorded(existing);
+      return alreadyRecorded(existing, context.locale ?? DEFAULT_LOCALE);
     }
     const reading = await this.read(context, message);
     switch (reading.kind) {
@@ -127,14 +128,14 @@ function notUsable(reason: ImageRejection): ImageOutcome {
   return { status: 'IMAGE_NOT_USABLE', reason, facts: { reason } };
 }
 
-function alreadyRecorded(transaction: Transaction): ImageOutcome {
+function alreadyRecorded(transaction: Transaction, locale: Locale): ImageOutcome {
   return {
     status: 'ALREADY_RECORDED',
     transaction,
     facts: {
       alreadyRecorded: true,
       type: transaction.type,
-      amount: formatMoney(transaction.amountMinor, transaction.currency),
+      amount: formatMoney(transaction.amountMinor, transaction.currency, locale),
       merchant: transaction.merchant,
       date: transaction.transactionDate,
     },

@@ -50,6 +50,13 @@
       "when": 1791193539746,
       "tag": "0006_proactive_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791215929028,
+      "tag": "0007_household_locale",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,8 @@
+import { DEFAULT_LOCALE } from '../i18n/locale.js';
 import { Injectable } from '@nestjs/common';
 import { CfoService, type CurrencyAnalysis, type MonthlyAnalysis } from '../cfo/cfo.service.js';
 import type { ReviewBudget } from '../cfo/analysis/monthly-review.js';
-import { presentResult, type NameDirectory } from '../cfo/context/result-description.js';
-import { ALL_SPENDING_LABEL } from '../cfo/context/review-context.js';
+import { localeOf, presentResult, type NameDirectory } from '../cfo/context/result-description.js';
 import { describeFindings } from '../cfo/explanation/deterministic-narrative.js';
 import {
   HouseholdDirectoryService,
@@ -46,7 +46,11 @@ import {
   type TransactionsView,
 } from './dashboard.contracts.js';
 import { listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
-import { describeAnomalies, describeInsights } from '../cfo/context/signal-descriptions.js';
+import {
+  allSpendingLabel,
+  describeAnomalies,
+  describeInsights,
+} from '../cfo/context/signal-descriptions.js';
 
 export interface TransactionFilters {
   readonly month?: string | undefined;
@@ -97,7 +101,8 @@ export class DashboardService {
       currency: profile.currency,
       timezone: profile.timezone,
       today,
-      months: listMonths(earliest, today),
+      months: listMonths(earliest, today, profile.locale),
+      locale: profile.locale,
     });
   }
 
@@ -128,12 +133,12 @@ export class DashboardService {
                   },
             topCategories: review.topCategories,
             spendingByMember: review.byMember,
-            budgets: review.budgets.map(withBudgetScope),
+            budgets: review.budgets.map(budgetScopeIn(analysis.directory)),
             forecast: review.forecast,
             recurringMonthlyEquivalentMinor: review.recurring.monthlyEquivalentMinor,
             recurringCount: review.recurring.commitments.length,
             balances: review.balances,
-            findings: describeFindings(described),
+            findings: describeFindings(described, localeOf(analysis.directory)),
           },
           analysis.directory,
         ),
@@ -201,7 +206,7 @@ export class DashboardService {
         presentResult(
           {
             currency: review.currency,
-            budgets: review.budgets.map(withBudgetScope),
+            budgets: review.budgets.map(budgetScopeIn(analysis.directory)),
             forecast: review.forecast,
           },
           analysis.directory,
@@ -257,7 +262,7 @@ export class DashboardService {
             actual: review.totals,
             budgetsProjectedOverLimit: review.budgets
               .filter((budget) => budget.isProjectedOverLimit)
-              .map(withBudgetScope),
+              .map(budgetScopeIn(analysis.directory)),
             recurring: review.recurring,
           },
           analysis.directory,
@@ -457,7 +462,7 @@ export class DashboardService {
     instant: Date,
   ): Promise<{ month: SelectedMonth; today: IsoDate }> {
     const today = await this.finance.currentDate(context.householdId, instant);
-    return { month: selectMonth(monthKey, today), today };
+    return { month: selectMonth(monthKey, today, context.locale ?? DEFAULT_LOCALE), today };
   }
 }
 
@@ -479,9 +484,16 @@ function flowOf({ snapshot, review }: CurrencyAnalysis, kind: 'spending' | 'inco
   };
 }
 
-function withBudgetScope(budget: ReviewBudget): Record<string, unknown> {
+function budgetScopeIn(
+  directory: NameDirectory,
+): (budget: ReviewBudget) => Record<string, unknown> {
+  const allSpending = allSpendingLabel(localeOf(directory));
+  return (budget) => withBudgetScope(budget, allSpending);
+}
+
+function withBudgetScope(budget: ReviewBudget, allSpending: string): Record<string, unknown> {
   const { categoryId, ...rest } = budget;
-  return categoryId === null ? { category: ALL_SPENDING_LABEL, ...rest } : { categoryId, ...rest };
+  return categoryId === null ? { category: allSpending, ...rest } : { categoryId, ...rest };
 }
 
 function toOption(entry: NamedEntry): { key: string; name: string } {
@@ -518,5 +530,6 @@ function namesOf(directory: HouseholdDirectory): NameDirectory {
     categories: byId(directory.categories),
     accounts: byId(directory.accounts),
     goals: byId(directory.goals),
+    locale: directory.locale,
   };
 }
