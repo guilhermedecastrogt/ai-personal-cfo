@@ -12,6 +12,7 @@ const EXPECTED_TABLES = [
   'goals',
   'households',
   'insights',
+  'member_default_accounts',
   'members',
   'monthly_reports',
   'recurring_expenses',

@@ -40,8 +40,31 @@ export const accounts = pgTable(
       table.id,
       table.currency,
     ),
+    unique('accounts_household_id_id_unique').on(table.householdId, table.id),
     unique('accounts_household_id_name_unique').on(table.householdId, table.name),
     check('accounts_name_not_blank', sql`length(trim(${table.name})) > 0`),
     check('accounts_currency_format', sql`${table.currency} ~ '^[A-Z]{3}$'`),
+  ],
+);
+
+export const memberDefaultAccounts = pgTable(
+  'member_default_accounts',
+  {
+    memberId: uuid('member_id').primaryKey(),
+    householdId: uuid('household_id').notNull(),
+    accountId: uuid('account_id').notNull(),
+    ...auditTimestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: 'member_default_accounts_member_fk',
+      columns: [table.householdId, table.memberId],
+      foreignColumns: [members.householdId, members.id],
+    }),
+    foreignKey({
+      name: 'member_default_accounts_account_fk',
+      columns: [table.householdId, table.accountId],
+      foreignColumns: [accounts.householdId, accounts.id],
+    }),
   ],
 );

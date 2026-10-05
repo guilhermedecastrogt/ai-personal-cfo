@@ -59,12 +59,17 @@ A change is ready to commit when formatting, lint, type checking, tests and the 
 
 The backend reads its configuration from the environment once, at startup, and validates it. If a variable is missing or invalid the process exits and names the offending variables without printing their values.
 
-| Variable       | Required | Default       | Purpose                                                        |
-| -------------- | -------- | ------------- | -------------------------------------------------------------- |
-| `DATABASE_URL` | Yes      |               | PostgreSQL connection string, `postgres://` or `postgresql://` |
-| `PORT`         | No       | `3000`        | Port the API listens on                                        |
-| `NODE_ENV`     | No       | `development` | `development`, `test` or `production`                          |
-| `LOG_LEVEL`    | No       | `log`         | `error`, `warn`, `log` or `debug`                              |
+| Variable                  | Required | Default       | Purpose                                                               |
+| ------------------------- | -------- | ------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`            | Yes      |               | PostgreSQL connection string, `postgres://` or `postgresql://`        |
+| `PORT`                    | No       | `3000`        | Port the API listens on                                               |
+| `NODE_ENV`                | No       | `development` | `development`, `test` or `production`                                 |
+| `LOG_LEVEL`               | No       | `log`         | `error`, `warn`, `log` or `debug`                                     |
+| `OPENAI_API_KEY`          | Yes      |               | Credential for the OpenAI API                                         |
+| `OPENAI_MODEL`            | Yes      |               | Model used for interpretation and replies                             |
+| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`         | Below this, an extracted transaction is confirmed instead of recorded |
+
+The example file has a placeholder API key. The application starts with it, and calls to the model fail gracefully until a real key is set. Database commands and tests need only `DATABASE_URL`.
 
 Application code never reads `process.env`. It receives a typed configuration object by injection, which keeps configuration in one place and makes it replaceable in tests.
 
@@ -85,11 +90,12 @@ Log statements describe what happened in the system. They must not contain messa
 
 ## Tests
 
-| Suffix                        | Kind                                                   | Runs with                  |
-| ----------------------------- | ------------------------------------------------------ | -------------------------- |
-| `*.spec.ts` beside the source | Unit                                                   | `npm test`                 |
-| `test/*.e2e-spec.ts`          | The HTTP surface with infrastructure replaced by stubs | `npm test`                 |
-| `test/*.int-spec.ts`          | Code against real PostgreSQL                           | `npm run test:integration` |
+| Suffix                        | Kind                                                   | Runs with                        |
+| ----------------------------- | ------------------------------------------------------ | -------------------------------- |
+| `*.spec.ts` beside the source | Unit                                                   | `npm test`                       |
+| `test/*.e2e-spec.ts`          | The HTTP surface with infrastructure replaced by stubs | `npm test`                       |
+| `test/*.int-spec.ts`          | Code against real PostgreSQL                           | `npm run test:integration`       |
+| `test/*.live-spec.ts`         | Calls to the real OpenAI API                           | `npm run test:live`, never in CI |
 
 Tests use hand-written stubs passed through dependency injection. Test names state behaviour.
 

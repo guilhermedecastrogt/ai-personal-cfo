@@ -85,21 +85,21 @@ flowchart TD
     Domain --> DB[(PostgreSQL)]
 ```
 
-| Module         | Owns                                                                             |
-| -------------- | -------------------------------------------------------------------------------- |
-| `households`   | Households, members, WhatsApp identities and resolution of the request context   |
-| `accounts`     | Accounts and balances                                                            |
-| `categories`   | The category tree and mapping of names to categories                             |
-| `transactions` | Transaction validation, creation and querying, including transfers               |
-| `budgets`      | Budget definitions                                                               |
-| `goals`        | Goal definitions and progress inputs                                             |
-| `finance`      | The finance engine: pure calculations, and the service that feeds them           |
-| `ai`           | The `AIProvider` interface, its OpenAI implementation and transaction extraction |
-| `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter   |
-| `conversation` | Orchestration of an inbound message from intent to reply                         |
-| `insights`     | Rules that decide whether something deserves the household's attention           |
-| `advisor`      | Phrasing of verified facts into replies, and answering questions through tools   |
-| `reports`      | Monthly report generation                                                        |
+| Module         | Owns                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| `households`   | Households, members, WhatsApp identities and resolution of the request context              |
+| `accounts`     | Accounts and balances                                                                       |
+| `categories`   | The category tree and mapping of names to categories                                        |
+| `transactions` | Transaction validation, creation and querying, including transfers                          |
+| `budgets`      | Budget definitions                                                                          |
+| `goals`        | Goal definitions and progress inputs                                                        |
+| `finance`      | The finance engine: pure calculations, and the service that feeds them                      |
+| `ai`           | The `AIProvider` interface, its OpenAI implementation, interpretation and reply composition |
+| `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter              |
+| `conversation` | Orchestration of a message: transaction extraction, financial questions and the reply       |
+| `insights`     | Rules that decide whether something deserves the household's attention                      |
+| `advisor`      | Financial advice built on insights. Planned                                                 |
+| `reports`      | Monthly report generation                                                                   |
 
 ### Dependency rules
 
@@ -190,22 +190,24 @@ Any failure leads to a question for the sender, never to a guessed value. The me
 
 ## Questions and advice
 
-When a member asks a question, the advisor answers through tools rather than from memory.
+A question is interpreted into one structured intent with parameters. The application resolves the parameters, runs the finance engine method that intent maps to, and gives the model the verified result to phrase ([ADR-016](adr/ADR-016-task-level-ai-capabilities.md)).
 
 ```mermaid
 flowchart LR
-    Question --> Advisor
-    Advisor -->|tool call| Tools[Query tools bound to the household]
-    Tools --> Domain[Domain services]
-    Tools --> Finance[Finance engine]
-    Tools -->|verified figures| Advisor
-    Advisor --> Answer
+    Question --> Interpret[Model: intent and parameters]
+    Interpret --> Resolve[Resolve against the sender's household]
+    Resolve --> Finance[Finance engine]
+    Finance -->|verified figures as text| Compose[Model: phrase]
+    Compose --> Guard[Figure guard]
+    Guard --> Answer
 ```
 
-- Tools are created per request and bound to the request context. The model can choose a category, a period or a member to filter by. It cannot choose the household.
-- Tool arguments are validated like any other model output.
-- Tools return figures already computed by the finance engine. The model's job is to select, explain and phrase them.
-- "I" maps to the context member and "we" to the household. This mapping is done by the application when tools are invoked.
+- The household always comes from the request context. The model can name a category, a period, an account or a member to filter by. It cannot name a household.
+- The intent and its parameters are validated like any other model output.
+- The model receives figures as finished text. A reply containing a number that was not supplied is replaced by a deterministic one.
+- "I" maps to the context member and "we" to the household. The mapping is done by the application.
+
+The details are in [ai-integration.md](ai-integration.md).
 
 ## Insights
 
@@ -272,18 +274,18 @@ flowchart TD
 
 ## Security
 
-| Concern                | Approach                                                                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Transport              | HTTPS terminated at Caddy with automatically managed certificates                                                                      |
-| Webhook authenticity   | Signature verification on the raw request body before parsing                                                                          |
-| Replay and duplication | Unique provider event identifiers in `webhook_events`                                                                                  |
-| Sender identity        | Deterministic lookup, with unknown senders dropped                                                                                     |
-| Dashboard access       | Authenticated session that carries the member and household                                                                            |
-| Authorization          | Household scope from the request context on every query                                                                                |
-| Input                  | Schema validation on every request body and on every model output                                                                      |
-| Prompt injection       | Message content can only ever propose a transaction or a tool call. Both are validated and both are confined to the sender's household |
-| Logging                | Structured logs without message bodies, amounts, merchants or phone numbers                                                            |
-| Data minimisation      | Images are deleted after extraction and never stored                                                                                   |
+| Concern                | Approach                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport              | HTTPS terminated at Caddy with automatically managed certificates                                                                         |
+| Webhook authenticity   | Signature verification on the raw request body before parsing                                                                             |
+| Replay and duplication | Unique provider event identifiers in `webhook_events`                                                                                     |
+| Sender identity        | Deterministic lookup, with unknown senders dropped                                                                                        |
+| Dashboard access       | Authenticated session that carries the member and household                                                                               |
+| Authorization          | Household scope from the request context on every query                                                                                   |
+| Input                  | Schema validation on every request body and on every model output                                                                         |
+| Prompt injection       | Message content can only ever propose a transaction or a query intent. Both are validated and both are confined to the sender's household |
+| Logging                | Structured logs without message bodies, amounts, merchants or phone numbers                                                               |
+| Data minimisation      | Images are deleted after extraction and never stored                                                                                      |
 
 ## What is deliberately absent
 

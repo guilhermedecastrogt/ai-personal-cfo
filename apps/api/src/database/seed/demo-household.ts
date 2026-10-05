@@ -5,10 +5,12 @@ export const demoHousehold: SeedDefinitionInput = {
   members: [
     {
       name: 'Member A',
+      defaultAccount: 'Member A Current',
       whatsapp: { provider: 'kapso', externalUserId: '12025550101', phoneNumber: '+12025550101' },
     },
     {
       name: 'Member B',
+      defaultAccount: 'Member B Current',
       whatsapp: { provider: 'kapso', externalUserId: '12025550102', phoneNumber: '+12025550102' },
     },
     { name: 'Member C' },

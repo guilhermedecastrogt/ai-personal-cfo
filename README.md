@@ -82,7 +82,7 @@ The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the
 - [x] Backend bootstrap with health and readiness checks
 - [x] Database schema and core domain
 - [x] Finance engine
-- [ ] AI transaction extraction from text
+- [x] AI transaction extraction from text and financial questions
 - [ ] AI transaction extraction from images
 - [ ] WhatsApp integration with webhook idempotency
 - [ ] Insight engine and AI advisor

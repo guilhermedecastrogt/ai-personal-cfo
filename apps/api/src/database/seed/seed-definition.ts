@@ -8,6 +8,7 @@ const positiveMinorAmount = z.number().int().positive();
 
 const memberDefinition = z.object({
   name,
+  defaultAccount: name.optional(),
   whatsapp: z
     .object({
       provider: name,
@@ -71,6 +72,15 @@ export const seedDefinitionSchema = z
           account.owner === undefined || members.some((member) => member.name === account.owner),
       ),
     { path: ['accounts'], error: 'Account owners must be members of the household' },
+  )
+  .refine(
+    ({ members, accounts }) =>
+      members.every(
+        (member) =>
+          member.defaultAccount === undefined ||
+          accounts.some((account) => account.name === member.defaultAccount),
+      ),
+    { path: ['members'], error: 'Default accounts must be accounts of the household' },
   );
 
 export type SeedDefinitionInput = z.input<typeof seedDefinitionSchema>;

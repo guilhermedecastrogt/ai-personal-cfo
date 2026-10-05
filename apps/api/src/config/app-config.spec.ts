@@ -1,6 +1,12 @@
-import { InvalidEnvironmentError, loadAppConfig } from './app-config.js';
+import { InvalidEnvironmentError, loadAppConfig, loadDatabaseUrl } from './app-config.js';
 
 const DATABASE_URL = 'postgres://cfo:secret@localhost:5432/cfo';
+
+const REQUIRED = {
+  DATABASE_URL,
+  OPENAI_API_KEY: 'test-key',
+  OPENAI_MODEL: 'test-model',
+};
 
 function captureError(action: () => unknown): unknown {
   try {
@@ -11,62 +17,82 @@ function captureError(action: () => unknown): unknown {
   throw new Error('Expected the action to throw');
 }
 
+function invalidVariables(variables: Record<string, string | undefined>): readonly string[] {
+  return (captureError(() => loadAppConfig(variables)) as InvalidEnvironmentError).variables;
+}
+
 describe('loadAppConfig', () => {
   it('applies defaults when only required variables are set', () => {
-    expect(loadAppConfig({ DATABASE_URL })).toEqual({
+    expect(loadAppConfig(REQUIRED)).toEqual({
       environment: 'development',
       port: 3000,
       logLevel: 'log',
       databaseUrl: DATABASE_URL,
+      openaiApiKey: 'test-key',
+      openaiModel: 'test-model',
+      aiConfidenceThreshold: 0.8,
     });
   });
 
   it('reads every supported variable', () => {
     const config = loadAppConfig({
+      ...REQUIRED,
       NODE_ENV: 'production',
       PORT: '8080',
       LOG_LEVEL: 'warn',
-      DATABASE_URL,
+      AI_CONFIDENCE_THRESHOLD: '0.9',
     });
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       environment: 'production',
       port: 8080,
       logLevel: 'warn',
-      databaseUrl: DATABASE_URL,
+      aiConfidenceThreshold: 0.9,
     });
   });
 
   it('accepts the postgresql scheme', () => {
     const databaseUrl = 'postgresql://cfo:secret@localhost:5432/cfo';
 
-    expect(loadAppConfig({ DATABASE_URL: databaseUrl }).databaseUrl).toBe(databaseUrl);
+    expect(loadAppConfig({ ...REQUIRED, DATABASE_URL: databaseUrl }).databaseUrl).toBe(databaseUrl);
   });
 
-  it('rejects a missing database url', () => {
+  it('rejects an empty environment naming every required variable', () => {
     const error = captureError(() => loadAppConfig({}));
 
     expect(error).toBeInstanceOf(InvalidEnvironmentError);
-    expect((error as InvalidEnvironmentError).variables).toEqual(['DATABASE_URL']);
+    expect((error as InvalidEnvironmentError).variables).toEqual([
+      'DATABASE_URL',
+      'OPENAI_API_KEY',
+      'OPENAI_MODEL',
+    ]);
   });
 
   it('rejects a database url that is not a postgres url', () => {
-    expect(() => loadAppConfig({ DATABASE_URL: 'https://example.com' })).toThrow(
-      InvalidEnvironmentError,
-    );
+    expect(invalidVariables({ ...REQUIRED, DATABASE_URL: 'https://example.com' })).toEqual([
+      'DATABASE_URL',
+    ]);
   });
 
   it.each(['0', '65536', '80.5', 'http'])('rejects port %s', (port) => {
-    const error = captureError(() => loadAppConfig({ DATABASE_URL, PORT: port }));
+    expect(invalidVariables({ ...REQUIRED, PORT: port })).toEqual(['PORT']);
+  });
 
-    expect((error as InvalidEnvironmentError).variables).toEqual(['PORT']);
+  it('rejects a blank api key or model', () => {
+    expect(invalidVariables({ ...REQUIRED, OPENAI_API_KEY: '', OPENAI_MODEL: '' })).toEqual([
+      'OPENAI_API_KEY',
+      'OPENAI_MODEL',
+    ]);
+  });
+
+  it.each(['-0.1', '1.1', 'high'])('rejects a confidence threshold of %s', (threshold) => {
+    expect(invalidVariables({ ...REQUIRED, AI_CONFIDENCE_THRESHOLD: threshold })).toEqual([
+      'AI_CONFIDENCE_THRESHOLD',
+    ]);
   });
 
   it('lists every invalid variable in alphabetical order', () => {
-    const error = captureError(() => loadAppConfig({ NODE_ENV: 'staging', LOG_LEVEL: 'loud' }));
-
-    expect((error as InvalidEnvironmentError).variables).toEqual([
-      'DATABASE_URL',
+    expect(invalidVariables({ ...REQUIRED, NODE_ENV: 'staging', LOG_LEVEL: 'loud' })).toEqual([
       'LOG_LEVEL',
       'NODE_ENV',
     ]);
@@ -74,9 +100,27 @@ describe('loadAppConfig', () => {
 
   it('never includes variable values in the error message', () => {
     const error = captureError(() =>
-      loadAppConfig({ DATABASE_URL: 'mysql://cfo:secret@localhost:3306/cfo' }),
+      loadAppConfig({
+        DATABASE_URL: 'mysql://cfo:database-secret@localhost:3306/cfo',
+        OPENAI_API_KEY: 'sk-secret-key',
+        OPENAI_MODEL: '',
+      }),
     );
 
-    expect((error as Error).message).not.toContain('secret');
+    expect((error as Error).message).not.toContain('database-secret');
+    expect((error as Error).message).not.toContain('sk-secret-key');
+  });
+});
+
+describe('loadDatabaseUrl', () => {
+  it('needs only the database url', () => {
+    expect(loadDatabaseUrl({ DATABASE_URL })).toBe(DATABASE_URL);
+  });
+
+  it('rejects a missing or malformed database url', () => {
+    expect(() => loadDatabaseUrl({})).toThrow(InvalidEnvironmentError);
+    expect(() => loadDatabaseUrl({ DATABASE_URL: 'https://example.com' })).toThrow(
+      InvalidEnvironmentError,
+    );
   });
 });

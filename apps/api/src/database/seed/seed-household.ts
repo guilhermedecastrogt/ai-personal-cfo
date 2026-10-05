@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { accounts } from '../../accounts/accounts.schema.js';
+import { accounts, memberDefaultAccounts } from '../../accounts/accounts.schema.js';
 import { budgets } from '../../budgets/budgets.schema.js';
 import { categories } from '../../categories/categories.schema.js';
 import { goals } from '../../goals/goals.schema.js';
@@ -34,6 +34,7 @@ export async function seedHousehold(
       .onConflictDoNothing();
     const memberIds = await seedMembers(transaction, householdId, definition);
     await seedAccounts(transaction, householdId, memberIds, definition);
+    await seedDefaultAccounts(transaction, householdId, memberIds, definition);
     await seedBudgets(transaction, householdId, definition);
     await seedGoals(transaction, householdId, definition);
     return { householdId, memberIds };
@@ -82,6 +83,27 @@ async function seedAccounts(
         openingBalanceMinor: account.openingBalanceMinor,
       })
       .onConflictDoNothing();
+  }
+}
+
+async function seedDefaultAccounts(
+  transaction: Transaction,
+  householdId: string,
+  memberIds: ReadonlyMap<string, string>,
+  definition: SeedDefinition,
+): Promise<void> {
+  for (const member of definition.members) {
+    const memberId = memberIds.get(member.name);
+    if (member.defaultAccount !== undefined && memberId !== undefined) {
+      await transaction
+        .insert(memberDefaultAccounts)
+        .values({
+          householdId,
+          memberId,
+          accountId: deterministicUuid(householdId, 'account', member.defaultAccount),
+        })
+        .onConflictDoNothing();
+    }
   }
 }
 

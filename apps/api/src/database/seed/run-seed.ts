@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { loadAppConfig } from '../../config/app-config.js';
+import { loadDatabaseUrl } from '../../config/app-config.js';
 import { demoHousehold } from './demo-household.js';
 import { seedDefinitionSchema, type SeedDefinition } from './seed-definition.js';
 import { seedHousehold } from './seed-household.js';
@@ -15,7 +15,7 @@ async function loadSeedDefinition(filePath: string | undefined): Promise<SeedDef
 }
 
 const definition = await loadSeedDefinition(process.env.SEED_DEFINITION_FILE);
-const pool = new Pool({ connectionString: loadAppConfig(process.env).databaseUrl });
+const pool = new Pool({ connectionString: loadDatabaseUrl(process.env) });
 
 try {
   await seedHousehold(drizzle(pool), definition);

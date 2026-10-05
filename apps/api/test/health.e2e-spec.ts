@@ -11,6 +11,9 @@ const TEST_CONFIG: AppConfig = {
   port: 0,
   logLevel: 'error',
   databaseUrl: 'postgres://unused:unused@localhost:5432/unused',
+  openaiApiKey: 'unused',
+  openaiModel: 'unused',
+  aiConfidenceThreshold: 0.8,
 };
 
 class StubDatabaseHealth {

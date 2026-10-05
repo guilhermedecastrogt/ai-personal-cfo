@@ -16,27 +16,20 @@ import { accounts } from '../accounts/accounts.schema.js';
 import { categories } from '../categories/categories.schema.js';
 import { auditTimestamps, identifier } from '../database/columns.js';
 import { households, members } from '../households/households.schema.js';
+import {
+  EXPENSE_SCOPES,
+  PAYMENT_METHODS,
+  TRANSACTION_SOURCES,
+  TRANSACTION_TYPES,
+} from './transaction-vocabulary.js';
 
-export const transactionType = pgEnum('transaction_type', ['EXPENSE', 'INCOME', 'TRANSFER']);
+export const transactionType = pgEnum('transaction_type', TRANSACTION_TYPES);
 
-export const expenseScope = pgEnum('expense_scope', ['HOUSEHOLD', 'INDIVIDUAL']);
+export const expenseScope = pgEnum('expense_scope', EXPENSE_SCOPES);
 
-export const paymentMethod = pgEnum('payment_method', [
-  'CASH',
-  'DEBIT_CARD',
-  'CREDIT_CARD',
-  'BANK_TRANSFER',
-  'DIRECT_DEBIT',
-  'OTHER',
-]);
+export const paymentMethod = pgEnum('payment_method', PAYMENT_METHODS);
 
-export const transactionSource = pgEnum('transaction_source', [
-  'WHATSAPP_TEXT',
-  'WHATSAPP_IMAGE',
-  'WEB',
-  'MANUAL',
-  'IMPORT',
-]);
+export const transactionSource = pgEnum('transaction_source', TRANSACTION_SOURCES);
 
 export const transactions = pgTable(
   'transactions',
