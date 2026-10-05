@@ -654,4 +654,100 @@ describe('architecture', () => {
       'whatsapp/kapso/kapso-media-source.ts',
     ]);
   });
+
+  describe('production stack', () => {
+    const repositoryRoot = join(SOURCE_ROOT, '..', '..', '..');
+    const read = (path: string): string => readFileSync(join(repositoryRoot, path), 'utf8');
+    const compose = read('infra/docker/compose.yml');
+    const serviceBlock = (name: string): string => {
+      const start = compose.indexOf(`\n  ${name}:\n`);
+      const next = compose.slice(start + 1).search(/\n {2}[a-z]+:\n/);
+      return compose.slice(start, next === -1 ? undefined : start + 1 + next);
+    };
+
+    it('publishes ports only from the proxy and keeps the database on the internal network', () => {
+      expect(compose.match(/\n {4}ports:/g)).toHaveLength(1);
+      expect(serviceBlock('caddy')).toContain('ports:');
+      expect(serviceBlock('postgres')).not.toContain('ports:');
+      expect(serviceBlock('postgres')).toMatch(/networks:\n {6}- data\n/);
+      expect(serviceBlock('postgres')).not.toContain('- edge');
+      expect(serviceBlock('web')).not.toContain('- data');
+      expect(serviceBlock('caddy')).not.toContain('- data');
+      expect(compose).toMatch(/\n {2}data:\n {4}internal: true/);
+      expect(compose).not.toContain('5432:');
+    });
+
+    it('starts the API only after migrations succeed and the database is healthy', () => {
+      const api = serviceBlock('api');
+
+      expect(api).toMatch(/migrate:\n {8}condition: service_completed_successfully/);
+      expect(api).toMatch(/postgres:\n {8}condition: service_healthy/);
+      expect(serviceBlock('migrate')).toContain('dist/database/run-migrations.js');
+      expect(compose).not.toMatch(/run-seed|db:seed|drop database|--force-recreate/);
+    });
+
+    it('limits and confines every service', () => {
+      for (const name of ['postgres', 'migrate', 'api', 'web', 'caddy']) {
+        const service = serviceBlock(name);
+
+        expect(service).toMatch(/limits:\n {10}cpus: '0\.\d+'\n {10}memory: \d+M/);
+        expect(service).toMatch(/no-new-privileges:true|<<: \*hardening/);
+      }
+      for (const name of ['api', 'web']) {
+        expect(serviceBlock(name)).toContain('read_only: true');
+        expect(serviceBlock(name)).toMatch(/cap_drop:\n {6}- ALL/);
+      }
+    });
+
+    it('takes every secret from the environment and requires it', () => {
+      for (const name of [
+        'POSTGRES_PASSWORD',
+        'OPENAI_API_KEY',
+        'KAPSO_API_KEY',
+        'KAPSO_WEBHOOK_SECRET',
+        'CFO_DOMAIN',
+        'IMAGE_TAG',
+      ]) {
+        expect(compose).toContain(`\${${name}:?`);
+      }
+      expect(compose).not.toMatch(/:latest|image: .*-(api|web)$/m);
+      expect(read('infra/docker/.env.example')).toMatch(/OPENAI_API_KEY=replace-with/);
+      expect(read('infra/docker/.env.example')).not.toMatch(/sk-[A-Za-z0-9]{20}|BEGIN/);
+    });
+
+    it('builds images that run compiled code as a non-root user', () => {
+      for (const path of ['apps/api/Dockerfile', 'apps/web/Dockerfile']) {
+        const dockerfile = read(path);
+
+        expect(dockerfile).toContain('USER node');
+        expect(dockerfile).toContain('HEALTHCHECK');
+        expect(dockerfile).toMatch(/CMD \["node", "[^"]+\.js"\]/);
+        expect(dockerfile).not.toMatch(
+          /npm run (start:dev|dev)|next dev|ARG .*(KEY|SECRET|PASSWORD)|\.env/,
+        );
+      }
+      expect(read('.dockerignore')).toContain('**/.env');
+    });
+
+    it('routes only the webhook from the proxy to the API', () => {
+      const caddyfile = read('infra/docker/Caddyfile');
+
+      expect(caddyfile.match(/reverse_proxy api:3000/g)).toHaveLength(1);
+      expect(caddyfile).toContain('@webhook path /webhooks/whatsapp');
+      expect(caddyfile).toContain('{$CFO_DOMAIN}');
+      expect(caddyfile).not.toMatch(/postgres|5432|tls internal|auto_https off/);
+    });
+
+    it('never manages the existing virtual machine in Terraform', () => {
+      const terraform = ['compute.tf', 'network.tf', 'security.tf', 'storage.tf', 'providers.tf']
+        .map((name) => read(`infra/terraform/${name}`))
+        .join('\n');
+
+      expect(terraform).toContain('data "oci_core_instance" "existing"');
+      expect(terraform).not.toMatch(
+        /resource "oci_core_(instance|volume|boot_volume|vcn|subnet|security_list|internet_gateway|route_table)[a-z_]*"/,
+      );
+      expect(terraform).not.toMatch(/private_key|fingerprint|user_ocid|tenancy_ocid\s*=\s*"/);
+    });
+  });
 });

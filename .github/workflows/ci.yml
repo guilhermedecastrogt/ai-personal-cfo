@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Format, lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  integration:
+    name: Integration tests against PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cfo
+          POSTGRES_PASSWORD: cfo
+          POSTGRES_DB: cfo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username cfo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://cfo:cfo@localhost:5432/cfo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+
+  infrastructure:
+    name: Terraform, Compose and scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.2
+      - name: Terraform format
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+      - name: Terraform validate
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Terraform plan tests with a mocked provider
+        working-directory: infra/terraform
+        run: terraform test
+      - name: Compose configuration
+        working-directory: infra/docker
+        run: IMAGE_TAG=validation docker compose --env-file .env.example --file compose.yml config --quiet
+      - name: Caddy configuration
+        working-directory: infra/docker
+        run: >-
+          docker run --rm
+          --env CFO_DOMAIN=cfo.example.com
+          --env ACME_EMAIL=ops@example.com
+          --volume "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+      - name: Shell scripts
+        run: shellcheck --severity=warning infra/docker/scripts/*.sh
+
+  images:
+    name: Build production images for arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --file apps/api/Dockerfile --tag ai-personal-cfo-api:ci .
+      - run: docker build --file apps/web/Dockerfile --tag ai-personal-cfo-web:ci .
+      - name: Images run as a non-root user
+        run: |
+          test "$(docker image inspect ai-personal-cfo-api:ci --format '{{.Config.User}}')" = "node"
+          test "$(docker image inspect ai-personal-cfo-web:ci --format '{{.Config.User}}')" = "node"

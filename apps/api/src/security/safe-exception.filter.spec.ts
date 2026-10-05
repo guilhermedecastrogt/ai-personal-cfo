@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
   type ArgumentsHost,
 } from '@nestjs/common';
-import { hardenHttp, securityHeaders } from './http-hardening.js';
+import { hardenHttp, routeLabel, securityHeaders } from './http-hardening.js';
 import { describeError, SafeExceptionFilter } from './safe-exception.filter.js';
 import { SECURITY_POLICY } from './security-policy.js';
 
@@ -115,6 +115,22 @@ describe('API security headers', () => {
     expect(securityHeaders({ environment: 'development' }, SECURITY_POLICY)).not.toHaveProperty(
       'Strict-Transport-Security',
     );
+  });
+
+  it.each([
+    ['/dashboard/overview?month=2026-10&householdId=secret', '/dashboard/overview'],
+    [
+      '/dashboard/notifications/5f0c8a52-1f0e-4c56-9a47-0a8f8d1f7c11/read',
+      '/dashboard/notifications',
+    ],
+    ['/auth/sessions/current', '/auth/sessions'],
+    ['/webhooks/whatsapp', '/webhooks/whatsapp'],
+    ["/dashboard/' OR 1=1 --", '/dashboard'],
+    ['/Secret-Token-abc123', '/'],
+    ['/', '/'],
+    [undefined, '/'],
+  ])('logs %s as the route %s, without query, identifiers or free text', (url, label) => {
+    expect(routeLabel(url)).toBe(label);
   });
 
   it('configures the proxy trust, body limits and banner removal on the application', () => {

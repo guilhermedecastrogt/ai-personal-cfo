@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import type { AppConfig } from '../config/app-config.js';
 import { SECURITY_POLICY, type SecurityPolicy } from './security-policy.js';
 
 export const REQUEST_ID_HEADER = 'X-Request-Id';
 
 const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'";
+const UNLOGGED_ROUTES: ReadonlySet<string> = new Set(['/health', '/ready']);
+const ROUTE_SEGMENT = /^[a-z][a-z-]*$/;
+const LOGGED_ROUTE_SEGMENTS = 2;
 const API_PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=()';
 
 interface HardenableApplication extends INestApplication {
@@ -37,6 +40,18 @@ export function securityHeaders(
   };
 }
 
+export function routeLabel(url: string | undefined): string {
+  const [pathname = ''] = (url ?? '').split('?');
+  const segments: string[] = [];
+  for (const segment of pathname.split('/').filter((part) => part !== '')) {
+    if (segments.length === LOGGED_ROUTE_SEGMENTS || !ROUTE_SEGMENT.test(segment)) {
+      break;
+    }
+    segments.push(segment);
+  }
+  return `/${segments.join('/')}`;
+}
+
 export function hardenHttp(
   application: INestApplication,
   config: HardeningConfig,
@@ -48,10 +63,21 @@ export function hardenHttp(
   app.disable('x-powered-by');
   app.useBodyParser('json', { limit: policy.requestBodyLimitInBytes });
   app.useBodyParser('urlencoded', { limit: policy.requestBodyLimitInBytes });
-  app.use((_request: IncomingMessage, response: ServerResponse, next: () => void): void => {
-    response.setHeader(REQUEST_ID_HEADER, randomUUID());
+  const logger = new Logger('Http');
+  app.use((request: IncomingMessage, response: ServerResponse, next: () => void): void => {
+    const requestId = randomUUID();
+    const startedAt = Date.now();
+    const route = routeLabel(request.url);
+    response.setHeader(REQUEST_ID_HEADER, requestId);
     for (const [name, value] of headers) {
       response.setHeader(name, value);
+    }
+    if (!UNLOGGED_ROUTES.has(route)) {
+      response.on('finish', () => {
+        logger.log(
+          `event=request request=${requestId} method=${request.method ?? 'unknown'} route=${route} status=${String(response.statusCode)} duration_ms=${String(Date.now() - startedAt)}`,
+        );
+      });
     }
     next();
   });

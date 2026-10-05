@@ -6,7 +6,7 @@ This is a personal project built in the open. A household can have one member, t
 
 ## Status
 
-Early development. The repository currently contains the project skeleton and documentation only. Nothing described below is implemented yet; see the [roadmap](#roadmap) for the build order.
+The application, its dashboard, the WhatsApp integration and the production stack are implemented and tested with stand-ins for the model and for WhatsApp. It has not yet been deployed or exercised against the live services. The [roadmap](#roadmap) shows what is done.
 
 ## Design principles
 
@@ -75,6 +75,18 @@ npm run dev --workspace apps/web
 
 The API listens on port 3000 and the dashboard on port 3001. To sign in to the dashboard, issue an access code for a member as described in the [dashboard guide](docs/web-dashboard.md). See the [development guide](docs/development.md) for the full set of commands and conventions.
 
+## Deployment
+
+Production is a Docker Compose stack, Caddy, the web application, the API and PostgreSQL, on a single ARM64 VM that it shares with other workloads. Images are built by GitHub Actions and tagged with the commit SHA. Terraform manages only the network rule the stack needs.
+
+| Guide                                            | Covers                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [Infrastructure](docs/infrastructure.md)         | Layout, resource limits, host requirements, network and DNS                    |
+| [Deployment](docs/deployment.md)                 | CI, the deploy workflow, first-time setup, configuration, migrations, rollback |
+| [Operations](docs/operations.md)                 | Health, logs, diagnosing failures, one-off commands                            |
+| [Backup and restore](docs/backup-and-restore.md) | Schedule, off-machine copies, restore procedures                               |
+| [Terraform](infra/terraform/README.md)           | What is and is not managed, and how to plan safely                             |
+
 ## Roadmap
 
 - [x] Repository initialization
@@ -92,7 +104,7 @@ The API listens on port 3000 and the dashboard on port 3001. To sign in to the d
 - [x] Proactive notifications
 - [x] Recurring expense and subscription intelligence
 - [ ] Monthly reports
-- [ ] Deployment infrastructure
+- [x] Deployment infrastructure
 - [x] Security hardening
 
 Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, expense splitting between members, private per-member data, self-service household sign-up and a mobile application.

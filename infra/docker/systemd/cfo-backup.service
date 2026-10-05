@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Personal CFO database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ai-personal-cfo
+ExecStart=/opt/ai-personal-cfo/scripts/backup.sh
+Nice=10
+IOSchedulingClass=idle

@@ -17,7 +17,10 @@ Documents are added as the corresponding part of the system is built.
 | [`proactive-cfo.md`](proactive-cfo.md)               | Proactive notifications: events, policy, state, scheduling and delivery                              | Written                                 |
 | [`recurring-expenses.md`](recurring-expenses.md)     | Recurring detection, price changes, stopped commitments and totals                                   | Written                                 |
 | [`security.md`](security.md)                         | Authentication, isolation, rate limiting, webhook and media hardening, headers and known limitations | Written                                 |
-| `deployment.md`                                      | Oracle Cloud provisioning and release process                                                        | Planned                                 |
+| [`deployment.md`](deployment.md)                     | CI, the deploy workflow, configuration, migrations and rollback                                      | Written                                 |
+| [`infrastructure.md`](infrastructure.md)             | Production layout, resource limits, host and network requirements                                    | Written                                 |
+| [`operations.md`](operations.md)                     | Health checks, logs and diagnosing failures                                                          | Written                                 |
+| [`backup-and-restore.md`](backup-and-restore.md)     | Database backups and restore procedures                                                              | Written                                 |
 | [`adr/`](adr/README.md)                              | Architecture decision records                                                                        | Written, extended as decisions are made |
 
 ## Conventions

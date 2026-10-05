@@ -270,14 +270,17 @@ flowchart TD
     Internet --> Caddy
     subgraph Compose[Docker Compose network]
         Caddy --> web
-        Caddy --> api
+        Caddy -->|webhook only| api
+        web --> api
         api --> postgres[(postgres)]
     end
 ```
 
 - Four containers: `caddy`, `web`, `api` and `postgres`. All images are built for ARM64.
 - Only Caddy publishes ports. PostgreSQL is reachable only on the internal network and stores its data on a named volume.
-- The virtual machine, network and firewall rules are provisioned with Terraform.
+- Caddy forwards only the WhatsApp webhook to the API. Everything else goes to the web application, which calls the API on the internal network.
+- The virtual machine already exists and is shared with another workload. Terraform manages only the network rule the stack adds, and never the machine itself ([ADR-026](adr/ADR-026-single-vm-compose-deployment.md)).
+- The details are in [infrastructure.md](infrastructure.md) and [deployment.md](deployment.md).
 - Configuration and secrets are supplied through environment variables. The repository contains only an example file with placeholders.
 
 ## Security

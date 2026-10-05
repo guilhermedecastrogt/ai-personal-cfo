@@ -1,0 +1,22 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$CFO_DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 1MB
+	}
+
+	@webhook path /webhooks/whatsapp
+	handle @webhook {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header -Server
+}

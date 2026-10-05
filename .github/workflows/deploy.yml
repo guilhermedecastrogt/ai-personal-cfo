@@ -1,0 +1,128 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Commit SHA of an image that is already published. Leave empty to build and deploy the selected commit.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Publish images
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.image_tag == '') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.release.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: release
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            echo "image_tag=$(git rev-parse HEAD)"
+            echo "namespace=${REGISTRY}/${OWNER,,}"
+          } >>"$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push the API image
+        env:
+          IMAGE: ${{ steps.release.outputs.namespace }}/ai-personal-cfo-api:${{ steps.release.outputs.image_tag }}
+        run: |
+          docker build --file apps/api/Dockerfile --tag "$IMAGE" \
+            --label "org.opencontainers.image.revision=${{ steps.release.outputs.image_tag }}" \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" .
+          docker push "$IMAGE"
+      - name: Build and push the web image
+        env:
+          IMAGE: ${{ steps.release.outputs.namespace }}/ai-personal-cfo-web:${{ steps.release.outputs.image_tag }}
+        run: |
+          docker build --file apps/web/Dockerfile --tag "$IMAGE" \
+            --label "org.opencontainers.image.revision=${{ steps.release.outputs.image_tag }}" \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" .
+          docker push "$IMAGE"
+
+  deploy:
+    name: Deploy to production
+    needs: publish
+    if: >-
+      always() && vars.DEPLOY_ENABLED == 'true' &&
+      (needs.publish.result == 'success' ||
+      (needs.publish.result == 'skipped' && github.event_name == 'workflow_dispatch' && inputs.image_tag != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      IMAGE_TAG: ${{ needs.publish.outputs.image_tag || inputs.image_tag }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/ai-personal-cfo' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Check the image tag
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "The image tag must be a full commit SHA"; exit 1; }
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" >~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" >~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          {
+            echo "Host production"
+            echo "  HostName $DEPLOY_HOST"
+            echo "  User $DEPLOY_USER"
+            echo "  Port $DEPLOY_PORT"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+          } >~/.ssh/config
+      - name: Copy the stack definition
+        run: |
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "DEPLOY_PATH must be a plain absolute path"; exit 1; }
+          ssh production mkdir -p "$DEPLOY_PATH"
+          rsync --archive --delete --exclude '.env' --exclude '.deployed-tag' --exclude '.previous-tag' \
+            infra/docker/ "production:$DEPLOY_PATH/"
+      - name: Deploy
+        run: |
+          ssh production bash -s -- "$DEPLOY_PATH" "$IMAGE_TAG" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          ./scripts/deploy.sh "$2"
+          REMOTE
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

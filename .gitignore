@@ -28,3 +28,6 @@ crash.log
 tmp/
 
 *.local.json
+
+infra/docker/.deployed-tag
+infra/docker/.previous-tag

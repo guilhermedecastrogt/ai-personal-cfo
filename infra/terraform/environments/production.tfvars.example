@@ -1,0 +1,12 @@
+region                 = "eu-frankfurt-1"
+oci_config_profile     = "DEFAULT"
+compartment_ocid       = "ocid1.compartment.oc1..replace-with-your-compartment-ocid"
+existing_instance_ocid = "ocid1.instance.oc1.eu-frankfurt-1.replace-with-your-instance-ocid"
+
+web_ingress_cidrs = ["0.0.0.0/0"]
+ssh_ingress_cidrs = []
+enable_http3      = true
+
+create_backup_bucket     = false
+backup_upload_expires_at = "2027-10-01T00:00:00Z"
+backup_retention_days    = 0

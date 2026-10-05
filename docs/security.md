@@ -235,16 +235,20 @@ The web application reads two variables, `API_URL` and `NODE_ENV`. Neither is a 
 
 `npm audit` reports 4 moderate advisories, all the same issue in the copy of `esbuild` bundled with `drizzle-kit`. It affects a development server that this project does not run, and `drizzle-kit` is a development dependency that is not part of the running application. The fix offered is a breaking downgrade of `drizzle-kit`, so it was not applied. There are no high or critical advisories.
 
-## Runtime recommendations
+## Runtime
 
-Containers are not built in this repository yet. When they are:
+The production stack is described in [infrastructure.md](infrastructure.md). The parts that matter for security:
 
-- Run as a non-root user, from a minimal base image, with a read-only root filesystem and a writable temporary directory only.
-- Drop all Linux capabilities and set memory and CPU limits.
-- Pass secrets through the platform's secret mechanism, not through image layers.
-- Expose only the web application and the webhook route to the internet. Keep the API's other routes and PostgreSQL on a private network.
-- Terminate TLS in front of both applications and set `TRUSTED_PROXY_HOPS` accordingly.
-- Run the API as a single process, or put rate limiting in the proxy, until the limiter is shared.
+- The API and web containers run as a non-root user with a read-only filesystem, all Linux capabilities dropped and `no-new-privileges`. Their only writable paths are in-memory temporary directories.
+- Caddy keeps one capability, binding low ports.
+- Every container has a memory and CPU limit.
+- PostgreSQL is on an internal Docker network and publishes no port.
+- Caddy is the only container with published ports. It routes one path to the API, the webhook. The API's health, sign-in and dashboard routes are not reachable from the internet.
+- Secrets are in one file on the VM, mode `600`, and are passed as environment variables. None is built into an image or held by GitHub.
+- `TRUSTED_PROXY_HOPS` is `1` in the stack, matching Caddy.
+- There is one API container, so the in-memory rate limits are not multiplied.
+
+PostgreSQL's own container runs with the image's defaults, and the deploy user's membership of the `docker` group is equivalent to root on the host.
 
 ## Known limitations
 
@@ -259,4 +263,5 @@ Containers are not built in this repository yet. When they are:
 - Prompt injection can cause a wrong transaction in the sender's own household.
 - Message content and images are sent to OpenAI.
 - Data is not encrypted by the application at rest. That is left to the database and the disk.
+- Traffic between the containers is not encrypted. It stays on Docker's private networks on one host.
 - No penetration test, fuzzing or third-party review has been done.
