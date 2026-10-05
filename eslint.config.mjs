@@ -21,5 +21,31 @@ export default tseslint.config(
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true }],
     },
   },
+  {
+    files: ['apps/api/src/finance/domain/**/*.ts', 'apps/api/src/money/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@nestjs/*',
+                'drizzle-orm',
+                'drizzle-orm/*',
+                'pg',
+                'openai',
+                '**/application/**',
+                '**/infrastructure/**',
+                '**/database/**',
+              ],
+              message:
+                'The finance domain is pure. It must not depend on frameworks, persistence, transport or AI providers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 );

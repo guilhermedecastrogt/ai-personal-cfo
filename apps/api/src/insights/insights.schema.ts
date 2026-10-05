@@ -4,12 +4,13 @@ import { auditTimestamps, identifier } from '../database/columns.js';
 import { households, members } from '../households/households.schema.js';
 
 export const insightType = pgEnum('insight_type', [
-  'BUDGET_WARNING',
-  'SPENDING_TREND',
-  'ANOMALY',
+  'BUDGET_NEAR_LIMIT',
+  'BUDGET_EXCEEDED',
+  'SPENDING_INCREASE',
+  'UNUSUAL_SPENDING',
   'RECURRING_EXPENSE',
-  'GOAL_RISK',
-  'SAVINGS_RECOMMENDATION',
+  'GOAL_PROGRESS',
+  'CASH_FLOW_WARNING',
 ]);
 
 export const insightSeverity = pgEnum('insight_severity', [

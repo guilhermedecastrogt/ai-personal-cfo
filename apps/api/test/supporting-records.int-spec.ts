@@ -78,14 +78,14 @@ describe('supporting records', () => {
         .values([
           {
             householdId: fixture.household.id,
-            type: 'BUDGET_WARNING',
+            type: 'BUDGET_NEAR_LIMIT',
             severity: 'MEDIUM',
             title: 'Restaurant budget at 80%',
           },
           {
             householdId: fixture.household.id,
             memberId: memberAt(fixture, 2).id,
-            type: 'SPENDING_TREND',
+            type: 'SPENDING_INCREASE',
             severity: 'LOW',
             title: 'Transport spending increased',
             payload: { changePercent: 38 },
@@ -108,7 +108,7 @@ describe('supporting records', () => {
         testDatabase.database.insert(insights).values({
           householdId: first.household.id,
           memberId: memberAt(second, 0).id,
-          type: 'ANOMALY',
+          type: 'UNUSUAL_SPENDING',
           severity: 'HIGH',
           title: 'Unusual purchase',
         }),

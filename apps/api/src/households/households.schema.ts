@@ -8,11 +8,13 @@ export const households = pgTable(
     ...identifier,
     name: text('name').notNull(),
     currency: char('currency', { length: 3 }).notNull(),
+    timezone: text('timezone').notNull().default('UTC'),
     ...auditTimestamps,
   },
   (table) => [
     check('households_name_not_blank', sql`length(trim(${table.name})) > 0`),
     check('households_currency_format', sql`${table.currency} ~ '^[A-Z]{3}$'`),
+    check('households_timezone_not_blank', sql`length(trim(${table.timezone})) > 0`),
   ],
 );
 

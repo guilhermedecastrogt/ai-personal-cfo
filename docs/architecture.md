@@ -93,7 +93,7 @@ flowchart TD
 | `transactions` | Transaction validation, creation and querying, including transfers               |
 | `budgets`      | Budget definitions                                                               |
 | `goals`        | Goal definitions and progress inputs                                             |
-| `finance`      | The finance engine: pure calculators with no I/O                                 |
+| `finance`      | The finance engine: pure calculations, and the service that feeds them           |
 | `ai`           | The `AIProvider` interface, its OpenAI implementation and transaction extraction |
 | `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter   |
 | `conversation` | Orchestration of an inbound message from intent to reply                         |
@@ -247,20 +247,11 @@ Supporting tables for conversations, messages and webhook events sit outside the
 
 ## Finance engine
 
-The engine is a set of pure calculators:
+The engine is a set of pure functions over the ledger entries of one household, with a service that loads the data and calls them ([ADR-015](adr/ADR-015-pure-finance-engine.md)). It calculates spending and income breakdowns, cash flow, savings, budget usage, goal progress, trends, forecasts, recurring expenses, anomalies, account balances and insights.
 
-| Calculator                 | Produces                                                                               |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| `BudgetCalculator`         | Spent, remaining, percentage used, days remaining, projected spending                  |
-| `CashFlowCalculator`       | Income, expenses and net flow for a period                                             |
-| `SavingsCalculator`        | Savings and savings rate                                                               |
-| `ForecastCalculator`       | Projected month-end spending and savings from historical averages and current velocity |
-| `GoalCalculator`           | Percentage complete, remaining amount, required saving rate, deadline risk             |
-| `RecurringExpenseDetector` | Expenses that repeat at a regular interval for a similar amount                        |
-| `SpendingTrendAnalyzer`    | Change in category spending between periods                                            |
-| `AnomalyDetector`          | Transactions that are unusual against the household's history                          |
+The same calculation serves household and per-member analytics: results carry a breakdown by member for however many members the household has. Calculations work in one currency at a time and fail if given another. Ratios are integer basis points.
 
-Each takes transactions and definitions as input and returns values. The same calculator serves household and per-member analytics, since a member's figures are the same calculation over a filtered set. Breakdowns are computed per member over however many members the household has. Calculators operate on one currency at a time. Percentages are derived from integer amounts with explicit rounding rules.
+Calculations, methodologies and thresholds are described in [finance-engine.md](finance-engine.md).
 
 ## Deployment
 

@@ -1,7 +1,7 @@
 import type { SeedDefinitionInput } from './seed-definition.js';
 
 export const demoHousehold: SeedDefinitionInput = {
-  household: { name: 'Demo Household', currency: 'EUR' },
+  household: { name: 'Demo Household', currency: 'EUR', timezone: 'Europe/Dublin' },
   members: [
     {
       name: 'Member A',

@@ -11,6 +11,7 @@ export type WhatsAppIdentity = typeof whatsappIdentities.$inferSelect;
 export interface NewHousehold {
   readonly name: string;
   readonly currency: string;
+  readonly timezone?: string;
 }
 
 export interface NewWhatsAppIdentity {
@@ -33,6 +34,14 @@ export class HouseholdsRepository {
 
   async createHousehold(household: NewHousehold): Promise<Household> {
     return requireRow(await this.database.insert(households).values(household).returning());
+  }
+
+  async findHousehold(householdId: string): Promise<Household | undefined> {
+    const [household] = await this.database
+      .select()
+      .from(households)
+      .where(eq(households.id, householdId));
+    return household;
   }
 
   async addMember(householdId: string, name: string): Promise<Member> {

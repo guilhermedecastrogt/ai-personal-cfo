@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isSupportedTimeZone } from '../../finance/domain/period/period.js';
 import { isSupportedCurrency } from '../../money/money.js';
 
 const currency = z.string().refine(isSupportedCurrency);
@@ -45,7 +46,11 @@ function hasDuplicates(values: readonly string[]): boolean {
 
 export const seedDefinitionSchema = z
   .object({
-    household: z.object({ name, currency }),
+    household: z.object({
+      name,
+      currency,
+      timezone: z.string().refine(isSupportedTimeZone).default('UTC'),
+    }),
     members: z.array(memberDefinition).min(1),
     accounts: z.array(accountDefinition).default([]),
     budgets: z.array(budgetDefinition).default([]),

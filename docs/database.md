@@ -43,7 +43,7 @@ erDiagram
 
 | Table                 | Purpose                                                               | Household scope                           |
 | --------------------- | --------------------------------------------------------------------- | ----------------------------------------- |
-| `households`          | The unit that owns financial data                                     | Is the scope                              |
+| `households`          | The unit that owns financial data, with its currency and time zone    | Is the scope                              |
 | `members`             | People in a household, one to many                                    | `household_id`                            |
 | `whatsapp_identities` | External sender identity mapped to one member                         | Through `member_id`                       |
 | `accounts`            | Where money is held. `owner_member_id` is null for a joint account    | `household_id`                            |

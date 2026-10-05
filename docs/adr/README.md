@@ -18,3 +18,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [012](ADR-012-money-as-integer-minor-units.md)       | Money as integer minor units bound to a currency                  | Accepted |
 | [013](ADR-013-transfers-as-single-transaction.md)    | A transfer is one transaction between two accounts                | Accepted |
 | [014](ADR-014-global-category-list.md)               | Categories are a global controlled list created by migration      | Accepted |
+| [015](ADR-015-pure-finance-engine.md)                | The finance engine is pure functions over one household's ledger  | Accepted |
