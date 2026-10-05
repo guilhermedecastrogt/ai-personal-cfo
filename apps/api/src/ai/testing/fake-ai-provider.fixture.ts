@@ -2,6 +2,7 @@ import {
   AIProviderError,
   type AIFailureCategory,
   type AIProvider,
+  type ImageExtractionRequest,
   type InterpretationRequest,
   type ReplyRequest,
 } from '../ai-provider.js';
@@ -64,6 +65,14 @@ export function questionInterpretation(overrides: Partial<FinancialQuestion> = {
   };
 }
 
+export function imageReading(overrides: Partial<TransactionCandidate> = {}): unknown {
+  return {
+    kind: 'SINGLE_TRANSACTION',
+    transactionCount: null,
+    transaction: (transactionInterpretation(overrides) as { transaction: unknown }).transaction,
+  };
+}
+
 export const OTHER_INTERPRETATION: unknown = { kind: 'OTHER', transaction: null, question: null };
 
 type ScriptedInterpretation =
@@ -74,6 +83,8 @@ type ReplyScript = (request: ReplyRequest) => string;
 export class FakeAIProvider implements AIProvider {
   readonly interpretationRequests: InterpretationRequest[] = [];
   readonly replyRequests: ReplyRequest[] = [];
+  readonly imageRequests: ImageExtractionRequest[] = [];
+  private imageReadings: ScriptedInterpretation[] = [];
   private interpretations: ScriptedInterpretation[] = [];
   private replyScript: ReplyScript = (request) => `[${request.situation}]`;
 
@@ -84,6 +95,16 @@ export class FakeAIProvider implements AIProvider {
 
   willFailToInterpret(failure: AIFailureCategory): this {
     this.interpretations = [{ failure }];
+    return this;
+  }
+
+  willReadImageAs(...outputs: unknown[]): this {
+    this.imageReadings = outputs.map((output) => ({ output }));
+    return this;
+  }
+
+  willFailToReadImage(failure: AIFailureCategory): this {
+    this.imageReadings = [{ failure }];
     return this;
   }
 
@@ -104,6 +125,17 @@ export class FakeAIProvider implements AIProvider {
     const next = this.interpretations.shift();
     if (next === undefined) {
       return Promise.reject(new Error('The fake provider has no interpretation scripted'));
+    }
+    return 'failure' in next
+      ? Promise.reject(new AIProviderError(next.failure))
+      : Promise.resolve(next.output);
+  }
+
+  extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown> {
+    this.imageRequests.push(request);
+    const next = this.imageReadings.shift();
+    if (next === undefined) {
+      return Promise.reject(new Error('The fake provider has no image reading scripted'));
     }
     return 'failure' in next
       ? Promise.reject(new AIProviderError(next.failure))

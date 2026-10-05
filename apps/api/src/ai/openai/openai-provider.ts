@@ -12,6 +12,7 @@ import {
   AIProviderError,
   type AIFailureCategory,
   type AIProvider,
+  type ImageExtractionRequest,
   type InterpretationRequest,
   type ReplyRequest,
 } from '../ai-provider.js';
@@ -21,6 +22,14 @@ import {
   messageInterpretationJsonSchema,
 } from '../interpretation/message-interpretation.schema.js';
 import { buildReplyInput, buildReplyInstructions } from '../reply/reply-instructions.js';
+import {
+  buildImageCaptionText,
+  buildImageExtractionInstructions,
+} from '../vision/image-extraction-instructions.js';
+import {
+  IMAGE_EXTRACTION_SCHEMA_NAME,
+  imageExtractionJsonSchema,
+} from '../vision/image-extraction.schema.js';
 
 const REQUEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 const MAXIMUM_RETRIES = 2;
@@ -33,7 +42,7 @@ export interface OpenAIProviderOptions {
   readonly maximumRetries?: number;
 }
 
-type Operation = 'interpretMessage' | 'composeReply';
+type Operation = 'interpretMessage' | 'extractTransactionFromImage' | 'composeReply';
 
 export class OpenAIProvider implements AIProvider {
   private readonly logger = new Logger(OpenAIProvider.name);
@@ -69,11 +78,36 @@ export class OpenAIProvider implements AIProvider {
         },
       },
     });
-    try {
-      return JSON.parse(output) as unknown;
-    } catch {
-      throw new AIProviderError('INVALID_RESPONSE');
-    }
+    return parseStructuredOutput(output);
+  }
+
+  async extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown> {
+    const { mimeType, bytes } = request.image;
+    const output = await this.respond('extractTransactionFromImage', {
+      instructions: buildImageExtractionInstructions(request),
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: buildImageCaptionText(request.caption) },
+            {
+              type: 'input_image',
+              detail: 'high',
+              image_url: `data:${mimeType};base64,${bytes.toString('base64')}`,
+            },
+          ],
+        },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: IMAGE_EXTRACTION_SCHEMA_NAME,
+          strict: true,
+          schema: imageExtractionJsonSchema(),
+        },
+      },
+    });
+    return parseStructuredOutput(output);
   }
 
   async composeReply(request: ReplyRequest): Promise<string> {
@@ -117,6 +151,14 @@ export class OpenAIProvider implements AIProvider {
     } else {
       this.logger.warn(message);
     }
+  }
+}
+
+function parseStructuredOutput(output: string): unknown {
+  try {
+    return JSON.parse(output) as unknown;
+  } catch {
+    throw new AIProviderError('INVALID_RESPONSE');
   }
 }
 

@@ -1,3 +1,5 @@
+import type { ImageMimeType } from '../media/image-inspection.js';
+
 export const AI_PROVIDER = Symbol('AI_PROVIDER');
 
 export interface ConversationTurn {
@@ -20,8 +22,19 @@ export interface InterpretationRequest {
   readonly categories: readonly CategoryOption[];
 }
 
+export interface ImageExtractionRequest {
+  readonly image: { readonly mimeType: ImageMimeType; readonly bytes: Buffer };
+  readonly caption: string | null;
+  readonly accountNames: readonly string[];
+  readonly categories: readonly CategoryOption[];
+}
+
 export type ReplySituation =
-  'TRANSACTION_RECORDED' | 'CLARIFICATION_NEEDED' | 'QUESTION_ANSWERED' | 'OUT_OF_SCOPE';
+  | 'TRANSACTION_RECORDED'
+  | 'CLARIFICATION_NEEDED'
+  | 'QUESTION_ANSWERED'
+  | 'IMAGE_NOT_USABLE'
+  | 'OUT_OF_SCOPE';
 
 export type ReplyFacts = Readonly<Record<string, unknown>>;
 
@@ -34,6 +47,7 @@ export interface ReplyRequest {
 
 export interface AIProvider {
   interpretMessage(request: InterpretationRequest): Promise<unknown>;
+  extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown>;
   composeReply(request: ReplyRequest): Promise<string>;
 }
 

@@ -1,0 +1,115 @@
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AccountsRepository } from '../../src/accounts/accounts.repository.js';
+import { MessageInterpreter } from '../../src/ai/interpretation/message-interpreter.js';
+import { ReplyComposer } from '../../src/ai/reply/reply-composer.js';
+import { FakeAIProvider } from '../../src/ai/testing/fake-ai-provider.fixture.js';
+import { ImageTransactionReader } from '../../src/ai/vision/image-transaction-reader.js';
+import { BudgetsRepository } from '../../src/budgets/budgets.repository.js';
+import { CategoriesRepository } from '../../src/categories/categories.repository.js';
+import type { AppConfig } from '../../src/config/app-config.js';
+import { ConversationsRepository } from '../../src/conversation/conversations.repository.js';
+import { TransactionExtractionService } from '../../src/conversation/extraction/transaction-extraction.service.js';
+import { FinancialAssistant } from '../../src/conversation/financial-assistant.service.js';
+import { ImageTransactionService } from '../../src/conversation/image/image-transaction.service.js';
+import { FinancialQueryService } from '../../src/conversation/queries/financial-query.service.js';
+import type { Database } from '../../src/database/database.js';
+import { FinanceService } from '../../src/finance/application/finance.service.js';
+import { LedgerRepository } from '../../src/finance/infrastructure/ledger.repository.js';
+import { GoalsRepository } from '../../src/goals/goals.repository.js';
+import { HouseholdsRepository } from '../../src/households/households.repository.js';
+import { DEFAULT_MEDIA_POLICY, type MediaPolicy } from '../../src/media/media-policy.js';
+import { TemporaryMediaStore } from '../../src/media/temporary-media-store.js';
+import { FakeMediaSource } from '../../src/media/testing/fake-media-source.fixture.js';
+import { TransactionsRepository } from '../../src/transactions/transactions.repository.js';
+import { TransactionsService } from '../../src/transactions/transactions.service.js';
+
+export const TEST_CONFIG: AppConfig = {
+  environment: 'test',
+  port: 0,
+  logLevel: 'error',
+  databaseUrl: 'postgres://unused',
+  openaiApiKey: 'unused',
+  openaiModel: 'unused',
+  aiConfidenceThreshold: 0.8,
+};
+
+export interface AssistantHarness {
+  readonly assistant: FinancialAssistant;
+  readonly provider: FakeAIProvider;
+  readonly mediaSource: FakeMediaSource;
+  readonly finance: FinanceService;
+  readonly accounts: AccountsRepository;
+  readonly budgets: BudgetsRepository;
+  readonly goals: GoalsRepository;
+  readonly transactions: TransactionsRepository;
+  temporaryFiles(): Promise<string[]>;
+  dispose(): Promise<void>;
+}
+
+export async function createAssistantHarness(
+  database: Database,
+  mediaPolicy: MediaPolicy = DEFAULT_MEDIA_POLICY,
+): Promise<AssistantHarness> {
+  const mediaRoot = await mkdtemp(join(tmpdir(), 'cfo-assistant-test-'));
+  const households = new HouseholdsRepository(database);
+  const categories = new CategoriesRepository(database);
+  const accounts = new AccountsRepository(database);
+  const budgets = new BudgetsRepository(database);
+  const goals = new GoalsRepository(database);
+  const transactions = new TransactionsRepository(database);
+  const transactionsService = new TransactionsService(
+    transactions,
+    households,
+    accounts,
+    categories,
+  );
+  const finance = new FinanceService(
+    new LedgerRepository(database),
+    households,
+    categories,
+    budgets,
+    goals,
+    accounts,
+  );
+  const provider = new FakeAIProvider();
+  const mediaSource = new FakeMediaSource();
+  const extraction = new TransactionExtractionService(
+    transactionsService,
+    accounts,
+    categories,
+    TEST_CONFIG,
+  );
+  const assistant = new FinancialAssistant(
+    new MessageInterpreter(provider),
+    new ReplyComposer(provider),
+    extraction,
+    new FinancialQueryService(finance, households, categories, accounts, goals),
+    new ImageTransactionService(
+      new TemporaryMediaStore(mediaSource, mediaRoot, mediaPolicy),
+      new ImageTransactionReader(provider),
+      extraction,
+      transactions,
+      accounts,
+      categories,
+    ),
+    finance,
+    new ConversationsRepository(database),
+    households,
+    accounts,
+    categories,
+  );
+  return {
+    assistant,
+    provider,
+    mediaSource,
+    finance,
+    accounts,
+    budgets,
+    goals,
+    transactions,
+    temporaryFiles: () => readdir(mediaRoot, { recursive: true }),
+    dispose: () => rm(mediaRoot, { recursive: true, force: true }),
+  };
+}

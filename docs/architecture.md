@@ -85,21 +85,22 @@ flowchart TD
     Domain --> DB[(PostgreSQL)]
 ```
 
-| Module         | Owns                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------- |
-| `households`   | Households, members, WhatsApp identities and resolution of the request context              |
-| `accounts`     | Accounts and balances                                                                       |
-| `categories`   | The category tree and mapping of names to categories                                        |
-| `transactions` | Transaction validation, creation and querying, including transfers                          |
-| `budgets`      | Budget definitions                                                                          |
-| `goals`        | Goal definitions and progress inputs                                                        |
-| `finance`      | The finance engine: pure calculations, and the service that feeds them                      |
-| `ai`           | The `AIProvider` interface, its OpenAI implementation, interpretation and reply composition |
-| `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter              |
-| `conversation` | Orchestration of a message: transaction extraction, financial questions and the reply       |
-| `insights`     | Rules that decide whether something deserves the household's attention                      |
-| `advisor`      | Financial advice built on insights. Planned                                                 |
-| `reports`      | Monthly report generation                                                                   |
+| Module         | Owns                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| `households`   | Households, members, WhatsApp identities and resolution of the request context                     |
+| `accounts`     | Accounts and balances                                                                              |
+| `categories`   | The category tree and mapping of names to categories                                               |
+| `transactions` | Transaction validation, creation and querying, including transfers                                 |
+| `budgets`      | Budget definitions                                                                                 |
+| `goals`        | Goal definitions and progress inputs                                                               |
+| `finance`      | The finance engine: pure calculations, and the service that feeds them                             |
+| `ai`           | The `AIProvider` interface, its OpenAI implementation, interpretation and reply composition        |
+| `whatsapp`     | Webhook handling, signature verification, idempotency and the provider adapter                     |
+| `conversation` | Orchestration of a message: transaction extraction, financial questions and the reply              |
+| `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily |
+| `insights`     | Rules that decide whether something deserves the household's attention                             |
+| `advisor`      | Financial advice built on insights. Planned                                                        |
+| `reports`      | Monthly report generation                                                                          |
 
 ### Dependency rules
 
@@ -164,7 +165,7 @@ Points that matter:
 - **Idempotency comes first.** The provider's event identifier is stored in `webhook_events` under a unique constraint before any processing. A redelivered event is acknowledged and ignored.
 - **Unknown senders stop at identity resolution.** No model is called and no reply is sent.
 - **The webhook is acknowledged before slow work.** Model calls take seconds, and providers retry on slow responses. Processing continues in-process after the acknowledgement. A crash between acknowledgement and completion leaves an event marked as received but not processed, which is detectable and can be retried. A queue is deliberately not introduced for this.
-- **Images follow the same path.** The image is downloaded to a temporary file, passed to vision extraction, and deleted in a `finally` step whether extraction succeeds or fails. Nothing but the structured result is persisted.
+- **Images follow the same path.** The image is downloaded to a temporary directory, validated, read by the model and deleted in a `finally` step whether reading succeeds or fails. Nothing but the structured result is persisted. See [vision-extraction.md](vision-extraction.md).
 
 ## Extraction and validation
 

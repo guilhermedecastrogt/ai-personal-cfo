@@ -4,6 +4,7 @@ const HEADLINES: Record<ReplySituation, string> = {
   TRANSACTION_RECORDED: 'Recorded.',
   CLARIFICATION_NEEDED: 'I need a bit more information before I can continue.',
   QUESTION_ANSWERED: 'Here is what I found.',
+  IMAGE_NOT_USABLE: 'I could not record anything from that image.',
   OUT_OF_SCOPE:
     'I can record expenses and income, and answer questions about spending, budgets, goals and balances.',
 };

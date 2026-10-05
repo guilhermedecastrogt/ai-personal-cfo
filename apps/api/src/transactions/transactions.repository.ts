@@ -25,6 +25,24 @@ export class TransactionsRepository {
     );
   }
 
+  async findBySourceMessage(
+    householdId: string,
+    sourceMessageId: string,
+  ): Promise<Transaction | undefined> {
+    const [transaction] = await this.database
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          eq(transactions.sourceMessageId, sourceMessageId),
+        ),
+      )
+      .orderBy(desc(transactions.createdAt))
+      .limit(1);
+    return transaction;
+  }
+
   async list(householdId: string, filter: TransactionFilter = {}): Promise<Transaction[]> {
     const conditions: SQL[] = [eq(transactions.householdId, householdId)];
     if (filter.memberId !== undefined) {

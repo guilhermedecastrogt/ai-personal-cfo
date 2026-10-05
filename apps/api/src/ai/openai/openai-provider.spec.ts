@@ -3,7 +3,8 @@ import type { AddressInfo } from 'node:net';
 import { Logger } from '@nestjs/common';
 import { APIConnectionTimeoutError } from 'openai';
 import { AIProviderError } from '../ai-provider.js';
-import { transactionInterpretation } from '../testing/fake-ai-provider.fixture.js';
+import { pngImage } from '../../media/testing/fake-media-source.fixture.js';
+import { imageReading, transactionInterpretation } from '../testing/fake-ai-provider.fixture.js';
 import { OpenAIProvider, categorizeFailure } from './openai-provider.js';
 
 interface RecordedRequest {
@@ -187,6 +188,93 @@ describe('OpenAIProvider', () => {
       expect(await failureOf(provider().interpretMessage(INTERPRETATION_REQUEST))).toMatchObject({
         category: 'INVALID_RESPONSE',
       });
+    });
+  });
+
+  describe('extractTransactionFromImage', () => {
+    const image = { mimeType: 'image/png' as const, bytes: pngImage() };
+    const request = {
+      image,
+      caption: 'almoço de ontem',
+      accountNames: ['Joint Account', 'Savings'],
+      categories: INTERPRETATION_REQUEST.categories,
+    };
+
+    it('sends the image inline with a strict schema and without storing it', async () => {
+      responses.push(completed(JSON.stringify(imageReading())));
+
+      await provider().extractTransactionFromImage(request);
+      const body = requests[0]?.body;
+
+      expect(requests[0]?.path).toBe('/v1/responses');
+      expect(body).toMatchObject({
+        model: 'configured-model',
+        store: false,
+        text: {
+          format: { type: 'json_schema', name: 'image_transaction_extraction', strict: true },
+        },
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: 'Caption: almoço de ontem' },
+              {
+                type: 'input_image',
+                detail: 'high',
+                image_url: `data:image/png;base64,${image.bytes.toString('base64')}`,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('sends the accounts and categories and nothing else about the household', async () => {
+      responses.push(completed(JSON.stringify(imageReading())));
+
+      await provider().extractTransactionFromImage({ ...request, caption: null });
+      const body = requests[0]?.body;
+
+      expect(body?.instructions).toEqual(expect.stringContaining('- Savings'));
+      expect(body?.instructions).toEqual(
+        expect.stringContaining('- Groceries (expense, under Food)'),
+      );
+      expect(body?.instructions).not.toEqual(expect.stringContaining('Member'));
+      expect(JSON.stringify(body?.input)).toContain('No caption was sent with the image.');
+      expect(Object.keys(body ?? {}).sort()).toEqual([
+        'input',
+        'instructions',
+        'model',
+        'store',
+        'text',
+      ]);
+    });
+
+    it('returns the parsed structured output', async () => {
+      responses.push(
+        completed(JSON.stringify(imageReading({ amount: '43.27', merchant: 'Tesco' }))),
+      );
+
+      expect(await provider().extractTransactionFromImage(request)).toEqual(
+        imageReading({ amount: '43.27', merchant: 'Tesco' }),
+      );
+    });
+
+    it('reports output that is not JSON as an invalid response', async () => {
+      responses.push(completed('The receipt shows 43.27 at Tesco.'));
+
+      expect(await failureOf(provider().extractTransactionFromImage(request))).toMatchObject({
+        category: 'INVALID_RESPONSE',
+      });
+    });
+
+    it('reports a rate limit without leaking the image', async () => {
+      responses.push(failed(429));
+
+      const error = (await failureOf(provider().extractTransactionFromImage(request))) as Error;
+
+      expect(error).toMatchObject({ category: 'RATE_LIMITED' });
+      expect(JSON.stringify(error) + error.message).not.toContain(image.bytes.toString('base64'));
     });
   });
 

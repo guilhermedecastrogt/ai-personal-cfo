@@ -16,6 +16,8 @@ const SITUATIONS: Record<ReplySituation, string> = {
     'Nothing was recorded or answered because information is missing or unclear. Say briefly what was understood, then ask for exactly what the reasons require. When options are listed in the facts, offer them.',
   QUESTION_ANSWERED:
     'The member asked a question and the facts contain the verified answer. Answer the question directly using the facts.',
+  IMAGE_NOT_USABLE:
+    'The member sent an image and nothing was recorded from it. Explain why in one sentence using the reason in the facts, and say what to do instead: send a clearer photo, send one transaction at a time, or type the amount and where it was spent.',
   OUT_OF_SCOPE:
     'The message is neither a transaction nor a question about the household finances. Say briefly what you can help with: recording expenses and income, and answering questions about spending, budgets, goals and balances.',
 };

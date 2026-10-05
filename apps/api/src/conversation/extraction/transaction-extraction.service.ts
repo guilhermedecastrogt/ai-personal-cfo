@@ -7,6 +7,7 @@ import { APP_CONFIG, type AppConfig } from '../../config/app-config.js';
 import type { IsoDate } from '../../finance/domain/period/period.js';
 import type { RequestContext } from '../../households/request-context.js';
 import { formatMoney } from '../../money/format-money.js';
+import type { TransactionSource } from '../../transactions/transaction-vocabulary.js';
 import type { Transaction } from '../../transactions/transactions.repository.js';
 import {
   TransactionRejectedError,
@@ -39,6 +40,7 @@ export interface ExtractionRequest {
   readonly context: RequestContext;
   readonly candidate: TransactionCandidate;
   readonly today: IsoDate;
+  readonly medium: 'TEXT' | 'IMAGE';
   readonly sourceMessageId?: string;
 }
 
@@ -88,7 +90,7 @@ export class TransactionExtractionService {
       const transaction = await this.transactions.record(context.householdId, {
         ...draft.fields,
         memberId: context.memberId,
-        source: context.channel === 'whatsapp' ? 'WHATSAPP_TEXT' : 'WEB',
+        source: sourceOf(context, request.medium),
         ...(request.sourceMessageId === undefined
           ? {}
           : { sourceMessageId: request.sourceMessageId }),
@@ -101,6 +103,13 @@ export class TransactionExtractionService {
       throw error;
     }
   }
+}
+
+function sourceOf(context: RequestContext, medium: ExtractionRequest['medium']): TransactionSource {
+  if (context.channel !== 'whatsapp') {
+    return 'WEB';
+  }
+  return medium === 'IMAGE' ? 'WHATSAPP_IMAGE' : 'WHATSAPP_TEXT';
 }
 
 function clarification(

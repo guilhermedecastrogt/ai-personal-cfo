@@ -4,6 +4,7 @@ import { AI_PROVIDER, type AIProvider } from './ai-provider.js';
 import { MessageInterpreter } from './interpretation/message-interpreter.js';
 import { OpenAIProvider } from './openai/openai-provider.js';
 import { ReplyComposer } from './reply/reply-composer.js';
+import { ImageTransactionReader } from './vision/image-transaction-reader.js';
 
 @Module({
   providers: [
@@ -14,8 +15,9 @@ import { ReplyComposer } from './reply/reply-composer.js';
         new OpenAIProvider({ apiKey: config.openaiApiKey, model: config.openaiModel }),
     },
     MessageInterpreter,
+    ImageTransactionReader,
     ReplyComposer,
   ],
-  exports: [MessageInterpreter, ReplyComposer],
+  exports: [MessageInterpreter, ImageTransactionReader, ReplyComposer],
 })
 export class AiModule {}

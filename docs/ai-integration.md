@@ -21,7 +21,7 @@ flowchart TD
     Guard --> Reply[Reply]
 ```
 
-Image input is not part of this. It arrives with a later phase.
+Images follow the same pipeline after a separate reading step, described in [vision-extraction.md](vision-extraction.md).
 
 ## Structure
 
@@ -47,14 +47,15 @@ apps/api/src
 ```ts
 interface AIProvider {
   interpretMessage(request: InterpretationRequest): Promise<unknown>;
+  extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown>;
   composeReply(request: ReplyRequest): Promise<string>;
 }
 ```
 
-The interface has two task-level capabilities and nothing generic ([ADR-016](adr/ADR-016-task-level-ai-capabilities.md)). There is no method that accepts an arbitrary prompt.
+The interface has three task-level capabilities and nothing generic ([ADR-016](adr/ADR-016-task-level-ai-capabilities.md)). There is no method that accepts an arbitrary prompt.
 
-- `interpretMessage` returns `unknown` on purpose. Whatever a provider returns is untrusted until `MessageInterpreter` has parsed it.
-- Neither request type has a field for a household or member identifier. The provider is given names of members, accounts and categories so that it can recognise them in a message, and nothing else about the household.
+- `interpretMessage` and `extractTransactionFromImage` return `unknown` on purpose. Whatever a provider returns is untrusted until `MessageInterpreter` has parsed it.
+- No request type has a field for a household or member identifier. The provider is given names of members, accounts and categories so that it can recognise them in a message, and nothing else about the household.
 - Failures are reported as `AIProviderError` with a category: `TIMEOUT`, `RATE_LIMITED`, `AUTHENTICATION`, `UNAVAILABLE`, `REJECTED` or `INVALID_RESPONSE`.
 
 A lint rule forbids importing the OpenAI SDK anywhere outside `ai/openai`.

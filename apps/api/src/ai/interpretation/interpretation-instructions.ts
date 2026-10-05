@@ -26,7 +26,7 @@ Rules for a question:
 - "account" is the account name as the sender wrote it when the question is about one, otherwise null.
 - "memberScope" is SENDER when the sender asks about themselves ("I", "me", "my"), NAMED_MEMBER with "memberName" exactly as listed when another member is named, and HOUSEHOLD otherwise ("we", "us", or nobody).`;
 
-function listCategories(categories: InterpretationRequest['categories']): string {
+export function listCategories(categories: InterpretationRequest['categories']): string {
   return categories
     .map(({ name, kind, parent }) =>
       parent === null
@@ -36,7 +36,7 @@ function listCategories(categories: InterpretationRequest['categories']): string
     .join('\n');
 }
 
-function listNames(names: readonly string[]): string {
+export function listNames(names: readonly string[]): string {
   return names.length === 0 ? '- none' : names.map((name) => `- ${name}`).join('\n');
 }
 

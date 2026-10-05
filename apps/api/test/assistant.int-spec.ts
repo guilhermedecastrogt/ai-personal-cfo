@@ -1,9 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { AccountsRepository, type Account } from '../src/accounts/accounts.repository.js';
-import { MessageInterpreter } from '../src/ai/interpretation/message-interpreter.js';
 import { AI_UNAVAILABLE_REPLY } from '../src/ai/reply/fallback-reply.js';
-import { ReplyComposer } from '../src/ai/reply/reply-composer.js';
 import {
   FakeAIProvider,
   OTHER_INTERPRETATION,
@@ -13,48 +11,32 @@ import {
   transactionInterpretation,
 } from '../src/ai/testing/fake-ai-provider.fixture.js';
 import { BudgetsRepository } from '../src/budgets/budgets.repository.js';
-import { CategoriesRepository } from '../src/categories/categories.repository.js';
 import { categories } from '../src/categories/categories.schema.js';
-import type { AppConfig } from '../src/config/app-config.js';
-import { ConversationsRepository } from '../src/conversation/conversations.repository.js';
 import { aiMessages } from '../src/conversation/conversations.schema.js';
-import { TransactionExtractionService } from '../src/conversation/extraction/transaction-extraction.service.js';
-import {
+import type {
+  AssistantResponse,
   FinancialAssistant,
-  type AssistantResponse,
 } from '../src/conversation/financial-assistant.service.js';
-import { FinancialQueryService } from '../src/conversation/queries/financial-query.service.js';
 import { FinanceService } from '../src/finance/application/finance.service.js';
 import { calendarMonth } from '../src/finance/domain/period/period.js';
-import { LedgerRepository } from '../src/finance/infrastructure/ledger.repository.js';
 import { GoalsRepository } from '../src/goals/goals.repository.js';
-import { HouseholdsRepository } from '../src/households/households.repository.js';
 import type { RequestContext } from '../src/households/request-context.js';
 import { TransactionsRepository } from '../src/transactions/transactions.repository.js';
-import { TransactionsService } from '../src/transactions/transactions.service.js';
 import {
   createHouseholdFixture,
   memberAt,
   type HouseholdFixture,
 } from './support/household-fixture.js';
+import { createAssistantHarness, type AssistantHarness } from './support/assistant-harness.js';
 import { createTestDatabase, type TestDatabase } from './support/test-database.js';
 
 const INSTANT = new Date('2026-10-20T12:00:00Z');
 const OCTOBER = calendarMonth(2026, 10);
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
 
-const CONFIG: AppConfig = {
-  environment: 'test',
-  port: 0,
-  logLevel: 'error',
-  databaseUrl: 'postgres://unused',
-  openaiApiKey: 'unused',
-  openaiModel: 'unused',
-  aiConfidenceThreshold: 0.8,
-};
-
 describe('financial assistant', () => {
   let testDatabase: TestDatabase;
+  let harness: AssistantHarness;
   let provider: FakeAIProvider;
   let assistant: FinancialAssistant;
   let finance: FinanceService;
@@ -125,39 +107,8 @@ describe('financial assistant', () => {
   beforeAll(async () => {
     Logger.overrideLogger(false);
     testDatabase = await createTestDatabase();
-    const { database } = testDatabase;
-    const households = new HouseholdsRepository(database);
-    const categoriesRepository = new CategoriesRepository(database);
-    accounts = new AccountsRepository(database);
-    budgets = new BudgetsRepository(database);
-    goals = new GoalsRepository(database);
-    transactions = new TransactionsRepository(database);
-    const transactionsService = new TransactionsService(
-      transactions,
-      households,
-      accounts,
-      categoriesRepository,
-    );
-    finance = new FinanceService(
-      new LedgerRepository(database),
-      households,
-      categoriesRepository,
-      budgets,
-      goals,
-      accounts,
-    );
-    provider = new FakeAIProvider();
-    assistant = new FinancialAssistant(
-      new MessageInterpreter(provider),
-      new ReplyComposer(provider),
-      new TransactionExtractionService(transactionsService, accounts, categoriesRepository, CONFIG),
-      new FinancialQueryService(finance, households, categoriesRepository, accounts, goals),
-      finance,
-      new ConversationsRepository(database),
-      households,
-      accounts,
-      categoriesRepository,
-    );
+    harness = await createAssistantHarness(testDatabase.database);
+    ({ assistant, provider, finance, accounts, budgets, goals, transactions } = harness);
   });
 
   beforeEach(() => {
@@ -167,6 +118,7 @@ describe('financial assistant', () => {
   });
 
   afterAll(async () => {
+    await harness.dispose();
     await testDatabase.destroy();
   });
 
