@@ -117,6 +117,15 @@ export class ProactiveCfoService {
     return this.notifications.markRead(householdId, notificationId, instant);
   }
 
+  async suppressForBudget(householdId: string, budgetId: string, instant: Date): Promise<void> {
+    const suppressed = await this.notifications.suppressForBudget(householdId, budgetId, instant);
+    if (suppressed > 0) {
+      this.logger.log(
+        `event=notifications-suppressed reason=budget-removed count=${String(suppressed)}`,
+      );
+    }
+  }
+
   private async register(
     householdId: string,
     candidate: NotificationCandidate,

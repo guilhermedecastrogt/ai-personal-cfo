@@ -2,9 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, lte, notInArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { households, members } from '../households/households.schema.js';
+import { isUniqueViolation } from '../database/unique-violation.js';
 import { dashboardSessions, memberAccessCodes, memberCredentials } from './auth.schema.js';
-
-const UNIQUE_VIOLATION = '23505';
 
 export interface SessionOwner {
   readonly householdId: string;
@@ -129,8 +128,7 @@ export class AuthRepository {
       });
       return true;
     } catch (error) {
-      const failure = error as { code?: unknown; cause?: { code?: unknown } };
-      if (failure.code === UNIQUE_VIOLATION || failure.cause?.code === UNIQUE_VIOLATION) {
+      if (isUniqueViolation(error)) {
         return false;
       }
       throw error;

@@ -2,8 +2,9 @@ import { sql } from 'drizzle-orm';
 import { bigint, char, check, date, index, pgEnum, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { auditTimestamps, identifier } from '../database/columns.js';
 import { households } from '../households/households.schema.js';
+import { GOAL_TYPES } from './goal-vocabulary.js';
 
-export const goalType = pgEnum('goal_type', ['EMERGENCY_FUND', 'TRAVEL', 'PURCHASE', 'SAVINGS']);
+export const goalType = pgEnum('goal_type', GOAL_TYPES);
 
 export const goalStatus = pgEnum('goal_status', ['ACTIVE', 'ACHIEVED', 'CANCELLED']);
 

@@ -160,7 +160,7 @@ describe('architecture', () => {
 
   it('guards every dashboard route and takes the household only from the session', () => {
     const controller = files.find((file) => file.path === 'dashboard/dashboard.controller.ts');
-    const routes = controller?.text.match(/@(Get|Post)\(/g) ?? [];
+    const routes = controller?.text.match(/@(Get|Post|Patch|Delete)\(/g) ?? [];
     const contexts = controller?.text.match(/@CurrentContext\(\) context: RequestContext/g) ?? [];
 
     expect(controller?.text).toContain('@UseGuards(RateLimitGuard, SessionGuard)');

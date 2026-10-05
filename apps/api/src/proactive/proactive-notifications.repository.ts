@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, exists, gt, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, exists, gt, inArray, isNull, like, lt, or, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import type { NotificationCandidate } from './proactive-candidates.js';
 import {
@@ -235,6 +235,21 @@ export class ProactiveNotificationsRepository {
       .where(eq(proactiveNotifications.householdId, householdId))
       .orderBy(desc(proactiveNotifications.lastDetectedAt), desc(proactiveNotifications.level))
       .limit(limit);
+  }
+
+  async suppressForBudget(householdId: string, budgetId: string, instant: Date): Promise<number> {
+    const suppressed = await this.database
+      .update(proactiveNotifications)
+      .set({ status: 'SUPPRESSED', statusReason: 'BUDGET_REMOVED', updatedAt: instant })
+      .where(
+        and(
+          eq(proactiveNotifications.householdId, householdId),
+          inArray(proactiveNotifications.status, ['PENDING', 'FAILED']),
+          like(proactiveNotifications.eventKey, `%:${budgetId}:%`),
+        ),
+      )
+      .returning({ id: proactiveNotifications.id });
+    return suppressed.length;
   }
 
   async markRead(householdId: string, notificationId: string, instant: Date): Promise<boolean> {

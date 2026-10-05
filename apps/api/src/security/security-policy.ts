@@ -3,7 +3,12 @@ export interface RateLimitRule {
   readonly windowInSeconds: number;
 }
 
-export const RATE_LIMITED_SURFACES = ['AUTHENTICATION', 'DASHBOARD', 'WEBHOOK'] as const;
+export const RATE_LIMITED_SURFACES = [
+  'AUTHENTICATION',
+  'DASHBOARD',
+  'DASHBOARD_WRITE',
+  'WEBHOOK',
+] as const;
 
 export type RateLimitedSurface = (typeof RATE_LIMITED_SURFACES)[number];
 
@@ -30,6 +35,7 @@ export const SECURITY_POLICY: SecurityPolicy = {
   rateLimits: {
     AUTHENTICATION: { limit: 10, windowInSeconds: 60 },
     DASHBOARD: { limit: 240, windowInSeconds: 60 },
+    DASHBOARD_WRITE: { limit: 30, windowInSeconds: 60 },
     WEBHOOK: { limit: 600, windowInSeconds: 60 },
   },
   inboundMessages: {

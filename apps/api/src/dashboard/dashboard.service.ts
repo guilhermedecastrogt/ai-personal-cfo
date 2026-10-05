@@ -45,6 +45,7 @@ import {
   type SpendingView,
   type TransactionsView,
 } from './dashboard.contracts.js';
+import { budgetOptions, goalOptions } from './edit-options.js';
 import { listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
 import {
   allSpendingLabel,
@@ -199,19 +200,28 @@ export class DashboardService {
     monthKey: string | undefined,
     instant: Date,
   ): Promise<BudgetsView> {
-    const { month, analysis } = await this.analyse(context, monthKey, instant);
+    const [{ month, analysis }, directory, currency] = await Promise.all([
+      this.analyse(context, monthKey, instant),
+      this.directories.load(context.householdId),
+      this.householdCurrency(context),
+    ]);
     return budgetsSchema.parse({
       month,
       currencies: analysis.analyses.map(({ review }) =>
-        presentResult(
-          {
-            currency: review.currency,
-            budgets: review.budgets.map(budgetScopeIn(analysis.directory)),
-            forecast: review.forecast,
-          },
-          analysis.directory,
+        withRowKeys(
+          presentResult(
+            {
+              currency: review.currency,
+              budgets: review.budgets.map(budgetScopeIn(analysis.directory)),
+              forecast: review.forecast,
+            },
+            analysis.directory,
+          ),
+          'budgets',
+          review.budgets.map((budget) => budget.budgetId),
         ),
       ),
+      options: budgetOptions(directory, currency, month.period.start),
     });
   }
 
@@ -220,26 +230,35 @@ export class DashboardService {
     monthKey: string | undefined,
     instant: Date,
   ): Promise<GoalsView> {
-    const { month, analysis } = await this.analyse(context, monthKey, instant);
+    const [{ month, analysis }, directory, currency] = await Promise.all([
+      this.analyse(context, monthKey, instant),
+      this.directories.load(context.householdId),
+      this.householdCurrency(context),
+    ]);
     return goalsSchema.parse({
       month,
+      options: goalOptions(directory, currency),
       currencies: analysis.analyses.map(({ review }) =>
-        presentResult(
-          {
-            currency: review.currency,
-            goals: review.goals.map((goal) => ({
-              goalId: goal.goalId,
-              targetMinor: goal.targetMinor,
-              savedMinor: goal.currentMinor,
-              remainingMinor: goal.remainingMinor,
-              progressBasisPoints: goal.progressBasisPoints,
-              state: goal.state,
-              targetDate: goal.targetDate,
-              daysRemaining: goal.daysRemaining,
-              requiredMonthlyMinor: goal.requiredMonthlyMinor,
-            })),
-          },
-          analysis.directory,
+        withRowKeys(
+          presentResult(
+            {
+              currency: review.currency,
+              goals: review.goals.map((goal) => ({
+                goalId: goal.goalId,
+                targetMinor: goal.targetMinor,
+                savedMinor: goal.currentMinor,
+                remainingMinor: goal.remainingMinor,
+                progressBasisPoints: goal.progressBasisPoints,
+                state: goal.state,
+                targetDate: goal.targetDate,
+                daysRemaining: goal.daysRemaining,
+                requiredMonthlyMinor: goal.requiredMonthlyMinor,
+              })),
+            },
+            analysis.directory,
+          ),
+          'goals',
+          review.goals.map((goal) => goal.goalId),
         ),
       ),
     });
@@ -391,8 +410,9 @@ export class DashboardService {
         accounts: directory.accounts.map(toOption),
         members: directory.members.map(toOption),
       },
-      transactions: found.transactions.map((transaction) =>
-        presentResult(
+      transactions: found.transactions.map((transaction) => ({
+        key: transaction.id,
+        ...(presentResult(
           {
             currency: transaction.currency,
             date: transaction.transactionDate,
@@ -411,8 +431,8 @@ export class DashboardService {
             source: transaction.source,
           },
           namesOf(directory),
-        ),
-      ),
+        ) as Record<string, unknown>),
+      })),
     });
   }
 
@@ -456,6 +476,14 @@ export class DashboardService {
     };
   }
 
+  private async householdCurrency(context: RequestContext): Promise<string> {
+    const profile = await this.directories.profile(context.householdId);
+    if (profile === undefined) {
+      throw new HouseholdNotFoundError();
+    }
+    return profile.currency;
+  }
+
   private async monthOf(
     context: RequestContext,
     monthKey: string | undefined,
@@ -494,6 +522,12 @@ function budgetScopeIn(
 function withBudgetScope(budget: ReviewBudget, allSpending: string): Record<string, unknown> {
   const { categoryId, ...rest } = budget;
   return categoryId === null ? { category: allSpending, ...rest } : { categoryId, ...rest };
+}
+
+function withRowKeys(presented: unknown, field: string, keys: readonly string[]): unknown {
+  const section = presented as Record<string, unknown>;
+  const rows = section[field] as readonly Record<string, unknown>[];
+  return { ...section, [field]: rows.map((row, index) => ({ key: keys[index], ...row })) };
 }
 
 function toOption(entry: NamedEntry): { key: string; name: string } {

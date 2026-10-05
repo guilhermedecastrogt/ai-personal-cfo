@@ -1,12 +1,17 @@
 import {
   BadRequestException,
+  Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   HttpCode,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
+  UnprocessableEntityException,
   UseFilters,
   UseGuards,
   Catch,
@@ -22,6 +27,10 @@ import { TRANSACTION_TYPES } from '../transactions/transaction-vocabulary.js';
 import { RECURRING_SORTS } from './dashboard.contracts.js';
 import type {
   AccountsView,
+  BudgetEditView,
+  GoalEditView,
+  SavedView,
+  TransactionEditView,
   BudgetsView,
   GoalsView,
   IncomeView,
@@ -35,8 +44,17 @@ import type {
   SpendingView,
   TransactionsView,
 } from './dashboard.contracts.js';
+import { DashboardWritesService, type WriteOutcome } from './dashboard-writes.service.js';
 import { DashboardService } from './dashboard.service.js';
 import { InvalidMonthError } from './month-selection.js';
+import {
+  budgetEditRequestSchema,
+  budgetRequestSchema,
+  goalEditRequestSchema,
+  goalRequestSchema,
+  parseRequest,
+  transactionEditRequestSchema,
+} from './write-requests.js';
 
 const monthQuerySchema = z.object({
   month: z
@@ -66,6 +84,52 @@ function parseQuery<Schema extends z.ZodType>(schema: Schema, query: unknown): z
   return parsed.data;
 }
 
+function parseKey(key: string): string {
+  const parsed = z.uuid().safeParse(key);
+  if (!parsed.success) {
+    throw new NotFoundException();
+  }
+  return parsed.data;
+}
+
+function found<View>(view: View | undefined): View {
+  if (view === undefined) {
+    throw new NotFoundException();
+  }
+  return view;
+}
+
+function savedOrThrow(outcome: WriteOutcome): SavedView {
+  switch (outcome.status) {
+    case 'SAVED':
+      return outcome.saved;
+    case 'NOT_FOUND':
+      throw new NotFoundException();
+    case 'STALE':
+      throw new ConflictException({ code: 'STALE' });
+    case 'INVALID':
+      throw new UnprocessableEntityException({ errors: outcome.errors });
+  }
+}
+
+function removedOrThrow(removed: boolean): void {
+  if (!removed) {
+    throw new NotFoundException();
+  }
+}
+
+async function written<Schema extends z.ZodType>(
+  schema: Schema,
+  body: unknown,
+  write: (request: z.output<Schema>) => Promise<WriteOutcome>,
+): Promise<SavedView> {
+  const parsed = parseRequest(schema, body);
+  if (!parsed.success) {
+    throw new UnprocessableEntityException({ errors: parsed.errors });
+  }
+  return savedOrThrow(await write(parsed.data));
+}
+
 @Catch(InvalidMonthError, FutureMonthError)
 class InvalidMonthFilter implements ExceptionFilter {
   catch(_error: Error, host: ArgumentsHost): void {
@@ -83,7 +147,10 @@ class InvalidMonthFilter implements ExceptionFilter {
 @RateLimit('DASHBOARD')
 @UseFilters(InvalidMonthFilter)
 export class DashboardController {
-  constructor(private readonly dashboard: DashboardService) {}
+  constructor(
+    private readonly dashboard: DashboardService,
+    private readonly writes: DashboardWritesService,
+  ) {}
 
   @Get('session')
   session(@CurrentContext() context: RequestContext): Promise<SessionView> {
@@ -192,5 +259,115 @@ export class DashboardController {
   @Get('accounts')
   accounts(@CurrentContext() context: RequestContext): Promise<AccountsView> {
     return this.dashboard.accounts(context, new Date());
+  }
+
+  @Get('transactions/:key')
+  async transaction(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<TransactionEditView> {
+    return found(await this.writes.transaction(context, parseKey(key)));
+  }
+
+  @Patch('transactions/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  editTransaction(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+    @Body() body: unknown,
+  ): Promise<SavedView> {
+    const transactionId = parseKey(key);
+    return written(transactionEditRequestSchema, body, (request) =>
+      this.writes.editTransaction(context, transactionId, request),
+    );
+  }
+
+  @Delete('transactions/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  @HttpCode(HTTP_NO_CONTENT)
+  async removeTransaction(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<void> {
+    removedOrThrow(await this.writes.removeTransaction(context, parseKey(key)));
+  }
+
+  @Get('budgets/:key')
+  async budget(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<BudgetEditView> {
+    return found(await this.writes.budget(context, parseKey(key)));
+  }
+
+  @Post('budgets')
+  @RateLimit('DASHBOARD_WRITE')
+  createBudget(
+    @CurrentContext() context: RequestContext,
+    @Body() body: unknown,
+  ): Promise<SavedView> {
+    return written(budgetRequestSchema, body, (request) =>
+      this.writes.createBudget(context, request),
+    );
+  }
+
+  @Patch('budgets/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  editBudget(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+    @Body() body: unknown,
+  ): Promise<SavedView> {
+    const budgetId = parseKey(key);
+    return written(budgetEditRequestSchema, body, (request) =>
+      this.writes.editBudget(context, budgetId, request),
+    );
+  }
+
+  @Delete('budgets/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  @HttpCode(HTTP_NO_CONTENT)
+  async removeBudget(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<void> {
+    removedOrThrow(await this.writes.removeBudget(context, parseKey(key), new Date()));
+  }
+
+  @Get('goals/:key')
+  async goal(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<GoalEditView> {
+    return found(await this.writes.goal(context, parseKey(key)));
+  }
+
+  @Post('goals')
+  @RateLimit('DASHBOARD_WRITE')
+  createGoal(@CurrentContext() context: RequestContext, @Body() body: unknown): Promise<SavedView> {
+    return written(goalRequestSchema, body, (request) => this.writes.createGoal(context, request));
+  }
+
+  @Patch('goals/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  editGoal(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+    @Body() body: unknown,
+  ): Promise<SavedView> {
+    const goalId = parseKey(key);
+    return written(goalEditRequestSchema, body, (request) =>
+      this.writes.editGoal(context, goalId, request),
+    );
+  }
+
+  @Delete('goals/:key')
+  @RateLimit('DASHBOARD_WRITE')
+  @HttpCode(HTTP_NO_CONTENT)
+  async removeGoal(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<void> {
+    removedOrThrow(await this.writes.removeGoal(context, parseKey(key)));
   }
 }

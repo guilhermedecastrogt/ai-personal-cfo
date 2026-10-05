@@ -1,4 +1,4 @@
-import { formatBasisPoints, formatMoney } from './format-money.js';
+import { formatAmountInput, formatBasisPoints, formatMoney } from './format-money.js';
 
 describe('formatMoney', () => {
   it.each([
@@ -51,5 +51,17 @@ describe('Brazilian Portuguese formatting', () => {
     [-3333, '-33,33%'],
   ])('formats %d basis points as %s', (basisPoints, expected) => {
     expect(formatBasisPoints(basisPoints, 'pt-BR')).toBe(expected);
+  });
+});
+
+describe('formatAmountInput', () => {
+  it.each([
+    [1250, 'EUR', 'en', '12.50'],
+    [1250, 'EUR', 'pt-BR', '12,50'],
+    [123456, 'BRL', 'pt-BR', '1234,56'],
+    [5, 'EUR', 'pt-BR', '0,05'],
+    [1500, 'JPY', 'pt-BR', '1500'],
+  ] as const)('writes %d %s for %s as %s', (amountMinor, currency, locale, expected) => {
+    expect(formatAmountInput(amountMinor, currency, locale)).toBe(expected);
   });
 });

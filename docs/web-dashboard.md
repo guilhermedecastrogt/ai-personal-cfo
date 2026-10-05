@@ -59,7 +59,7 @@ The browser never talks to the API directly and never holds an identifier.
 
 ## API
 
-All routes require a session. All are `GET` and take an optional `month=YYYY-MM`, except the two notification routes.
+All routes require a session. The views are `GET` and take an optional `month=YYYY-MM`, except the notification routes and the routes that change data.
 
 | Route                                     | Returns                                                                                                                     |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -78,6 +78,25 @@ All routes require a session. All are `GET` and take an optional `month=YYYY-MM`
 | `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month                               |
 | `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                                              |
 
+Routes that change data ([ADR-029](adr/ADR-029-dashboard-writes.md)):
+
+| Route                                     | Does                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `GET /dashboard/transactions/:key`        | One transaction as an edit form, with its version and the household's options |
+| `PATCH /dashboard/transactions/:key`      | Saves an edit                                                                 |
+| `DELETE /dashboard/transactions/:key`     | Deletes the transaction                                                       |
+| `POST /dashboard/budgets`                 | Creates a budget                                                              |
+| `GET /dashboard/budgets/:key`             | One budget as an edit form                                                    |
+| `PATCH`, `DELETE /dashboard/budgets/:key` | Saves an edit, or deletes the budget and suppresses its unsent alerts         |
+| `POST /dashboard/goals`                   | Creates a goal                                                                |
+| `GET /dashboard/goals/:key`               | One goal as an edit form                                                      |
+| `PATCH`, `DELETE /dashboard/goals/:key`   | Saves an edit, or deletes the goal                                            |
+
+- Bodies carry amounts as typed text (`12,50`, `1.234,56`), read in the currency of the account, budget or goal.
+- A save returns `{ key, version }`. An out-of-date version gets `409` with `{ code: "STALE" }`. A refused field gets `422` with `{ errors: [{ field, code }] }`.
+- A key from another household, or one that does not exist, gets `404`.
+- The budgets and goals views include the options their forms need: categories, currencies, periods or types, and defaults.
+
 Sessions: `POST /auth/sessions` with an access code, and `DELETE /auth/sessions/current`.
 
 ### Contracts
@@ -87,7 +106,7 @@ Each response is a view written for the dashboard, defined as a Zod schema in `a
 - An amount is `{ minor, text }`: the exact integer and its formatted text, such as `€2,220.00`.
 - A ratio is `{ basisPoints, text }`, such as `82%`, or `null` when it does not exist.
 - Categories, accounts, members and goals appear by name.
-- Internal identifiers do not appear. The exception is the `key` of a transaction filter option, which the browser sends back to select a filter.
+- Internal identifiers appear only as `key`: on filter and form options, and on transaction, budget and goal rows. The browser only sends a key back.
 
 The web application imports the TypeScript types of these schemas and nothing else from the backend.
 

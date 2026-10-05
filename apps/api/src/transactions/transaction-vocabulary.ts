@@ -20,5 +20,6 @@ export const TRANSACTION_SOURCES = [
 ] as const;
 
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+export type ExpenseScope = (typeof EXPENSE_SCOPES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export type TransactionSource = (typeof TRANSACTION_SOURCES)[number];

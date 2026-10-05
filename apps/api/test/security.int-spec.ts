@@ -151,7 +151,7 @@ describe('security', () => {
 
   async function call(
     running: Running,
-    method: 'get' | 'post' | 'delete' | 'options',
+    method: 'get' | 'post' | 'patch' | 'delete' | 'options',
     path: string,
     headers: Record<string, string> = {},
     body?: unknown,
@@ -661,6 +661,22 @@ describe('security', () => {
       expect(write.status).toBe(401);
     });
 
+    it('does not let a cookie edit or delete a transaction', async () => {
+      const cookie = {
+        Cookie: `cfo_session=${alpha.token}; __Host-cfo_session=${alpha.token}`,
+        Origin: 'https://evil.example',
+      };
+      const [transaction] = await transactionsOf(alpha);
+      const path = `/dashboard/transactions/${transaction?.id ?? ''}`;
+
+      const edit = await call(main, 'patch', path, cookie, { amount: '1' });
+      const removal = await call(main, 'delete', path, cookie);
+
+      expect(edit.status).toBe(401);
+      expect(removal.status).toBe(401);
+      expect((await transactionsOf(alpha)).map((row) => row.id)).toContain(transaction?.id);
+    });
+
     it('grants no origin cross-origin access', async () => {
       const origin = { Origin: 'https://evil.example' };
       const simple = await call(main, 'get', '/dashboard/session', {
@@ -1069,6 +1085,7 @@ describe('security', () => {
       rateLimits: {
         AUTHENTICATION: SECURITY_POLICY.rateLimits.AUTHENTICATION,
         DASHBOARD: { limit: 20, windowInSeconds: 60 },
+        DASHBOARD_WRITE: { limit: 3, windowInSeconds: 60 },
         WEBHOOK: { limit: 12, windowInSeconds: 60 },
       },
       inboundMessages: {
@@ -1131,6 +1148,32 @@ describe('security', () => {
       expect(statuses.slice(20)).toEqual([429, 429]);
       expect((await call(strict, 'get', '/dashboard/session', bearer(bravo.token))).status).toBe(
         200,
+      );
+    });
+
+    it('limits dashboard changes more tightly than reads, per session', async () => {
+      const [transaction] = await transactionsOf(alpha);
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        statuses.push(
+          (
+            await call(
+              strict,
+              'patch',
+              `/dashboard/transactions/${transaction?.id ?? ''}`,
+              bearer(alpha.token),
+              {},
+            )
+          ).status,
+        );
+      }
+
+      expect(statuses).toEqual([422, 422, 422, 429, 429]);
+      expect((await call(strict, 'get', '/dashboard/session', bearer(alpha.token))).status).toBe(
+        200,
+      );
+      expect((await call(strict, 'post', '/dashboard/goals', bearer(bravo.token), {})).status).toBe(
+        422,
       );
     });
 

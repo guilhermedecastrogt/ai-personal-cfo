@@ -248,20 +248,68 @@ export const incomeSchema = z.object({
   ),
 });
 
+const optionSchema = z.object({ key: z.string(), name: z.string() });
+
+export const budgetOptionsSchema = z.object({
+  categories: z.array(optionSchema),
+  currencies: z.array(z.string()),
+  periods: z.array(z.enum(['WEEKLY', 'MONTHLY', 'YEARLY'])),
+  defaultCurrency: z.string(),
+  defaultStartsOn: z.string(),
+});
+
+export const goalOptionsSchema = z.object({
+  types: z.array(z.enum(['EMERGENCY_FUND', 'TRAVEL', 'PURCHASE', 'SAVINGS'])),
+  currencies: z.array(z.string()),
+  defaultCurrency: z.string(),
+});
+
 export const budgetsSchema = z.object({
   month: monthSchema,
   currencies: z.array(
     z.object({
       currency: z.string(),
-      budgets: z.array(budgetSchema),
+      budgets: z.array(budgetSchema.extend({ key: z.string() })),
       forecast: forecastSchema.nullable(),
     }),
   ),
+  options: budgetOptionsSchema,
 });
 
 export const goalsSchema = z.object({
   month: monthSchema,
-  currencies: z.array(z.object({ currency: z.string(), goals: z.array(goalSchema) })),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      goals: z.array(goalSchema.extend({ key: z.string() })),
+    }),
+  ),
+  options: goalOptionsSchema,
+});
+
+export const budgetEditSchema = z.object({
+  key: z.string(),
+  version: z.string(),
+  categoryKey: z.string().nullable(),
+  period: z.enum(['WEEKLY', 'MONTHLY', 'YEARLY']),
+  limit: z.string(),
+  currency: z.string(),
+  alertThresholdPercent: z.number(),
+  startsOn: z.string(),
+  endsOn: z.string().nullable(),
+  options: budgetOptionsSchema,
+});
+
+export const goalEditSchema = z.object({
+  key: z.string(),
+  version: z.string(),
+  name: z.string(),
+  type: z.enum(['EMERGENCY_FUND', 'TRAVEL', 'PURCHASE', 'SAVINGS']),
+  target: z.string(),
+  saved: z.string(),
+  currency: z.string(),
+  targetDate: z.string().nullable(),
+  options: goalOptionsSchema,
 });
 
 export const outlookViewSchema = z.object({
@@ -323,8 +371,6 @@ export const reviewSchema = z.object({
   priorities: z.array(z.string()),
 });
 
-const optionSchema = z.object({ key: z.string(), name: z.string() });
-
 export const transactionsSchema = z.object({
   month: monthSchema,
   page: z.number(),
@@ -338,6 +384,7 @@ export const transactionsSchema = z.object({
   }),
   transactions: z.array(
     z.object({
+      key: z.string(),
       date: z.string(),
       type: z.enum(['EXPENSE', 'INCOME', 'TRANSFER']),
       amount: moneySchema,
@@ -352,6 +399,47 @@ export const transactionsSchema = z.object({
       source: z.string(),
     }),
   ),
+});
+
+export const transactionEditSchema = z.object({
+  key: z.string(),
+  version: z.string(),
+  type: z.enum(['EXPENSE', 'INCOME', 'TRANSFER']),
+  amount: z.string(),
+  currency: z.string(),
+  date: z.string(),
+  merchant: z.string().nullable(),
+  description: z.string().nullable(),
+  categoryKey: z.string().nullable(),
+  memberKey: z.string(),
+  accountKey: z.string(),
+  transferAccount: z.string().nullable(),
+  expenseScope: z.enum(['HOUSEHOLD', 'INDIVIDUAL']),
+  source: z.string(),
+  options: z.object({
+    members: z.array(optionSchema),
+    accounts: z.array(optionSchema.extend({ currency: z.string() })),
+    categories: z.array(optionSchema.extend({ kind: z.enum(['EXPENSE', 'INCOME']) })),
+  }),
+});
+
+export const savedSchema = z.object({ key: z.string(), version: z.string() });
+
+export const FIELD_ERROR_CODES = [
+  'REQUIRED',
+  'INVALID',
+  'INVALID_AMOUNT',
+  'UNKNOWN',
+  'CURRENCY_MISMATCH',
+  'KIND_MISMATCH',
+  'NOT_ALLOWED',
+  'DUPLICATE',
+  'ENDS_BEFORE_START',
+] as const;
+
+export const fieldErrorSchema = z.object({
+  field: z.string(),
+  code: z.enum(FIELD_ERROR_CODES),
 });
 
 export const accountsSchema = z.object({
@@ -394,5 +482,15 @@ export type AccountsView = z.infer<typeof accountsSchema>;
 export type Comparison = z.infer<typeof comparisonSchema>;
 export type BudgetView = z.infer<typeof budgetSchema>;
 export type GoalView = z.infer<typeof goalSchema>;
+export type BudgetRowView = BudgetsView['currencies'][number]['budgets'][number];
+export type GoalRowView = GoalsView['currencies'][number]['goals'][number];
+export type BudgetOptions = z.infer<typeof budgetOptionsSchema>;
+export type GoalOptions = z.infer<typeof goalOptionsSchema>;
+export type TransactionEditView = z.infer<typeof transactionEditSchema>;
+export type BudgetEditView = z.infer<typeof budgetEditSchema>;
+export type GoalEditView = z.infer<typeof goalEditSchema>;
+export type SavedView = z.infer<typeof savedSchema>;
+export type FieldError = z.infer<typeof fieldErrorSchema>;
+export type FieldErrorCode = (typeof FIELD_ERROR_CODES)[number];
 export type SignalView = z.infer<typeof signalSchema>;
 export type FindingView = z.infer<typeof findingSchema>;

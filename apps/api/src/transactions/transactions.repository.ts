@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, between, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, between, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { requireRow } from '../database/require-row.js';
 import type { NewTransaction } from './new-transaction.schema.js';
@@ -22,6 +22,19 @@ export interface TransactionSearch {
   readonly offset: number;
 }
 
+export interface TransactionChanges {
+  readonly memberId: string;
+  readonly accountId: string;
+  readonly type: Transaction['type'];
+  readonly amountMinor: number;
+  readonly currency: string;
+  readonly merchant: string | null;
+  readonly description: string | null;
+  readonly categoryId: string | null;
+  readonly expenseScope: Transaction['expenseScope'];
+  readonly transactionDate: string;
+}
+
 export interface TransactionPage {
   readonly total: number;
   readonly transactions: readonly Transaction[];
@@ -38,6 +51,42 @@ export class TransactionsRepository {
         .values({ ...transaction, householdId })
         .returning(),
     );
+  }
+
+  async findById(householdId: string, transactionId: string): Promise<Transaction | undefined> {
+    const [transaction] = await this.database
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.householdId, householdId), eq(transactions.id, transactionId)));
+    return transaction;
+  }
+
+  async update(
+    householdId: string,
+    transactionId: string,
+    version: string,
+    changes: TransactionChanges,
+  ): Promise<Transaction | undefined> {
+    const [transaction] = await this.database
+      .update(transactions)
+      .set(changes)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          eq(transactions.id, transactionId),
+          sql`date_trunc('milliseconds', ${transactions.updatedAt}) = ${version}::timestamptz`,
+        ),
+      )
+      .returning();
+    return transaction;
+  }
+
+  async delete(householdId: string, transactionId: string): Promise<boolean> {
+    const deleted = await this.database
+      .delete(transactions)
+      .where(and(eq(transactions.householdId, householdId), eq(transactions.id, transactionId)))
+      .returning({ id: transactions.id });
+    return deleted.length > 0;
   }
 
   async findBySourceMessage(

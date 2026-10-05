@@ -13,8 +13,9 @@ import {
 import { categories } from '../categories/categories.schema.js';
 import { auditTimestamps, identifier } from '../database/columns.js';
 import { households } from '../households/households.schema.js';
+import { BUDGET_PERIODS } from './budget-vocabulary.js';
 
-export const budgetPeriod = pgEnum('budget_period', ['WEEKLY', 'MONTHLY', 'YEARLY']);
+export const budgetPeriod = pgEnum('budget_period', BUDGET_PERIODS);
 
 export const DEFAULT_ALERT_THRESHOLD_PERCENT = 80;
 

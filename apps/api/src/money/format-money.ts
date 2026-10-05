@@ -33,3 +33,14 @@ export function formatBasisPoints(basisPoints: number, locale: Locale = DEFAULT_
     .replace('.', DECIMAL_SEPARATOR[locale]);
   return `${percent}%`;
 }
+
+export function formatAmountInput(
+  amountMinor: number,
+  currency: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return toDecimalText(amountMinor, minorUnitDigits(currency)).replace(
+    '.',
+    DECIMAL_SEPARATOR[locale],
+  );
+}

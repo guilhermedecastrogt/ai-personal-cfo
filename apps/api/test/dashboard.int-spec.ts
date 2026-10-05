@@ -54,6 +54,20 @@ const TWO_MONTHS_AGO = previousPeriod('MONTHLY', LAST_MONTH);
 
 type NewRow = Partial<typeof transactions.$inferInsert> & { readonly amountMinor: number };
 
+function withoutKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(withoutKeys);
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([name]) => name !== 'key')
+        .map(([name, entry]) => [name, withoutKeys(entry)]),
+    );
+  }
+  return value;
+}
+
 function keyOf(month: DateRange): string {
   return month.start.slice(0, 7);
 }
@@ -475,6 +489,7 @@ describe('dashboard API', () => {
 
       expect(goals.currencies[0]?.goals).toEqual([
         {
+          key: expect.stringMatching(UUID),
           goal: 'Summer Trip',
           target: { minor: 100000, text: '€1,000.00' },
           saved: { minor: 62000, text: '€620.00' },
@@ -568,7 +583,8 @@ describe('dashboard API', () => {
           account: 'Joint Account',
         }),
       );
-      expect(JSON.stringify(history.transactions)).not.toMatch(UUID);
+      expect(history.transactions.every((row) => UUID.test(row.key))).toBe(true);
+      expect(JSON.stringify(withoutKeys(history.transactions))).not.toMatch(UUID);
       expect(history.filters.types).toEqual(['EXPENSE', 'INCOME', 'TRANSFER']);
       expect(history.filters.members.map((option) => option.name)).toEqual(
         fixture.members.map((member) => member.name),
@@ -651,7 +667,7 @@ describe('dashboard API', () => {
       expect(accounts.members).toHaveLength(3);
     });
 
-    it('exposes no internal identifier outside the transaction filter options', async () => {
+    it('exposes internal identifiers only as opaque keys', async () => {
       const paths = [
         'session',
         'overview',
@@ -668,7 +684,7 @@ describe('dashboard API', () => {
       for (const path of paths) {
         const response = await get(`/dashboard/${path}`, token);
 
-        expect(JSON.stringify(response.body)).not.toMatch(UUID);
+        expect(JSON.stringify(withoutKeys(response.body))).not.toMatch(UUID);
         expect(JSON.stringify(response.body)).not.toMatch(
           /householdId|memberId|accountId|categoryId/,
         );

@@ -51,7 +51,12 @@ const UNLIMITED = { limit: 1_000_000, windowInSeconds: 60 };
 
 export const RELAXED_SECURITY_POLICY: SecurityPolicy = {
   ...SECURITY_POLICY,
-  rateLimits: { AUTHENTICATION: UNLIMITED, DASHBOARD: UNLIMITED, WEBHOOK: UNLIMITED },
+  rateLimits: {
+    AUTHENTICATION: UNLIMITED,
+    DASHBOARD: UNLIMITED,
+    DASHBOARD_WRITE: UNLIMITED,
+    WEBHOOK: UNLIMITED,
+  },
   sessions: { ...SECURITY_POLICY.sessions, maximumPerMember: 10_000 },
   inboundMessages: { text: UNLIMITED, image: UNLIMITED },
 };

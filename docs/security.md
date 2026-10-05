@@ -10,14 +10,15 @@ Out of scope: a compromised host, a compromised database, a malicious operator, 
 
 ## Exposed surface
 
-| Surface                         | Who calls it   | Authentication          | Rate limit      |
-| ------------------------------- | -------------- | ----------------------- | --------------- |
-| `POST /auth/sessions`           | The web server | Access code in the body | 10 per minute   |
-| `DELETE /auth/sessions/current` | The web server | Session token           | 240 per minute  |
-| `/dashboard/*`                  | The web server | Session token           | 240 per minute  |
-| `POST /webhooks/whatsapp`       | Kapso          | HMAC signature          | 600 per minute  |
-| `GET /health`, `GET /ready`     | The platform   | None                    | None            |
-| The Next.js application         | Browsers       | Session cookie          | Through the API |
+| Surface                                | Who calls it   | Authentication          | Rate limit      |
+| -------------------------------------- | -------------- | ----------------------- | --------------- |
+| `POST /auth/sessions`                  | The web server | Access code in the body | 10 per minute   |
+| `DELETE /auth/sessions/current`        | The web server | Session token           | 240 per minute  |
+| `GET /dashboard/*`                     | The web server | Session token           | 240 per minute  |
+| `POST`, `PATCH`, `DELETE /dashboard/*` | The web server | Session token           | 30 per minute   |
+| `POST /webhooks/whatsapp`              | Kapso          | HMAC signature          | 600 per minute  |
+| `GET /health`, `GET /ready`            | The platform   | None                    | None            |
+| The Next.js application                | Browsers       | Session cookie          | Through the API |
 
 There are no other routes. Migrations, seeding, access codes and proactive evaluation are commands, not endpoints.
 
@@ -87,6 +88,7 @@ Limits are counted in memory, in fixed windows, by `security/rate-limiter.ts`. A
 | -------------------------- | ------------------------------------- | -------------- | -------------------------------------- |
 | Sign-in attempts           | Client address                        | 10 per minute  | `429` with `Retry-After`               |
 | Dashboard requests         | Session token, or address without one | 240 per minute | `429` with `Retry-After`               |
+| Dashboard changes          | Session token, or address without one | 30 per minute  | `429` with `Retry-After`               |
 | Webhook deliveries         | Client address                        | 600 per minute | `429` with `Retry-After`               |
 | Text messages to the model | Member                                | 30 per minute  | Ignored, with one reply asking to wait |
 | Images to the model        | Member                                | 6 per minute   | Ignored, with one reply asking to wait |
@@ -201,7 +203,7 @@ The API does not enable CORS and sends no `Access-Control-Allow-*` header to any
 ### CSRF
 
 - The API authenticates only from the `Authorization` header. It ignores cookies, so a cross-site request that carries a cookie is not authenticated.
-- The web application's state-changing operations, sign-in, sign-out and marking a notification as read, are Next.js server actions. They accept only `POST`, and Next.js rejects an action whose `Origin` does not match the host.
+- The web application's state-changing operations, sign-in, sign-out, marking a notification as read and the edits of [ADR-029](adr/ADR-029-dashboard-writes.md), are Next.js server actions. They accept only `POST`, and Next.js rejects an action whose `Origin` does not match the host.
 - The session cookie is `SameSite=Lax`, so it is not sent on cross-site `POST` requests.
 - Pages reached by `GET` only read.
 

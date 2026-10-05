@@ -263,7 +263,20 @@ export const INCOME: IncomeView = {
 
 export const BUDGETS: BudgetsView = {
   month: OCTOBER,
-  currencies: [{ currency: 'EUR', budgets: [RESTAURANTS_BUDGET], forecast: EUR_OVERVIEW.forecast }],
+  currencies: [
+    {
+      currency: 'EUR',
+      budgets: [{ key: 'budget-key-restaurants', ...RESTAURANTS_BUDGET }],
+      forecast: EUR_OVERVIEW.forecast,
+    },
+  ],
+  options: {
+    categories: [{ key: 'category-key-restaurants', name: 'Restaurants' }],
+    currencies: ['EUR'],
+    periods: ['WEEKLY', 'MONTHLY', 'YEARLY'],
+    defaultCurrency: 'EUR',
+    defaultStartsOn: '2026-10-01',
+  },
 };
 
 export const GOALS: GoalsView = {
@@ -273,6 +286,7 @@ export const GOALS: GoalsView = {
       currency: 'EUR',
       goals: [
         {
+          key: 'goal-key-summer-trip',
           goal: 'Summer Trip',
           target: eur('1,000.00', 100000),
           saved: eur('620.00', 62000),
@@ -286,6 +300,11 @@ export const GOALS: GoalsView = {
       ],
     },
   ],
+  options: {
+    types: ['EMERGENCY_FUND', 'TRAVEL', 'PURCHASE', 'SAVINGS'],
+    currencies: ['EUR'],
+    defaultCurrency: 'EUR',
+  },
 };
 
 export const OUTLOOK: OutlookView = {
@@ -374,6 +393,7 @@ export const TRANSACTIONS: TransactionsView = {
   },
   transactions: [
     {
+      key: 'transaction-key-bistro',
       date: '2026-10-12',
       type: 'EXPENSE',
       amount: eur('180.00', 18000),
@@ -388,6 +408,7 @@ export const TRANSACTIONS: TransactionsView = {
       source: 'WHATSAPP_TEXT',
     },
     {
+      key: 'transaction-key-transfer',
       date: '2026-10-02',
       type: 'TRANSFER',
       amount: eur('500.00', 50000),

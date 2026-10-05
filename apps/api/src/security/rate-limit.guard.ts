@@ -22,6 +22,7 @@ import {
 const SURFACE = 'rate-limited-surface';
 const BEARER_PREFIX = 'Bearer ';
 const UNKNOWN_ADDRESS = 'unknown';
+const SESSION_SURFACES: ReadonlySet<RateLimitedSurface> = new Set(['DASHBOARD', 'DASHBOARD_WRITE']);
 
 type HttpRequest = IncomingMessage & { readonly ip?: string };
 
@@ -68,7 +69,7 @@ export class RateLimitGuard implements CanActivate {
 
 function subjectOf(request: HttpRequest, surface: RateLimitedSurface): string {
   const header = request.headers.authorization;
-  if (surface === 'DASHBOARD' && header?.startsWith(BEARER_PREFIX) === true) {
+  if (SESSION_SURFACES.has(surface) && header?.startsWith(BEARER_PREFIX) === true) {
     return createHash('sha256').update(header).digest('hex');
   }
   return request.ip ?? request.socket.remoteAddress ?? UNKNOWN_ADDRESS;
