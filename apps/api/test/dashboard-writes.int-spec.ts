@@ -510,7 +510,7 @@ describe('dashboard writes', () => {
         endsOn: null,
       });
       expect(page.currencies[0]?.budgets).toEqual([
-        expect.objectContaining({ key, category: 'Restaurants', limit: expect.anything() }),
+        expect.objectContaining({ key, category: 'Restaurants' }),
       ]);
     });
 

@@ -487,9 +487,10 @@ describe('dashboard API', () => {
     it('reports goals by name', async () => {
       const goals = await view(goalsSchema, '/dashboard/goals', token);
 
+      expect(goals.currencies[0]?.goals.map((goal) => UUID.test(goal.key))).toEqual([true]);
       expect(goals.currencies[0]?.goals).toEqual([
         {
-          key: expect.stringMatching(UUID),
+          key: goals.currencies[0]?.goals[0]?.key,
           goal: 'Summer Trip',
           target: { minor: 100000, text: '€1,000.00' },
           saved: { minor: 62000, text: '€620.00' },
