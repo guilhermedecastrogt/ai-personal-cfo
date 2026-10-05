@@ -1,9 +1,6 @@
 import type { TransactionCandidate } from '../../ai/interpretation/message-interpretation.schema.js';
-import {
-  normalizeName,
-  resolveMentionedAccount,
-  type AccountOption,
-} from './account-resolution.js';
+import { resolveMentionedAccount, type AccountOption } from './account-resolution.js';
+import { comparableName, resolveMentionedMember, type MemberOption } from './member-resolution.js';
 import type { CategoryOption } from './transaction-draft.js';
 
 const ACCOUNT_REASONS: ReadonlySet<string> = new Set([
@@ -24,6 +21,7 @@ const CATEGORY_REASONS: ReadonlySet<string> = new Set([
   'UNKNOWN_CATEGORY',
   'CATEGORY_KIND_MISMATCH',
 ]);
+const MEMBER_REASONS: ReadonlySet<string> = new Set(['UNKNOWN_MEMBER']);
 const MINIMUM_WORD_LENGTH = 3;
 
 export interface PendingNeeds {
@@ -34,6 +32,7 @@ export interface PendingNeeds {
 export interface AnswerContext {
   readonly accounts: readonly AccountOption[];
   readonly categories: readonly CategoryOption[];
+  readonly members: readonly MemberOption[];
   readonly senderId: string;
 }
 
@@ -49,7 +48,8 @@ export function answerPendingTransaction(
   const category = needs(CATEGORY_REASONS)
     ? mentionedCategory(text, pending.candidate, context.categories)
     : undefined;
-  if (account === undefined && category === undefined) {
+  const member = needs(MEMBER_REASONS) ? mentionedMember(text, context.members) : undefined;
+  if (account === undefined && category === undefined && member === undefined) {
     return undefined;
   }
   return {
@@ -60,17 +60,24 @@ export function answerPendingTransaction(
         ? { account: account.name }
         : { transferAccount: account.name }),
     ...(category === undefined ? {} : { category: category.name }),
+    ...(member === undefined ? {} : { member: member.name }),
   };
 }
 
-function plain(text: string): string {
-  return normalizeName(
-    text
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .replace(/[^\p{L}\p{N}\s]/gu, ' '),
+function mentionedMember(text: string, members: readonly MemberOption[]): MemberOption | undefined {
+  const found = new Set(
+    phrases(text).flatMap((phrase) => {
+      const resolution = resolveMentionedMember(phrase, members);
+      return resolution.status === 'RESOLVED' ? [resolution.member.id] : [];
+    }),
   );
+  const [only, ...others] = [...found];
+  return only === undefined || others.length > 0
+    ? undefined
+    : members.find((member) => member.id === only);
 }
+
+const plain = comparableName;
 
 function phrases(text: string): string[] {
   const whole = plain(text);

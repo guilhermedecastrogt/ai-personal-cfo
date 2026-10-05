@@ -177,6 +177,10 @@ When something required is missing or unclear, the outcome is `NEEDS_CLARIFICATI
 | Account  | Resolved by the rule below                                                                                                              |
 | Date     | Resolved as described above                                                                                                             |
 
+### Whose transaction it is
+
+A transaction belongs to the sender unless the message says it was another member's, such as "Maria paid 40 at the pharmacy". The model then reports that member's name as listed, mapping a nickname only when it clearly means one member. The application resolves the name among the household's members only: exactly, then by first name, then by a unique beginning, ignoring case and accents. A name that fits nobody is asked about, listing the members. The transaction is recorded for that member, and their default account is used when no account is named. Images are always recorded for the sender.
+
 ### Account resolution
 
 The model never chooses an account. It reports the name the member wrote, if any, and the application resolves it ([ADR-017](adr/ADR-017-account-resolution.md)).

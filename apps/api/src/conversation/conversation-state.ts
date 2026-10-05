@@ -24,7 +24,7 @@ export const questionFrameSchema = z.object({
 });
 
 export const pendingTransactionSchema = z.object({
-  candidate: transactionCandidateSchema,
+  candidate: transactionCandidateSchema.extend({ member: z.string().nullable().default(null) }),
   reasons: z.array(z.string()),
   medium: z.enum(['TEXT', 'IMAGE']),
   sourceMessageId: z.string().nullable(),

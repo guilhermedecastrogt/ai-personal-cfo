@@ -1047,6 +1047,106 @@ describe('conversational assistant', () => {
       expect(await recorded(fixture)).toEqual([]);
     });
 
+    async function householdWithPersonalDefaults(name: string): Promise<{
+      fixture: HouseholdFixture;
+      partnerAccountId: string;
+    }> {
+      const fixture = await createHouseholdFixture(testDatabase.database, name, 2);
+      const partnerAccount = await harness.accounts.create(fixture.household.id, {
+        name: 'Partner Revolut',
+        type: 'BANK',
+        currency: 'EUR',
+        ownerMemberId: memberAt(fixture, 1).id,
+      });
+      await harness.accounts.setDefaultAccount(
+        fixture.household.id,
+        memberAt(fixture, 0).id,
+        fixture.jointAccount.id,
+      );
+      await harness.accounts.setDefaultAccount(
+        fixture.household.id,
+        memberAt(fixture, 1).id,
+        partnerAccount.id,
+      );
+      return { fixture, partnerAccountId: partnerAccount.id };
+    }
+
+    it('records for the member the sender names, in that member’s own account', async () => {
+      const { fixture, partnerAccountId } = await householdWithPersonalDefaults('Named Payer');
+      const partner = memberAt(fixture, 1);
+
+      const response = await say(
+        fixture,
+        'A Maria recebeu o salário, 900 euros',
+        transactionInterpretation({
+          type: 'INCOME',
+          amount: '900',
+          merchant: null,
+          category: 'Salary',
+          member: partner.name,
+        }),
+      );
+
+      expect(response.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
+      expect(lastFacts()).toMatchObject({ forMember: partner.name, account: 'Partner Revolut' });
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({
+          memberId: partner.id,
+          accountId: partnerAccountId,
+          type: 'INCOME',
+          amountMinor: 90000,
+        }),
+      ]);
+    });
+
+    it('keeps the sender as the member when the model names the sender', async () => {
+      const { fixture } = await householdWithPersonalDefaults('Self Named');
+
+      await say(
+        fixture,
+        'Gastei 23 no Lidl',
+        transactionInterpretation({ member: memberAt(fixture, 0).name }),
+      );
+
+      expect(lastFacts()).not.toHaveProperty('forMember');
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({
+          memberId: memberAt(fixture, 0).id,
+          accountId: fixture.jointAccount.id,
+        }),
+      ]);
+    });
+
+    it('asks who it was when the name fits nobody, then records for the member given', async () => {
+      const { fixture, partnerAccountId } = await householdWithPersonalDefaults('Unknown Payer');
+      const outsider = await createHouseholdFixture(testDatabase.database, 'Outsider Home', 1);
+      const partner = memberAt(fixture, 1);
+
+      const asked = await say(
+        fixture,
+        'O Zé gastou 40 no Lidl',
+        transactionInterpretation({ amount: '40', member: memberAt(outsider, 0).name }),
+      );
+      const facts = lastFacts();
+      const answered = await say(fixture, partner.name, OTHER_INTERPRETATION);
+
+      expect(reasonsOf(asked)).toEqual(['UNKNOWN_MEMBER']);
+      expect(facts).toMatchObject({
+        needed: ['who it belongs to'],
+        memberOptions: [memberAt(fixture, 0).name, partner.name],
+      });
+      expect(JSON.stringify(facts)).not.toContain(memberAt(outsider, 0).name);
+      expect(answered.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({
+          memberId: partner.id,
+          accountId: partnerAccountId,
+          amountMinor: 4000,
+        }),
+      ]);
+      expect(await recorded(outsider)).toEqual([]);
+    });
+
     it('does not complete anything when nothing is pending', async () => {
       const fixture = await createHouseholdFixture(testDatabase.database, 'Nothing Pending', 1);
 

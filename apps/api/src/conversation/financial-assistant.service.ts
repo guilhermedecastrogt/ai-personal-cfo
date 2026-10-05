@@ -291,6 +291,7 @@ export class FinancialAssistant {
     return answerPendingTransaction(text, pending, {
       accounts: directory.accounts,
       categories: directory.categories,
+      members: directory.members,
       senderId: context.memberId,
     });
   }

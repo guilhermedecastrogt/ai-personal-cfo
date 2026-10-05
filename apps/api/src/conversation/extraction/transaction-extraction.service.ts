@@ -22,6 +22,7 @@ import {
 } from './transaction-draft.js';
 import type { AccountOption } from './account-resolution.js';
 import { describeDate, describeKind, describeNeeds } from './clarification-needs.js';
+import { resolveMentionedMember } from './member-resolution.js';
 
 export type ClarificationReason = DraftProblem | TransactionRejectionReason;
 
@@ -72,48 +73,56 @@ export class TransactionExtractionService {
   async extract(request: ExtractionRequest): Promise<ExtractionOutcome> {
     const { context, candidate, today } = request;
     const locale = context.locale ?? DEFAULT_LOCALE;
-    const [{ accounts, categories }, defaultAccount] = await Promise.all([
-      this.directory.load(context.householdId),
-      this.directory.defaultAccount(context.householdId, context.memberId),
-    ]);
+    const { accounts, categories, members } = await this.directory.load(context.householdId);
+    const named =
+      candidate.member === null || candidate.member.trim() === ''
+        ? undefined
+        : resolveMentionedMember(candidate.member, members);
+    const owner =
+      named?.status === 'RESOLVED'
+        ? named.member
+        : members.find((member) => member.id === context.memberId);
+    const ownerId = owner?.id ?? context.memberId;
+    const defaultAccount = await this.directory.defaultAccount(context.householdId, ownerId);
     const draft = draftTransaction(candidate, {
-      senderId: context.memberId,
+      senderId: ownerId,
       today,
       accounts,
       defaultAccount,
       categories,
       confidenceThreshold: this.config.aiConfidenceThreshold,
     });
-    if (draft.fields === undefined) {
-      return clarification(
-        draft.problems,
-        candidate,
-        draft.understood,
+    const forMember = ownerId === context.memberId ? null : (owner?.name ?? null);
+    const clarify = (reasons: readonly ClarificationReason[]): ExtractionOutcome =>
+      clarification(reasons, candidate, draft.understood, forMember, {
         accounts,
         categories,
+        members,
         locale,
-      );
+      });
+    if (named?.status === 'UNKNOWN') {
+      return clarify(['UNKNOWN_MEMBER', ...draft.problems]);
+    }
+    if (draft.fields === undefined) {
+      return clarify(draft.problems);
     }
     try {
       const transaction = await this.transactions.record(context.householdId, {
         ...draft.fields,
-        memberId: context.memberId,
+        memberId: ownerId,
         source: sourceOf(context, request.medium),
         ...(request.sourceMessageId === undefined
           ? {}
           : { sourceMessageId: request.sourceMessageId }),
       });
-      return { status: 'RECORDED', transaction, facts: describe(draft.understood, locale) };
+      return {
+        status: 'RECORDED',
+        transaction,
+        facts: describe(draft.understood, forMember, locale),
+      };
     } catch (error) {
       if (error instanceof TransactionRejectedError) {
-        return clarification(
-          error.reasons,
-          candidate,
-          draft.understood,
-          accounts,
-          categories,
-          locale,
-        );
+        return clarify(error.reasons);
       }
       throw error;
     }
@@ -127,16 +136,23 @@ function sourceOf(context: RequestContext, medium: ExtractionRequest['medium']):
   return medium === 'IMAGE' ? 'WHATSAPP_IMAGE' : 'WHATSAPP_TEXT';
 }
 
+interface ClarificationOptions {
+  readonly accounts: readonly AccountOption[];
+  readonly categories: readonly CategoryOption[];
+  readonly members: readonly { readonly name: string }[];
+  readonly locale: Locale;
+}
+
 function clarification(
   reasons: readonly ClarificationReason[],
   candidate: TransactionCandidate,
   understood: Understood,
-  accounts: readonly AccountOption[],
-  categories: readonly CategoryOption[],
-  locale: Locale,
+  forMember: string | null,
+  { accounts, categories, members, locale }: ClarificationOptions,
 ): ExtractionOutcome {
   const needsCategory = reasons.some((reason) => CATEGORY_REASONS.includes(reason));
   const needsAccount = reasons.some((reason) => ACCOUNT_REASONS.includes(reason));
+  const needsMember = reasons.includes('UNKNOWN_MEMBER');
   const wantedKind = understood.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   return {
     status: 'NEEDS_CLARIFICATION',
@@ -144,7 +160,7 @@ function clarification(
     candidate,
     facts: {
       needed: describeNeeds(reasons, locale),
-      understood: describe(understood, locale),
+      understood: describe(understood, forMember, locale),
       ...(needsCategory
         ? {
             categoryOptions: categories
@@ -155,13 +171,15 @@ function clarification(
       ...(needsAccount
         ? { accountOptions: accounts.map((account) => `${account.name} (${account.currency})`) }
         : {}),
+      ...(needsMember ? { memberOptions: members.map((member) => member.name) } : {}),
     },
   };
 }
 
-function describe(understood: Understood, locale: Locale): ReplyFacts {
+function describe(understood: Understood, forMember: string | null, locale: Locale): ReplyFacts {
   const { amountMinor, currency } = understood;
   return {
+    ...(forMember === null ? {} : { forMember }),
     kind: describeKind(understood.type, locale),
     amount:
       amountMinor === undefined || currency === undefined

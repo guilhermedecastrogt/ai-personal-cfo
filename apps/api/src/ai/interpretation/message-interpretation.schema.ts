@@ -60,6 +60,7 @@ export const transactionCandidateSchema = z.object({
   category: z.string().nullable(),
   account: z.string().nullable(),
   transferAccount: z.string().nullable(),
+  member: z.string().nullable(),
   paymentMethod: z.enum(PAYMENT_METHODS).nullable(),
   date: dateReferenceSchema,
   confidence: z.number().min(0).max(1),

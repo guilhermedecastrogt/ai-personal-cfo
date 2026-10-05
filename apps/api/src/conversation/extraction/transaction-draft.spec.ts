@@ -30,6 +30,7 @@ function candidate(overrides: Partial<TransactionCandidate> = {}): TransactionCa
     category: 'Groceries',
     account: null,
     transferAccount: null,
+    member: null,
     paymentMethod: null,
     date: UNSPECIFIED_DATE,
     confidence: 0.98,

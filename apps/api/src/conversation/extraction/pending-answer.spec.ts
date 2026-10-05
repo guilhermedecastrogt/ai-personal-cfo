@@ -20,11 +20,16 @@ const SALARY: TransactionCandidate = {
   category: 'Salário',
   account: null,
   transferAccount: null,
+  member: null,
   paymentMethod: null,
   date: { kind: 'TODAY' },
   confidence: 0.95,
 } as TransactionCandidate;
-const CONTEXT = { accounts: ACCOUNTS, categories: CATEGORIES, senderId: 'g' };
+const MEMBERS = [
+  { id: 'g', name: 'Gabriel' },
+  { id: 'r', name: 'Renata' },
+];
+const CONTEXT = { accounts: ACCOUNTS, categories: CATEGORIES, members: MEMBERS, senderId: 'g' };
 
 function answer(text: string, reasons: readonly string[], candidate = SALARY): unknown {
   return answerPendingTransaction(text, { candidate, reasons }, CONTEXT);
@@ -69,6 +74,10 @@ describe('answerPendingTransaction', () => {
       ...transfer,
       transferAccount: 'Revolut Bia',
     });
+  });
+
+  it('reads the member who was asked about', () => {
+    expect(answer('foi a Renata', ['UNKNOWN_MEMBER'])).toEqual({ ...SALARY, member: 'Renata' });
   });
 
   it('leaves a message that is not an answer to the model', () => {

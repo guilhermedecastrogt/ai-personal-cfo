@@ -84,6 +84,7 @@ describe('ImageTransactionReader', () => {
       'currency',
       'date',
       'description',
+      'member',
       'merchant',
       'paymentMethod',
       'transferAccount',
