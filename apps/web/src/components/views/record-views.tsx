@@ -6,6 +6,7 @@ import type {
   TransactionsView as Transactions,
 } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
+import { Icon } from '../icons';
 import { Badge, Empty, Figure, PageHeading, Panel, Row, Rows } from '../ui';
 
 function Points({
@@ -91,6 +92,11 @@ function pageLink(data: Transactions, query: TransactionQuery, page: number): st
   return `/transactions?${parameters.toString()}`;
 }
 
+function editLink(transaction: TransactionRow, listPath: string): string {
+  const parameters = new URLSearchParams({ back: listPath });
+  return `/transactions/${encodeURIComponent(transaction.key)}?${parameters.toString()}`;
+}
+
 function Filter({
   name,
   label,
@@ -143,30 +149,40 @@ function accountOf(transaction: TransactionRow): string {
 
 function TransactionCards({
   rows,
+  listPath,
   t,
 }: {
   readonly rows: readonly TransactionRow[];
+  readonly listPath: string;
   readonly t: Dictionary;
 }): ReactNode {
   return (
-    <ul className="divide-y divide-line rounded-2xl border border-line bg-surface shadow-panel md:hidden">
-      {rows.map((transaction, position) => (
-        <li key={`${transaction.date}-${String(position)}`} className="flex gap-3 px-4 py-3.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium">{describeTransaction(transaction, t)}</p>
-            <p className="mt-0.5 truncate text-sm text-muted">
-              {transaction.category ?? kindOf(transaction, t)} · {transaction.member}
+    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-panel md:hidden">
+      {rows.map((transaction) => (
+        <li key={transaction.key}>
+          <Link
+            href={editLink(transaction, listPath)}
+            aria-label={t.editing.editItem(describeTransaction(transaction, t))}
+            className="flex gap-3 px-4 py-3.5 active:bg-raised"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{describeTransaction(transaction, t)}</p>
+              <p className="mt-0.5 truncate text-sm text-muted">
+                {transaction.category ?? kindOf(transaction, t)} · {transaction.member}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted">
+                <span className="figure">{t.date(transaction.date)}</span> ·{' '}
+                {accountOf(transaction)}
+              </p>
+            </div>
+            <p className="shrink-0 text-right font-medium">
+              <Figure
+                value={transaction.amount}
+                tone={transaction.type === 'INCOME' ? 'kept' : 'neutral'}
+              />
             </p>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              <span className="figure">{t.date(transaction.date)}</span> · {accountOf(transaction)}
-            </p>
-          </div>
-          <p className="shrink-0 text-right font-medium">
-            <Figure
-              value={transaction.amount}
-              tone={transaction.type === 'INCOME' ? 'kept' : 'neutral'}
-            />
-          </p>
+            <Icon name="chevron-right" className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+          </Link>
         </li>
       ))}
     </ul>
@@ -175,9 +191,11 @@ function TransactionCards({
 
 function TransactionTable({
   data,
+  listPath,
   t,
 }: {
   readonly data: Transactions;
+  readonly listPath: string;
   readonly t: Dictionary;
 }): ReactNode {
   const heading = 'eyebrow px-4 py-3 text-left text-muted';
@@ -205,11 +223,14 @@ function TransactionTable({
             <th scope="col" className={`${heading} text-right`}>
               {t.transactions.amount}
             </th>
+            <th scope="col" className={heading}>
+              <span className="sr-only">{t.editing.edit}</span>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {data.transactions.map((transaction, position) => (
-            <tr key={`${transaction.date}-${String(position)}`} className="hover:bg-raised">
+          {data.transactions.map((transaction) => (
+            <tr key={transaction.key} className="hover:bg-raised">
               <td className="figure px-4 py-3 text-muted">{t.date(transaction.date)}</td>
               <td className="px-4 py-3">
                 <span className="font-medium">{describeTransaction(transaction, t)}</span>
@@ -223,6 +244,15 @@ function TransactionTable({
                   value={transaction.amount}
                   tone={transaction.type === 'INCOME' ? 'kept' : 'neutral'}
                 />
+              </td>
+              <td className="py-1.5 pr-3 text-right">
+                <Link
+                  href={editLink(transaction, listPath)}
+                  aria-label={t.editing.editItem(describeTransaction(transaction, t))}
+                  className="inline-grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-surface hover:text-ink"
+                >
+                  <Icon name="edit" className="h-4 w-4" />
+                </Link>
               </td>
             </tr>
           ))}
@@ -304,8 +334,12 @@ export function TransactionsView({
         <Empty>{t.transactions.none(data.month.label)}</Empty>
       ) : (
         <>
-          <TransactionCards rows={data.transactions} t={t} />
-          <TransactionTable data={data} t={t} />
+          <TransactionCards
+            rows={data.transactions}
+            listPath={pageLink(data, query, data.page)}
+            t={t}
+          />
+          <TransactionTable data={data} listPath={pageLink(data, query, data.page)} t={t} />
         </>
       )}
       <nav

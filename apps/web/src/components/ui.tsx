@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { Icon, type IconName } from './icons';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import type { Comparison, Money, Ratio } from '@/lib/contracts';
 
@@ -261,5 +263,35 @@ export function PageHeading({
       </h1>
       {children}
     </header>
+  );
+}
+
+export function ActionLink({
+  href,
+  icon,
+  label,
+  children,
+}: {
+  readonly href: string;
+  readonly icon: IconName;
+  readonly label?: string;
+  readonly children?: ReactNode;
+}): ReactNode {
+  return children === undefined ? (
+    <Link
+      href={href}
+      aria-label={label}
+      className="inline-grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-raised hover:text-ink"
+    >
+      <Icon name={icon} className="h-[18px] w-[18px]" />
+    </Link>
+  ) : (
+    <Link
+      href={href}
+      className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-4 font-medium text-accent-ink"
+    >
+      <Icon name={icon} className="h-[18px] w-[18px]" />
+      {children}
+    </Link>
   );
 }

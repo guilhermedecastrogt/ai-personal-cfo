@@ -1,6 +1,6 @@
 # Web dashboard
 
-The dashboard is the household's view of its own finances in a browser: where the month stands, where the money went, how budgets and goals are doing, what is projected, and what the review says. It is read-only for financial data: the one thing it changes is the read mark on a notification. Transactions are recorded through WhatsApp.
+The dashboard is the household's view of its own finances in a browser: where the month stands, where the money went, how budgets and goals are doing, what is projected, and what the review says. Members can correct and delete transactions, and create, edit and delete budgets and goals ([ADR-029](adr/ADR-029-dashboard-writes.md)). Transactions are still recorded through WhatsApp.
 
 Every figure on every page is calculated by the backend. The web application renders what it is given.
 
@@ -135,8 +135,17 @@ The web application imports the TypeScript types of these schemas and nothing el
 | Recurring    | Monthly and annual commitment, each recurring expense with cadence, dates, payers and price changes, and what appears to have stopped |
 | Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read                                       |
 | Review       | Summary, strengths, concerns, suggestions and priorities                                                                              |
-| Transactions | Read-only history with filters and paging                                                                                             |
+| Transactions | History with filters and paging; each transaction opens for editing or deletion                                                       |
 | Accounts     | Accounts, ownership, balances, totals per currency, members                                                                           |
+
+## Editing
+
+- Each transaction card or row opens `/transactions/:key`, which comes back to the same page and filters on save. Budgets and goals have **New** and **Edit** actions on their pages.
+- Forms are client components with `useActionState`; the server actions in `app/(dashboard)/{transactions,budgets,goals}/actions.ts` send the change through `apiSend` with the session token, so the browser never talks to the API.
+- Amounts are sent as typed (`12,50`). The API reads them and answers with field errors, which the form shows next to each field while keeping what was typed.
+- An edit made from an out-of-date copy is refused with a message that offers to reload.
+- Deleting asks for confirmation in a dialog that names the item, with **Keep it** focused.
+- The return address is accepted only as a path inside the dashboard.
 
 ## Periods
 
@@ -181,7 +190,8 @@ The web application runs on port 3001 and reads the API's address from `API_URL`
 
 ## Limitations
 
-- Read-only for financial data. There is no editing of transactions, budgets, goals or accounts. Marking a notification as read is the only write.
+- Transactions are recorded only through WhatsApp, and accounts cannot be created or edited from the dashboard.
+- A deleted record cannot be restored from the dashboard; only a database backup brings it back.
 - Access codes are issued by an operator with a script. There is no self-service sign-up, code rotation screen or sign-in rate limiting yet.
 - The review is generated on each visit and is not stored.
 - Text produced by the API follows the household's language; the dashboard's own labels are covered by the web dictionary.

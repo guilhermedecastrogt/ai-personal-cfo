@@ -11,6 +11,7 @@ import type {
 } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
+  ActionLink,
   Badge,
   CurrencySections,
   Empty,
@@ -47,14 +48,25 @@ export function BudgetsView({
 }): ReactNode {
   return (
     <>
-      <PageHeading title={t.budgets.title} month={data.month} t={t} />
+      <PageHeading title={t.budgets.title} month={data.month} t={t}>
+        <div className="mt-5">
+          <ActionLink href={`/budgets/new?month=${data.month.key}`} icon="plus">
+            {t.editing.budget.add}
+          </ActionLink>
+        </div>
+      </PageHeading>
       <CurrencySections entries={data.currencies} t={t}>
         {(entry) =>
           entry.budgets.length === 0 ? (
             <Empty>{t.budgets.none}</Empty>
           ) : (
             <Panel title={t.budgets.householdBudgets} note={t.budgets.householdNote}>
-              <BudgetList budgets={entry.budgets} detailed t={t} />
+              <BudgetList
+                budgets={entry.budgets}
+                detailed
+                editHref={(key) => `/budgets/${key}?month=${data.month.key}`}
+                t={t}
+              />
             </Panel>
           )
         }
@@ -72,7 +84,13 @@ export function GoalsView({
 }): ReactNode {
   return (
     <>
-      <PageHeading title={t.goals.title} month={data.month} t={t} />
+      <PageHeading title={t.goals.title} month={data.month} t={t}>
+        <div className="mt-5">
+          <ActionLink href={`/goals/new?month=${data.month.key}`} icon="plus">
+            {t.editing.goal.add}
+          </ActionLink>
+        </div>
+      </PageHeading>
       <CurrencySections entries={data.currencies} t={t}>
         {(entry) =>
           entry.goals.length === 0 ? (
@@ -83,16 +101,25 @@ export function GoalsView({
                 {entry.goals.map((goal) => {
                   const state = { label: t.goals.state[goal.state], tone: GOAL_TONE[goal.state] };
                   return (
-                    <li key={goal.goal}>
-                      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                        <span className="font-medium">
-                          {goal.goal} <Badge tone={state.tone}>{state.label}</Badge>
-                        </span>
-                        <span>
-                          <Figure value={goal.saved} />{' '}
-                          <span className="text-muted">{t.common.of}</span>{' '}
-                          <Figure value={goal.target} />{' '}
-                          <span className="figure text-muted">({goal.progress.text})</span>
+                    <li key={goal.key}>
+                      <div className="mb-1.5 flex items-start gap-2">
+                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                          <span className="font-medium">
+                            {goal.goal} <Badge tone={state.tone}>{state.label}</Badge>
+                          </span>
+                          <span>
+                            <Figure value={goal.saved} />{' '}
+                            <span className="text-muted">{t.common.of}</span>{' '}
+                            <Figure value={goal.target} />{' '}
+                            <span className="figure text-muted">({goal.progress.text})</span>
+                          </span>
+                        </div>
+                        <span className="-my-2 -mr-2">
+                          <ActionLink
+                            href={`/goals/${goal.key}?month=${data.month.key}`}
+                            icon="edit"
+                            label={t.editing.editItem(goal.goal)}
+                          />
                         </span>
                       </div>
                       <Meter

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { BudgetView } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
-import { Badge, Figure, Meter, type Tone } from '../ui';
+import { ActionLink, Badge, Figure, Meter, type Tone } from '../ui';
 
 const STATUS_TONE: Record<BudgetView['status'], Tone> = {
   NOT_STARTED: 'neutral',
@@ -13,10 +13,12 @@ const STATUS_TONE: Record<BudgetView['status'], Tone> = {
 export function BudgetList({
   budgets,
   detailed = false,
+  editHref,
   t,
 }: {
-  readonly budgets: readonly BudgetView[];
+  readonly budgets: readonly (BudgetView & { readonly key?: string })[];
   readonly detailed?: boolean;
+  readonly editHref?: (key: string) => string;
   readonly t: Dictionary;
 }): ReactNode {
   return (
@@ -24,16 +26,27 @@ export function BudgetList({
       {budgets.map((budget) => {
         const status = { label: t.budgets.status[budget.status], tone: STATUS_TONE[budget.status] };
         return (
-          <li key={budget.category}>
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <span className="font-medium">
-                {budget.category} <Badge tone={status.tone}>{status.label}</Badge>
-              </span>
-              <span className="text-sm">
-                <Figure value={budget.spent} /> <span className="text-muted">{t.common.of}</span>{' '}
-                <Figure value={budget.limit} />{' '}
-                <span className="figure text-muted">({budget.usage.text})</span>
-              </span>
+          <li key={budget.key ?? budget.category}>
+            <div className="mb-2 flex items-start gap-2">
+              <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className="font-medium">
+                  {budget.category} <Badge tone={status.tone}>{status.label}</Badge>
+                </span>
+                <span className="text-sm">
+                  <Figure value={budget.spent} /> <span className="text-muted">{t.common.of}</span>{' '}
+                  <Figure value={budget.limit} />{' '}
+                  <span className="figure text-muted">({budget.usage.text})</span>
+                </span>
+              </div>
+              {editHref === undefined || budget.key === undefined ? null : (
+                <span className="-my-2 -mr-2">
+                  <ActionLink
+                    href={editHref(budget.key)}
+                    icon="edit"
+                    label={t.editing.editItem(budget.category)}
+                  />
+                </span>
+              )}
             </div>
             <Meter
               value={budget.usage}

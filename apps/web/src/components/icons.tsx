@@ -17,7 +17,10 @@ export type IconName =
   | 'chevron-right'
   | 'refresh'
   | 'sign-out'
-  | 'close';
+  | 'close'
+  | 'edit'
+  | 'plus'
+  | 'trash';
 
 const PATHS: Record<IconName, string> = {
   overview: 'M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z',
@@ -37,6 +40,9 @@ const PATHS: Record<IconName, string> = {
   refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6',
   'sign-out': 'M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3M10 16l4-4-4-4M14 12H4',
   close: 'M6 6l12 12M18 6L6 18',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6',
 };
 
 export function Icon({

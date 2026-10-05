@@ -1,8 +1,10 @@
 import type {
   AccountsView,
+  BudgetEditView,
   BudgetView,
   BudgetsView,
   Comparison,
+  GoalEditView,
   GoalsView,
   IncomeView,
   Money,
@@ -16,6 +18,7 @@ import type {
   SessionView,
   SignalsView,
   SpendingView,
+  TransactionEditView,
   TransactionsView,
 } from '@/lib/contracts';
 
@@ -590,4 +593,60 @@ export const RECURRING: RecurringView = {
       ],
     },
   ],
+};
+
+export const TRANSACTION_EDIT: TransactionEditView = {
+  key: 'transaction-key-bistro',
+  version: '2026-10-12T19:30:00.000Z',
+  type: 'EXPENSE',
+  amount: '180.00',
+  currency: 'EUR',
+  date: '2026-10-12',
+  merchant: 'Bistro',
+  description: null,
+  categoryKey: 'category-key-restaurants',
+  memberKey: 'member-key-c',
+  accountKey: 'account-key-joint',
+  transferAccount: null,
+  expenseScope: 'INDIVIDUAL',
+  source: 'WHATSAPP_TEXT',
+  options: {
+    members: [
+      { key: 'member-key-a', name: 'Member A' },
+      { key: 'member-key-c', name: 'Member C' },
+    ],
+    accounts: [
+      { key: 'account-key-joint', name: 'Joint Account', currency: 'EUR' },
+      { key: 'account-key-real', name: 'Conta Real', currency: 'BRL' },
+    ],
+    categories: [
+      { key: 'category-key-restaurants', name: 'Restaurants', kind: 'EXPENSE' },
+      { key: 'category-key-salary', name: 'Salary', kind: 'INCOME' },
+    ],
+  },
+};
+
+export const BUDGET_EDIT: BudgetEditView = {
+  key: 'budget-key-restaurants',
+  version: '2026-10-01T08:00:00.000Z',
+  categoryKey: 'category-key-restaurants',
+  period: 'MONTHLY',
+  limit: '150.00',
+  currency: 'EUR',
+  alertThresholdPercent: 80,
+  startsOn: '2026-10-01',
+  endsOn: null,
+  options: BUDGETS.options,
+};
+
+export const GOAL_EDIT: GoalEditView = {
+  key: 'goal-key-summer-trip',
+  version: '2026-10-01T08:00:00.000Z',
+  name: 'Summer Trip',
+  type: 'TRAVEL',
+  target: '1000.00',
+  saved: '620.00',
+  currency: 'EUR',
+  targetDate: '2027-06-30',
+  options: GOALS.options,
 };

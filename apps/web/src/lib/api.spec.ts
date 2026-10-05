@@ -1,4 +1,4 @@
-import { ApiError, apiGet, apiPost, apiUrl } from './api';
+import { ApiError, apiFind, apiGet, apiPost, apiSend, apiUrl } from './api';
 
 const cookieValue = jest.fn<string | undefined, []>();
 const redirect = jest.fn((path: string): never => {
@@ -18,6 +18,9 @@ jest.mock('next/headers', () => ({
 
 jest.mock('next/navigation', () => ({
   redirect: (path: string): never => redirect(path),
+  notFound: (): never => {
+    throw new Error('not found');
+  },
 }));
 
 function respondWith(status: number, body: unknown = {}): void {
@@ -25,6 +28,7 @@ function respondWith(status: number, body: unknown = {}): void {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
   } as Response);
 }
 
@@ -115,5 +119,74 @@ describe('apiPost', () => {
     respondWith(404);
 
     await expect(apiPost('/dashboard/notifications/x/read')).rejects.toEqual(new ApiError(404));
+  });
+});
+
+describe('apiSend', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    cookieValue.mockReturnValue('session-token');
+  });
+
+  it('sends a change as JSON with the session as a bearer token', async () => {
+    respondWith(200, { key: 'k', version: 'v' });
+
+    const outcome = await apiSend('PATCH', '/dashboard/transactions/k', { amount: '12,50' });
+
+    expect(outcome).toEqual({ ok: true, data: { key: 'k', version: 'v' } });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/dashboard/transactions/k', {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: '12,50' }),
+      cache: 'no-store',
+    });
+  });
+
+  it('accepts an empty answer to a deletion', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 204,
+      text: () => Promise.resolve(''),
+    } as Response);
+
+    expect(await apiSend('DELETE', '/dashboard/goals/k')).toEqual({ ok: true, data: undefined });
+  });
+
+  it('hands back a refusal with its body so the form can show which field is wrong', async () => {
+    const errors = { errors: [{ field: 'amount', code: 'INVALID_AMOUNT' }] };
+    respondWith(422, errors);
+
+    expect(await apiSend('POST', '/dashboard/budgets', {})).toEqual({
+      ok: false,
+      status: 422,
+      body: errors,
+    });
+  });
+
+  it('sends the visitor to sign in when the session is refused', async () => {
+    respondWith(401);
+
+    await expect(apiSend('DELETE', '/dashboard/goals/k')).rejects.toThrow('redirected to /login');
+  });
+});
+
+describe('apiFind', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    cookieValue.mockReturnValue('session-token');
+  });
+
+  it('shows the not-found page for a record that does not exist or is not the household’s', async () => {
+    respondWith(404);
+
+    await expect(apiFind('/dashboard/transactions/k')).rejects.toThrow('not found');
+  });
+
+  it('reports other failures as errors', async () => {
+    respondWith(503);
+
+    await expect(apiFind('/dashboard/transactions/k')).rejects.toEqual(new ApiError(503));
   });
 });

@@ -202,6 +202,32 @@ describe('budgets and goals', () => {
     expect(within(budgets).getByRole('meter')).toHaveAttribute('aria-valuenow', '100');
   });
 
+  it('offers to create a budget and to edit each one, keeping the month', () => {
+    render(<BudgetsView t={EN} data={BUDGETS} />);
+
+    expect(screen.getByRole('link', { name: 'New budget' })).toHaveAttribute(
+      'href',
+      '/budgets/new?month=2026-10',
+    );
+    expect(screen.getByRole('link', { name: 'Edit Restaurants' })).toHaveAttribute(
+      'href',
+      '/budgets/budget-key-restaurants?month=2026-10',
+    );
+  });
+
+  it('offers to create a goal and to edit each one', () => {
+    render(<GoalsView t={PT_BR} data={GOALS} />);
+
+    expect(screen.getByRole('link', { name: 'Nova meta' })).toHaveAttribute(
+      'href',
+      '/goals/new?month=2026-10',
+    );
+    expect(screen.getByRole('link', { name: 'Editar Summer Trip' })).toHaveAttribute(
+      'href',
+      '/goals/goal-key-summer-trip?month=2026-10',
+    );
+  });
+
   it('says when no budgets are set', () => {
     render(
       <BudgetsView
@@ -512,9 +538,17 @@ describe('transactions', () => {
     expect(screen.queryByRole('link', { name: 'Previous' })).not.toBeInTheDocument();
   });
 
-  it('offers no way to edit or delete a transaction', () => {
-    render(<TransactionsView t={EN} data={TRANSACTIONS} query={{}} />);
+  it('opens each transaction for editing and comes back to the same page and filters', () => {
+    render(<TransactionsView t={EN} data={TRANSACTIONS} query={{ type: 'EXPENSE' }} />);
+    const back = encodeURIComponent('/transactions?month=2026-10&page=1&type=EXPENSE');
 
+    expect(
+      screen.getAllByRole('link', { name: 'Edit Bistro' }).map((link) => link.getAttribute('href')),
+    ).toEqual([
+      `/transactions/transaction-key-bistro?back=${back}`,
+      `/transactions/transaction-key-bistro?back=${back}`,
+    ]);
+    expect(screen.getAllByRole('link', { name: 'Edit Transfer' })).toHaveLength(2);
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Apply']);
   });
 
