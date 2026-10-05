@@ -7,6 +7,7 @@ import type { RequestContext } from '../households/request-context.js';
 import { RateLimiter } from '../security/rate-limiter.js';
 import { SECURITY_POLICY_TOKEN, type SecurityPolicy } from '../security/security-policy.js';
 import { WhatsAppIdentityResolver } from '../households/whatsapp-identity-resolver.js';
+import { pauseBeforeInMilliseconds, splitIntoMessages } from './reply-messages.js';
 import { WebhookEventsRepository, type WebhookEventOutcome } from './webhook-events.repository.js';
 import {
   WHATSAPP_PROVIDER,
@@ -101,7 +102,13 @@ export class InboundMessageProcessor {
 
   private async reply(to: string, text: string): Promise<void> {
     try {
-      await this.provider.sendText({ to, text });
+      const messages = splitIntoMessages(text);
+      for (const [position, message] of messages.entries()) {
+        if (position > 0) {
+          await pause(pauseBeforeInMilliseconds(message));
+        }
+        await this.provider.sendText({ to, text: message });
+      }
     } catch (error) {
       const failure = error instanceof WhatsAppDeliveryError ? error.failure : 'UNEXPECTED';
       this.logger.error(`event=reply-failed provider=${this.provider.name} failure=${failure}`);
@@ -122,6 +129,12 @@ export class InboundMessageProcessor {
     }
     await this.reply(message.sender, PROCESSING_FAILED_REPLY);
   }
+}
+
+function pause(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function isSupported(message: InboundMessage): message is SupportedMessage {

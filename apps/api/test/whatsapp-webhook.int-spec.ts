@@ -208,6 +208,19 @@ describe('WhatsApp webhook', () => {
   });
 
   describe('text messages', () => {
+    it('sends a reply written as several paragraphs as separate messages, in order', async () => {
+      const { phones } = await householdWithSenders('Paragraphs');
+      ai.willInterpretAs(transactionInterpretation());
+      ai.willReply('Registrei a despesa.\n\nEstá na conta conjunta.');
+
+      await deliver(kapsoTextEvent({ id: nextMessageId(), from: phones[0] ?? '' }, MESSAGE_TEXT));
+
+      expect(repliesTo(phones[0] ?? '')).toEqual([
+        'Registrei a despesa.',
+        'Está na conta conjunta.',
+      ]);
+    });
+
     it('records a transaction for the resolved member and household and replies through the provider', async () => {
       const { fixture, phones } = await householdWithSenders('Text', 3);
       const messageId = nextMessageId();
