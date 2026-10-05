@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Shell } from '@/components/shell';
-import { apiGet } from '@/lib/api';
-import type { SessionView } from '@/lib/contracts';
+import { currentSession } from '@/lib/session';
 import { signOut } from '../login/actions';
 
 export default async function DashboardLayout({
@@ -9,7 +8,7 @@ export default async function DashboardLayout({
 }: {
   readonly children: ReactNode;
 }): Promise<ReactNode> {
-  const session = await apiGet<SessionView>('/dashboard/session');
+  const session = await currentSession();
   return (
     <Shell session={session} signOut={signOut}>
       {children}

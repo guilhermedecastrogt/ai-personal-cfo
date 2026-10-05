@@ -1,33 +1,36 @@
 import type { ReactNode } from 'react';
 import type { BudgetView } from '@/lib/contracts';
+import type { Dictionary } from '@/lib/i18n/dictionary';
 import { Badge, Figure, Meter, type Tone } from '../ui';
 
-const STATUS: Record<BudgetView['status'], { readonly label: string; readonly tone: Tone }> = {
-  NOT_STARTED: { label: 'Not started', tone: 'neutral' },
-  ON_TRACK: { label: 'On track', tone: 'kept' },
-  NEAR_LIMIT: { label: 'Near limit', tone: 'caution' },
-  EXCEEDED: { label: 'Exceeded', tone: 'concern' },
+const STATUS_TONE: Record<BudgetView['status'], Tone> = {
+  NOT_STARTED: 'neutral',
+  ON_TRACK: 'kept',
+  NEAR_LIMIT: 'caution',
+  EXCEEDED: 'concern',
 };
 
 export function BudgetList({
   budgets,
   detailed = false,
+  t,
 }: {
   readonly budgets: readonly BudgetView[];
   readonly detailed?: boolean;
+  readonly t: Dictionary;
 }): ReactNode {
   return (
-    <ul className="space-y-5">
+    <ul className="space-y-6">
       {budgets.map((budget) => {
-        const status = STATUS[budget.status];
+        const status = { label: t.budgets.status[budget.status], tone: STATUS_TONE[budget.status] };
         return (
           <li key={budget.category}>
-            <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <span className="font-medium">
                 {budget.category} <Badge tone={status.tone}>{status.label}</Badge>
               </span>
-              <span>
-                <Figure value={budget.spent} /> <span className="text-muted">of</span>{' '}
+              <span className="text-sm">
+                <Figure value={budget.spent} /> <span className="text-muted">{t.common.of}</span>{' '}
                 <Figure value={budget.limit} />{' '}
                 <span className="figure text-muted">({budget.usage.text})</span>
               </span>
@@ -35,12 +38,13 @@ export function BudgetList({
             <Meter
               value={budget.usage}
               tone={status.tone}
-              label={`${budget.category} budget used`}
+              label={t.budgets.used(budget.category)}
+              t={t}
             />
             {detailed ? (
-              <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm text-muted sm:grid-cols-2">
+              <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm text-muted sm:grid-cols-2">
                 <div>
-                  <dt className="inline">Remaining: </dt>
+                  <dt className="inline">{t.budgets.remaining}</dt>
                   <dd className="inline">
                     <Figure
                       value={budget.remaining}
@@ -49,7 +53,7 @@ export function BudgetList({
                   </dd>
                 </div>
                 <div>
-                  <dt className="inline">Projected by the end of the period: </dt>
+                  <dt className="inline">{t.budgets.projected}</dt>
                   <dd className="inline">
                     <Figure
                       value={budget.projectedTotal}

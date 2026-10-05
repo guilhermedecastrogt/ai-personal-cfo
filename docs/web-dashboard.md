@@ -93,6 +93,14 @@ The web application imports the TypeScript types of these schemas and nothing el
 
 `DashboardService` has no calculation of its own. Most views are slices of the monthly analysis that `CfoService` assembles from `FinanceService` ([cfo-intelligence.md](cfo-intelligence.md)). The review comes from `CfoService.monthlyReview`. Largest expenses, balances and the transaction list come from their services directly. Query parameters are validated with Zod, and a month that is malformed or has not started is rejected.
 
+## Look, language and navigation
+
+- **Themes.** Light and dark follow the device setting through `prefers-color-scheme`. Colours are semantic CSS variables in `app/globals.css`, mapped into Tailwind with `@theme inline`, so every component switches theme without its own dark classes.
+- **Language.** The dashboard's own labels come from a dictionary per language in `lib/i18n/`, chosen from `session.locale`, which the API takes from the household. Text produced by the API (categories, alerts, findings, months, amounts) is already in that language. Dates show as `DD/MM/YYYY` in Portuguese. The sign-in page follows the browser's language.
+- **Phones.** A bottom bar holds Overview, Transactions, Budgets and Goals; the rest open from a "More" sheet. Transactions show as cards below the `md` breakpoint and as a table above it, and filters collapse. No page scrolls sideways at 390 px.
+- **Larger screens.** A sidebar groups the sections, and the month is chosen with previous and next buttons around a selector.
+- Each request fetches the session once (`lib/session.ts`, cached per request), and server components receive the dictionary as a prop. Client components choose it themselves, because functions cannot cross from server to client.
+
 ## Views
 
 | Page         | Shows                                                                                                                                 |

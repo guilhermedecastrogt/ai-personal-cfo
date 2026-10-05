@@ -4,8 +4,10 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE, apiUrl } from '@/lib/api';
 
+export type SignInError = 'INVALID' | 'UNAVAILABLE' | 'TOO_MANY';
+
 export interface SignInState {
-  readonly error: string | null;
+  readonly error: SignInError | null;
 }
 
 interface IssuedSession {
@@ -13,16 +15,13 @@ interface IssuedSession {
   readonly expiresAt: string;
 }
 
-const SIGN_IN_FAILED = 'That access code was not recognised. Check it and try again.';
-const SERVICE_UNAVAILABLE = 'The service could not be reached. Try again in a moment.';
-const TOO_MANY_ATTEMPTS = 'Too many attempts. Wait a minute and try again.';
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_TOO_MANY_REQUESTS = 429;
 
 export async function signIn(_previous: SignInState, form: FormData): Promise<SignInState> {
   const accessCode = form.get('accessCode');
   if (typeof accessCode !== 'string' || accessCode.trim() === '') {
-    return { error: SIGN_IN_FAILED };
+    return { error: 'INVALID' };
   }
   const response = await fetch(apiUrl('/auth/sessions'), {
     method: 'POST',
@@ -31,13 +30,13 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
     cache: 'no-store',
   }).catch(() => undefined);
   if (response?.status === HTTP_TOO_MANY_REQUESTS) {
-    return { error: TOO_MANY_ATTEMPTS };
+    return { error: 'TOO_MANY' };
   }
   if (response === undefined || (!response.ok && response.status !== HTTP_UNAUTHORIZED)) {
-    return { error: SERVICE_UNAVAILABLE };
+    return { error: 'UNAVAILABLE' };
   }
   if (!response.ok) {
-    return { error: SIGN_IN_FAILED };
+    return { error: 'INVALID' };
   }
   const session = (await response.json()) as IssuedSession;
   const store = await cookies();

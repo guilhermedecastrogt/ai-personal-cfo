@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { RecurringView } from '@/components/views/recurring-view';
 import { apiGet } from '@/lib/api';
+import { currentDictionary } from '@/lib/session';
 import type { RecurringView as View } from '@/lib/contracts';
 import type { SearchParameters } from '@/lib/month';
 
@@ -15,5 +16,6 @@ export default async function RecurringPage({
   const data = await apiGet<View>('/dashboard/recurring', {
     sort: typeof sort === 'string' && SORTS.includes(sort) ? sort : undefined,
   });
-  return <RecurringView data={data} />;
+  const t = await currentDictionary();
+  return <RecurringView data={data} t={t} />;
 }

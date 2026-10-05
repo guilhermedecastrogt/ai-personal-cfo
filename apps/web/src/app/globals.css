@@ -1,37 +1,151 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-mist: #eef1f4;
-  --color-surface: #ffffff;
-  --color-ink: #14212b;
-  --color-ink-soft: #24343f;
-  --color-muted: #5b6b78;
-  --color-line: #d5dce2;
-  --color-kept: #0f6b4f;
-  --color-kept-soft: #e3f1ec;
-  --color-caution: #8a5a0b;
-  --color-caution-soft: #f6ecd6;
-  --color-concern: #8c2f39;
-  --color-concern-soft: #f5e3e5;
-  --font-display: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-figure: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+:root {
+  color-scheme: light dark;
+  --bg: #f2f3f0;
+  --surface: #ffffff;
+  --raised: #f7f8f5;
+  --ink: #15201b;
+  --ink-soft: #2b3a33;
+  --muted: #66716b;
+  --line: #e1e4df;
+  --accent: #1d4a3c;
+  --accent-ink: #f4f1e8;
+  --brass: #9c7c3c;
+  --hero: #14221c;
+  --hero-ink: #eef0ea;
+  --hero-muted: #a8b3ac;
+  --kept: #237052;
+  --kept-soft: #e2efe8;
+  --caution: #956514;
+  --caution-soft: #f5ecda;
+  --concern: #a13d33;
+  --concern-soft: #f6e4e1;
+  --track: #e8ebe6;
+  --chart-1: #1d4a3c;
+  --chart-2: #9c7c3c;
+  --chart-3: #4f7d8c;
+  --chart-4: #8c5a6e;
+  --chart-5: #6f8a4e;
+  --chart-6: #b0a089;
+  --shadow: 0 1px 2px rgb(21 32 27 / 0.04), 0 8px 24px -12px rgb(21 32 27 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1311;
+    --surface: #141c18;
+    --raised: #19231f;
+    --ink: #e9ece7;
+    --ink-soft: #c8cfc9;
+    --muted: #8f9b94;
+    --line: #25302b;
+    --accent: #8cc2a8;
+    --accent-ink: #0d1311;
+    --brass: #cfae6b;
+    --hero: #18241f;
+    --hero-ink: #f1efe6;
+    --hero-muted: #93a199;
+    --kept: #6cc29a;
+    --kept-soft: #16302a;
+    --caution: #e0ad52;
+    --caution-soft: #33291a;
+    --concern: #ec8a7c;
+    --concern-soft: #3a201d;
+    --track: #222d28;
+    --chart-1: #8cc2a8;
+    --chart-2: #cfae6b;
+    --chart-3: #7fb2c2;
+    --chart-4: #c995ab;
+    --chart-5: #a7c27e;
+    --chart-6: #8f8676;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px -14px rgb(0 0 0 / 0.6);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-mist: var(--raised);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-brass: var(--brass);
+  --color-hero: var(--hero);
+  --color-hero-ink: var(--hero-ink);
+  --color-hero-muted: var(--hero-muted);
+  --color-kept: var(--kept);
+  --color-kept-soft: var(--kept-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-concern: var(--concern);
+  --color-concern-soft: var(--concern-soft);
+  --color-track: var(--track);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --shadow-panel: var(--shadow);
+  --font-display:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', ui-serif, Georgia, serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 
 html {
-  background: var(--color-mist);
-  color: var(--color-ink);
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
 }
 
 .figure {
-  font-family: var(--font-figure);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.sr-only-table {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+dialog::backdrop {
+  background: rgb(8 12 10 / 0.45);
+  backdrop-filter: blur(2px);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-kept);
+  outline: 2px solid var(--brass);
   outline-offset: 2px;
 }
 

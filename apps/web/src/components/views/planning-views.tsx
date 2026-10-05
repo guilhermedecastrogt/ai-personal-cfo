@@ -9,6 +9,7 @@ import type {
   SignalView,
   SignalsView as Signals,
 } from '@/lib/contracts';
+import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
   Badge,
   CurrencySections,
@@ -23,10 +24,10 @@ import {
 } from '../ui';
 import { BudgetList } from './budget-list';
 
-const GOAL_STATE: Record<GoalView['state'], { readonly label: string; readonly tone: Tone }> = {
-  COMPLETED: { label: 'Reached', tone: 'kept' },
-  OVERDUE: { label: 'Past its date', tone: 'concern' },
-  IN_PROGRESS: { label: 'In progress', tone: 'neutral' },
+const GOAL_TONE: Record<GoalView['state'], Tone> = {
+  COMPLETED: 'kept',
+  OVERDUE: 'concern',
+  IN_PROGRESS: 'neutral',
 };
 
 const SEVERITY: Record<SignalView['severity'], Tone> = {
@@ -37,26 +38,23 @@ const SEVERITY: Record<SignalView['severity'], Tone> = {
   CRITICAL: 'concern',
 };
 
-const FORECAST_METHOD: Record<
-  NonNullable<Outlook['currencies'][number]['forecast']>['method'],
-  string
-> = {
-  ACTUAL: 'The period is over, so this is the actual total.',
-  HISTORICAL_REMAINDER: 'Based on what the rest of recent months cost from this point.',
-  LINEAR_PACE: 'Based on the pace so far, because there is no earlier month to learn from.',
-};
-
-export function BudgetsView({ data }: { readonly data: Budgets }): ReactNode {
+export function BudgetsView({
+  data,
+  t,
+}: {
+  readonly data: Budgets;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Budgets" month={data.month} />
-      <CurrencySections entries={data.currencies}>
+      <PageHeading title={t.budgets.title} month={data.month} t={t} />
+      <CurrencySections entries={data.currencies} t={t}>
         {(entry) =>
           entry.budgets.length === 0 ? (
-            <Empty>No budgets are set for this household.</Empty>
+            <Empty>{t.budgets.none}</Empty>
           ) : (
-            <Panel title="Household budgets" note="Limits apply to the household as a whole">
-              <BudgetList budgets={entry.budgets} detailed />
+            <Panel title={t.budgets.householdBudgets} note={t.budgets.householdNote}>
+              <BudgetList budgets={entry.budgets} detailed t={t} />
             </Panel>
           )
         }
@@ -65,19 +63,25 @@ export function BudgetsView({ data }: { readonly data: Budgets }): ReactNode {
   );
 }
 
-export function GoalsView({ data }: { readonly data: Goals }): ReactNode {
+export function GoalsView({
+  data,
+  t,
+}: {
+  readonly data: Goals;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Goals" month={data.month} />
-      <CurrencySections entries={data.currencies}>
+      <PageHeading title={t.goals.title} month={data.month} t={t} />
+      <CurrencySections entries={data.currencies} t={t}>
         {(entry) =>
           entry.goals.length === 0 ? (
-            <Empty>No goals are set for this household.</Empty>
+            <Empty>{t.goals.none}</Empty>
           ) : (
-            <Panel title="Household goals">
-              <ul className="space-y-6">
+            <Panel title={t.goals.householdGoals}>
+              <ul className="space-y-7">
                 {entry.goals.map((goal) => {
-                  const state = GOAL_STATE[goal.state];
+                  const state = { label: t.goals.state[goal.state], tone: GOAL_TONE[goal.state] };
                   return (
                     <li key={goal.goal}>
                       <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -85,7 +89,8 @@ export function GoalsView({ data }: { readonly data: Goals }): ReactNode {
                           {goal.goal} <Badge tone={state.tone}>{state.label}</Badge>
                         </span>
                         <span>
-                          <Figure value={goal.saved} /> <span className="text-muted">of</span>{' '}
+                          <Figure value={goal.saved} />{' '}
+                          <span className="text-muted">{t.common.of}</span>{' '}
                           <Figure value={goal.target} />{' '}
                           <span className="figure text-muted">({goal.progress.text})</span>
                         </span>
@@ -93,14 +98,17 @@ export function GoalsView({ data }: { readonly data: Goals }): ReactNode {
                       <Meter
                         value={goal.progress}
                         tone={state.tone}
-                        label={`${goal.goal} progress`}
+                        label={t.goals.progress(goal.goal)}
+                        t={t}
                       />
                       <p className="mt-2 text-sm text-muted">
-                        <Figure value={goal.remaining} /> to go
-                        {goal.targetDate === null ? '' : ` by ${goal.targetDate}`}
+                        <Figure value={goal.remaining} />
+                        {t.goals.toGo}
+                        {goal.targetDate === null ? '' : t.goals.by(t.date(goal.targetDate))}
                         {goal.requiredMonthly === null ? null : (
                           <>
-                            , which needs <Figure value={goal.requiredMonthly} /> a month
+                            {t.goals.needs}
+                            <Figure value={goal.requiredMonthly} /> {t.common.aMonth}
                           </>
                         )}
                         .
@@ -117,45 +125,51 @@ export function GoalsView({ data }: { readonly data: Goals }): ReactNode {
   );
 }
 
-export function OutlookView({ data }: { readonly data: Outlook }): ReactNode {
+export function OutlookView({
+  data,
+  t,
+}: {
+  readonly data: Outlook;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Outlook" month={data.month} />
-      <CurrencySections entries={data.currencies}>
+      <PageHeading title={t.outlook.title} month={data.month} t={t} />
+      <CurrencySections entries={data.currencies} t={t}>
         {(entry) => (
           <>
             <div className="grid gap-6 lg:grid-cols-2">
-              <Panel title="Actual" note="Recorded so far">
+              <Panel title={t.outlook.actual} note={t.outlook.actualNote}>
                 <Rows>
-                  <Row label="Income">
+                  <Row label={t.outlook.income}>
                     <Figure value={entry.actual.income} />
                   </Row>
-                  <Row label="Spending">
+                  <Row label={t.outlook.spending}>
                     <Figure value={entry.actual.expenses} />
                   </Row>
-                  <Row label="Kept">
+                  <Row label={t.outlook.kept}>
                     <Figure value={entry.actual.net} />
                   </Row>
                 </Rows>
               </Panel>
-              <Panel title="Projected" note="An estimate for the end of the month">
+              <Panel title={t.outlook.projected} note={t.outlook.projectedNote}>
                 {entry.forecast === null ? (
-                  <Empty>This month is complete. The actual figures are final.</Empty>
+                  <Empty>{t.outlook.complete}</Empty>
                 ) : (
                   <>
                     <Rows>
                       <Row
-                        label="Spending"
-                        detail={`${String(entry.forecast.daysRemaining)} days left`}
+                        label={t.outlook.spending}
+                        detail={t.common.daysLeft(entry.forecast.daysRemaining)}
                       >
                         <Figure value={entry.forecast.projectedTotal} tone="caution" />
                       </Row>
                       {entry.outlook === null ? null : (
                         <>
-                          <Row label="Expected income">
+                          <Row label={t.outlook.expectedIncome}>
                             <Figure value={entry.outlook.expectedIncome} tone="caution" />
                           </Row>
-                          <Row label="Kept">
+                          <Row label={t.outlook.kept}>
                             <Figure
                               value={entry.outlook.projectedNet}
                               tone={entry.outlook.projectedNet.minor < 0 ? 'concern' : 'caution'}
@@ -165,14 +179,14 @@ export function OutlookView({ data }: { readonly data: Outlook }): ReactNode {
                       )}
                     </Rows>
                     <p className="mt-3 text-sm text-muted">
-                      {FORECAST_METHOD[entry.forecast.method]}
+                      {t.outlook.method[entry.forecast.method]}
                     </p>
                   </>
                 )}
               </Panel>
             </div>
             {entry.budgetsProjectedOverLimit.length === 0 ? null : (
-              <Panel title="Budgets projected to run over">
+              <Panel title={t.outlook.overLimit}>
                 <Rows>
                   {entry.budgetsProjectedOverLimit.map((budget) => (
                     <Row
@@ -186,22 +200,21 @@ export function OutlookView({ data }: { readonly data: Outlook }): ReactNode {
                 </Rows>
               </Panel>
             )}
-            <Panel title="Recurring commitments" note="Detected from repeated charges">
+            <Panel title={t.outlook.recurring} note={t.outlook.recurringNote}>
               {entry.recurring.commitments.length === 0 ? (
-                <Empty>
-                  No recurring expense has been detected yet. It takes three regular charges.
-                </Empty>
+                <Empty>{t.outlook.noRecurring}</Empty>
               ) : (
                 <>
                   <p className="mb-3">
-                    About <Figure value={entry.recurring.monthlyEquivalent} /> a month in total.
+                    {t.outlook.about} <Figure value={entry.recurring.monthlyEquivalent} />{' '}
+                    {t.outlook.aMonthInTotal}
                   </p>
                   <Rows>
                     {entry.recurring.commitments.map((commitment) => (
                       <Row
                         key={`${commitment.merchant}-${commitment.frequency}`}
                         label={commitment.merchant}
-                        detail={`${commitment.frequency.toLowerCase()} · last ${commitment.lastDate} · next expected ${commitment.nextExpectedDate}`}
+                        detail={`${t.common.frequency[commitment.frequency]} · ${t.outlook.last} ${t.date(commitment.lastDate)} · ${t.outlook.nextExpected} ${t.date(commitment.nextExpectedDate)}`}
                       >
                         <Figure value={commitment.typicalAmount} />
                       </Row>
@@ -217,14 +230,11 @@ export function OutlookView({ data }: { readonly data: Outlook }): ReactNode {
   );
 }
 
-const NOTIFICATION_STATUS: Record<
-  NotificationView['status'],
-  { readonly label: string; readonly tone: Tone }
-> = {
-  SENT: { label: 'Sent', tone: 'kept' },
-  PENDING: { label: 'Waiting to send', tone: 'neutral' },
-  FAILED: { label: 'Not delivered', tone: 'concern' },
-  SUPPRESSED: { label: 'Shown here only', tone: 'neutral' },
+const NOTIFICATION_TONE: Record<NotificationView['status'], Tone> = {
+  SENT: 'kept',
+  PENDING: 'neutral',
+  FAILED: 'concern',
+  SUPPRESSED: 'neutral',
 };
 
 const DATE_LENGTH = 10;
@@ -232,14 +242,16 @@ const DATE_LENGTH = 10;
 export function NotificationsPanel({
   data,
   markRead,
+  t,
 }: {
   readonly data: Notifications;
   readonly markRead: (form: FormData) => Promise<void>;
+  readonly t: Dictionary;
 }): ReactNode {
   return (
-    <Panel title="Notifications" note="What the CFO raised on its own, newest first">
+    <Panel title={t.signals.notifications} note={t.signals.notificationsNote}>
       {data.notifications.length === 0 ? (
-        <Empty>Nothing has been raised yet. Notable changes will appear here.</Empty>
+        <Empty>{t.signals.noNotifications}</Empty>
       ) : (
         <ul className="divide-y divide-line">
           {data.notifications.map((notification) => (
@@ -251,27 +263,27 @@ export function NotificationsPanel({
                 <p className="font-medium">
                   {notification.title}{' '}
                   <Badge tone={SEVERITY[notification.severity]}>
-                    {notification.severity.toLowerCase()}
+                    {t.common.severity[notification.severity]}
                   </Badge>{' '}
-                  <Badge tone={NOTIFICATION_STATUS[notification.status].tone}>
-                    {NOTIFICATION_STATUS[notification.status].label}
+                  <Badge tone={NOTIFICATION_TONE[notification.status]}>
+                    {t.signals.status[notification.status]}
                   </Badge>
                 </p>
                 <p className="mt-1 text-sm text-muted">
                   <span className="figure">{notification.detail}</span>
-                  {` · ${notification.detectedAt.slice(0, DATE_LENGTH)}`}
+                  {` · ${t.date(notification.detectedAt.slice(0, DATE_LENGTH))}`}
                 </p>
               </div>
               {notification.isRead ? (
-                <span className="text-sm text-muted">Read</span>
+                <span className="text-sm text-muted">{t.signals.read}</span>
               ) : (
                 <form action={markRead}>
                   <input type="hidden" name="key" value={notification.key} />
                   <button
                     type="submit"
-                    className="rounded-lg border border-line px-3 py-1 text-sm hover:bg-mist focus-visible:outline-2"
+                    className="min-h-9 rounded-full border border-line px-3.5 py-1.5 text-sm hover:bg-raised"
                   >
-                    Mark as read
+                    {t.signals.markRead}
                   </button>
                 </form>
               )}
@@ -286,9 +298,11 @@ export function NotificationsPanel({
 function SignalList({
   signals,
   empty,
+  t,
 }: {
   readonly signals: readonly SignalView[];
   readonly empty: string;
+  readonly t: Dictionary;
 }): ReactNode {
   if (signals.length === 0) {
     return <Empty>{empty}</Empty>;
@@ -299,11 +313,11 @@ function SignalList({
         <li key={`${signal.type}-${signal.title}-${signal.detail}`} className="py-3">
           <p className="font-medium">
             {signal.title}{' '}
-            <Badge tone={SEVERITY[signal.severity]}>{signal.severity.toLowerCase()}</Badge>
+            <Badge tone={SEVERITY[signal.severity]}>{t.common.severity[signal.severity]}</Badge>
           </p>
           <p className="mt-1 text-sm text-muted">
             <span className="figure">{signal.detail}</span>
-            {signal.date === null ? '' : ` · ${signal.date}`}
+            {signal.date === null ? '' : ` · ${t.date(signal.date)}`}
           </p>
         </li>
       ))}
@@ -311,21 +325,24 @@ function SignalList({
   );
 }
 
-export function SignalsView({ data }: { readonly data: Signals }): ReactNode {
+export function SignalsView({
+  data,
+  t,
+}: {
+  readonly data: Signals;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Signals" month={data.month} />
-      <CurrencySections entries={data.currencies}>
+      <PageHeading title={t.signals.title} month={data.month} t={t} />
+      <CurrencySections entries={data.currencies} t={t}>
         {(entry) => (
           <>
-            <Panel title="Insights" note="Most urgent first">
-              <SignalList signals={entry.insights} empty="Nothing needs attention." />
+            <Panel title={t.signals.insights} note={t.signals.insightsNote}>
+              <SignalList signals={entry.insights} empty={t.signals.nothingNeedsAttention} t={t} />
             </Panel>
-            <Panel title="Unusual spending" note="Compared with this household's own history">
-              <SignalList
-                signals={entry.anomalies}
-                empty="Nothing unusual was found. This needs a few months of history to judge."
-              />
+            <Panel title={t.signals.unusual} note={t.signals.unusualNote}>
+              <SignalList signals={entry.anomalies} empty={t.signals.nothingUnusual} t={t} />
             </Panel>
           </>
         )}

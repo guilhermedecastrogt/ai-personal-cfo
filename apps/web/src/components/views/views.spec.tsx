@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { EN, PT_BR } from '@/lib/i18n/dictionary';
 import {
   ACCOUNTS,
   BRL_OVERVIEW,
@@ -40,7 +41,7 @@ function panel(title: string): HTMLElement {
 
 describe('overview', () => {
   it('opens with the month in one line, using the figures it was given', () => {
-    render(<OverviewView data={overview()} />);
+    render(<OverviewView t={EN} data={overview()} />);
     const line = screen.getByRole('region', { name: 'Month in one line' });
 
     expect(line).toHaveTextContent('October 2026 so far');
@@ -54,6 +55,7 @@ describe('overview', () => {
   it('shows a completed month without "so far" and says there is nothing to project', () => {
     render(
       <OverviewView
+        t={EN}
         data={overview([{ ...EUR_OVERVIEW, forecast: null, balances: null }], SEPTEMBER)}
       />,
     );
@@ -68,16 +70,16 @@ describe('overview', () => {
   });
 
   it('compares with the previous period', () => {
-    render(<OverviewView data={overview()} />);
+    render(<OverviewView t={EN} data={overview()} />);
     const comparison = panel('Compared with the previous period');
 
-    expect(comparison).toHaveTextContent('Spendingup from €2,130.00 (4.23%)');
+    expect(comparison).toHaveTextContent('Spending▲ up from €2,130.00 (4.23%)');
     expect(comparison).toHaveTextContent('Incomeunchanged from €3,000.00');
-    expect(comparison).toHaveTextContent('Keptdown from €870.00');
+    expect(comparison).toHaveTextContent('Kept▼ down from €870.00');
   });
 
   it('says so when there is no earlier period, instead of showing a change', () => {
-    render(<OverviewView data={overview([{ ...EUR_OVERVIEW, comparison: null }])} />);
+    render(<OverviewView t={EN} data={overview([{ ...EUR_OVERVIEW, comparison: null }])} />);
 
     expect(panel('Compared with the previous period')).toHaveTextContent(
       'There is no earlier period to compare with yet.',
@@ -85,7 +87,7 @@ describe('overview', () => {
   });
 
   it('shows findings, budgets, the projection and balances', () => {
-    render(<OverviewView data={overview()} />);
+    render(<OverviewView t={EN} data={overview()} />);
 
     expect(panel('What stands out')).toHaveTextContent('Income exceeded spending by €780.00.');
     expect(panel('What stands out')).toHaveTextContent(
@@ -99,7 +101,7 @@ describe('overview', () => {
   });
 
   it('links to the review of the same month', () => {
-    render(<OverviewView data={overview()} />);
+    render(<OverviewView t={EN} data={overview()} />);
 
     expect(
       screen.getByRole('link', { name: 'Read the full review for October 2026' }),
@@ -107,7 +109,7 @@ describe('overview', () => {
   });
 
   it('keeps each currency in its own section and never shows a combined total', () => {
-    render(<OverviewView data={overview([EUR_OVERVIEW, BRL_OVERVIEW])} />);
+    render(<OverviewView t={EN} data={overview([EUR_OVERVIEW, BRL_OVERVIEW])} />);
     const euros = screen.getByRole('region', { name: 'Figures in EUR' });
     const reais = screen.getByRole('region', { name: 'Figures in BRL' });
 
@@ -121,7 +123,7 @@ describe('overview', () => {
   });
 
   it('describes an empty household without any figure', () => {
-    render(<OverviewView data={overview([EMPTY_OVERVIEW])} />);
+    render(<OverviewView t={EN} data={overview([EMPTY_OVERVIEW])} />);
 
     expect(screen.getByText(/No transactions are recorded for October 2026/)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('€');
@@ -130,7 +132,7 @@ describe('overview', () => {
 
 describe('spending and income', () => {
   it('shows spending by category, member and account with changes and the largest expenses', () => {
-    render(<SpendingView data={SPENDING} />);
+    render(<SpendingView t={EN} data={SPENDING} />);
 
     expect(panel('Total spending')).toHaveTextContent('€2,220.00');
     expect(panel('Total spending')).toHaveTextContent('up from €2,130.00');
@@ -148,6 +150,7 @@ describe('spending and income', () => {
     const [entry] = SPENDING.currencies;
     render(
       <SpendingView
+        t={EN}
         data={{
           ...SPENDING,
           currencies: entry === undefined ? [] : [{ ...entry, comparison: null }],
@@ -165,6 +168,7 @@ describe('spending and income', () => {
     const [entry] = SPENDING.currencies;
     render(
       <SpendingView
+        t={EN}
         data={{
           ...SPENDING,
           currencies: entry === undefined ? [] : [{ ...entry, transactionCount: 0 }],
@@ -176,7 +180,7 @@ describe('spending and income', () => {
   });
 
   it('shows income by source and member', () => {
-    render(<IncomeView data={INCOME} />);
+    render(<IncomeView t={EN} data={INCOME} />);
 
     expect(panel('Total income')).toHaveTextContent('€3,000.00');
     expect(panel('Total income')).toHaveTextContent('unchanged from €3,000.00');
@@ -187,7 +191,7 @@ describe('spending and income', () => {
 
 describe('budgets and goals', () => {
   it('shows each budget with its status, remainder, projection and members', () => {
-    render(<BudgetsView data={BUDGETS} />);
+    render(<BudgetsView t={EN} data={BUDGETS} />);
     const budgets = panel('Household budgets');
 
     expect(budgets).toHaveTextContent('Restaurants Exceeded€180.00 of €150.00 (120%)');
@@ -201,6 +205,7 @@ describe('budgets and goals', () => {
   it('says when no budgets are set', () => {
     render(
       <BudgetsView
+        t={EN}
         data={{ ...BUDGETS, currencies: [{ currency: 'EUR', budgets: [], forecast: null }] }}
       />,
     );
@@ -209,7 +214,7 @@ describe('budgets and goals', () => {
   });
 
   it('shows each goal with progress and what it needs', () => {
-    render(<GoalsView data={GOALS} />);
+    render(<GoalsView t={EN} data={GOALS} />);
     const goals = panel('Household goals');
 
     expect(goals).toHaveTextContent('Summer Trip In progress€620.00 of €1,000.00 (62%)');
@@ -217,7 +222,7 @@ describe('budgets and goals', () => {
   });
 
   it('says when no goals are set', () => {
-    render(<GoalsView data={{ ...GOALS, currencies: [{ currency: 'EUR', goals: [] }] }} />);
+    render(<GoalsView t={EN} data={{ ...GOALS, currencies: [{ currency: 'EUR', goals: [] }] }} />);
 
     expect(screen.getByText('No goals are set for this household.')).toBeInTheDocument();
   });
@@ -225,7 +230,7 @@ describe('budgets and goals', () => {
 
 describe('outlook and signals', () => {
   it('separates actual figures from projected ones', () => {
-    render(<OutlookView data={OUTLOOK} />);
+    render(<OutlookView t={EN} data={OUTLOOK} />);
 
     expect(panel('Actual')).toHaveTextContent('Recorded so far');
     expect(panel('Actual')).toHaveTextContent('Spending€2,220.00');
@@ -237,7 +242,7 @@ describe('outlook and signals', () => {
   });
 
   it('lists recurring commitments with the dates the backend supplied', () => {
-    render(<OutlookView data={OUTLOOK} />);
+    render(<OutlookView t={EN} data={OUTLOOK} />);
 
     expect(panel('Recurring commitments')).toHaveTextContent('About €1,817.99 a month in total.');
     expect(panel('Recurring commitments')).toHaveTextContent(
@@ -249,6 +254,7 @@ describe('outlook and signals', () => {
     const [entry] = OUTLOOK.currencies;
     render(
       <OutlookView
+        t={EN}
         data={{
           ...OUTLOOK,
           currencies:
@@ -277,7 +283,7 @@ describe('outlook and signals', () => {
   });
 
   it('lists insights with their severity and anomalies with their date', () => {
-    render(<SignalsView data={SIGNALS} />);
+    render(<SignalsView t={EN} data={SIGNALS} />);
 
     expect(panel('Insights')).toHaveTextContent('Restaurants budget exceeded high');
     expect(panel('Insights')).toHaveTextContent('€180.00 of €150.00 spent (120%).');
@@ -290,6 +296,7 @@ describe('outlook and signals', () => {
   it('says when there is nothing to flag and that history is needed', () => {
     render(
       <SignalsView
+        t={EN}
         data={{ ...SIGNALS, currencies: [{ currency: 'EUR', insights: [], anomalies: [] }] }}
       />,
     );
@@ -303,7 +310,7 @@ describe('notifications', () => {
   const markRead = (): Promise<void> => Promise.resolve();
 
   it('lists what was raised with its severity, delivery status and date', () => {
-    render(<NotificationsPanel data={NOTIFICATIONS} markRead={markRead} />);
+    render(<NotificationsPanel t={EN} data={NOTIFICATIONS} markRead={markRead} />);
     const items = within(panel('Notifications')).getAllByRole('listitem');
 
     expect(items).toHaveLength(2);
@@ -313,7 +320,7 @@ describe('notifications', () => {
   });
 
   it('offers to mark only unread notifications as read, by their key', () => {
-    render(<NotificationsPanel data={NOTIFICATIONS} markRead={markRead} />);
+    render(<NotificationsPanel t={EN} data={NOTIFICATIONS} markRead={markRead} />);
     const items = within(panel('Notifications')).getAllByRole('listitem');
     const unread = items[0] ?? document.body;
     const read = items[1] ?? document.body;
@@ -327,7 +334,7 @@ describe('notifications', () => {
   });
 
   it('says when nothing has been raised', () => {
-    render(<NotificationsPanel data={{ notifications: [] }} markRead={markRead} />);
+    render(<NotificationsPanel t={EN} data={{ notifications: [] }} markRead={markRead} />);
 
     expect(panel('Notifications')).toHaveTextContent('Nothing has been raised yet.');
   });
@@ -335,7 +342,7 @@ describe('notifications', () => {
 
 describe('recurring', () => {
   it('shows the monthly and annual commitment and what is coming up, as given', () => {
-    render(<RecurringView data={RECURRING} />);
+    render(<RecurringView t={EN} data={RECURRING} />);
 
     expect(panel('Commitment')).toHaveTextContent('€1,826.98 a month, €21,923.76 a year.');
     expect(panel('Commitment')).toHaveTextContent(
@@ -344,19 +351,19 @@ describe('recurring', () => {
   });
 
   it('lists each recurring expense with cadence, dates, payers and annual cost', () => {
-    render(<RecurringView data={RECURRING} />);
+    render(<RecurringView t={EN} data={RECURRING} />);
     const rows = within(panel('Recurring expenses')).getAllByRole('listitem');
 
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent(
-      'Landlord monthly · Rent · last 2026-10-01 · next expected 2026-10-31 · paid by Member A (6)',
+      'Landlord monthly · Rentlast 2026-10-01 · next expected 2026-10-31paid by Member A (6)',
     );
     expect(rows[0]).toHaveTextContent('€1,800.00€21,600.00 a year');
     expect(rows[1]).toHaveTextContent('paid by Member A (4), Member B (3)');
   });
 
   it('marks a price change with both amounts and its date, and a new commitment', () => {
-    render(<RecurringView data={RECURRING} />);
+    render(<RecurringView t={EN} data={RECURRING} />);
     const rows = within(panel('Recurring expenses')).getAllByRole('listitem');
 
     expect(rows[1]).toHaveTextContent('Price up');
@@ -366,17 +373,17 @@ describe('recurring', () => {
   });
 
   it('lists what appears to have stopped without saying why', () => {
-    render(<RecurringView data={RECURRING} />);
+    render(<RecurringView t={EN} data={RECURRING} />);
     const stopped = panel('Appear to have stopped');
 
     expect(stopped).toHaveTextContent(
-      'Old Gymmonthly · last charged 2026-07-05 · was expected 2026-08-04 · paid by Member A (5)',
+      'Old Gymmonthly · last charged 2026-07-05was expected 2026-08-04 · paid by Member A (5)',
     );
     expect(stopped).not.toHaveTextContent(/cancel/i);
   });
 
   it('offers sorting and marks the current order', () => {
-    render(<RecurringView data={{ ...RECURRING, sort: 'next' }} />);
+    render(<RecurringView t={EN} data={{ ...RECURRING, sort: 'next' }} />);
     const sorting = screen.getByRole('navigation', { name: 'Sort recurring expenses' });
 
     expect(within(sorting).getByRole('link', { name: 'Next date' })).toHaveAttribute(
@@ -393,6 +400,7 @@ describe('recurring', () => {
     const [eur] = RECURRING.currencies;
     render(
       <RecurringView
+        t={EN}
         data={{
           ...RECURRING,
           currencies: eur === undefined ? [] : [{ ...eur, commitments: [], stopped: [] }],
@@ -408,6 +416,7 @@ describe('recurring', () => {
     const [eur] = RECURRING.currencies;
     render(
       <RecurringView
+        t={EN}
         data={{
           ...RECURRING,
           currencies:
@@ -427,7 +436,7 @@ describe('recurring', () => {
 
 describe('review', () => {
   it('shows the summary, strengths, concerns, suggestions and priorities', () => {
-    render(<ReviewView data={REVIEW} />);
+    render(<ReviewView t={EN} data={REVIEW} />);
 
     expect(screen.getByText(/income was €3,000.00 and spending was €2,220.00/)).toBeInTheDocument();
     expect(panel('Going well')).toHaveTextContent('Income exceeded spending by €780.00.');
@@ -439,16 +448,17 @@ describe('review', () => {
   });
 
   it('says which form of the review is shown', () => {
-    const { rerender } = render(<ReviewView data={REVIEW} />);
+    const { rerender } = render(<ReviewView t={EN} data={REVIEW} />);
     expect(screen.getByText(/Shown in its plain form/)).toBeInTheDocument();
 
-    rerender(<ReviewView data={{ ...REVIEW, source: 'AI' }} />);
+    rerender(<ReviewView t={EN} data={{ ...REVIEW, source: 'AI' }} />);
     expect(screen.getByText(/Every number was checked against them/)).toBeInTheDocument();
   });
 
   it('leaves out sections that have nothing in them', () => {
     render(
       <ReviewView
+        t={EN}
         data={{ ...REVIEW, strengths: [], concerns: [], recommendations: [], priorities: [] }}
       />,
     );
@@ -460,7 +470,7 @@ describe('review', () => {
 
 describe('transactions', () => {
   it('lists transactions with names, never with identifiers', () => {
-    render(<TransactionsView data={TRANSACTIONS} query={{}} />);
+    render(<TransactionsView t={EN} data={TRANSACTIONS} query={{}} />);
     const rows = within(screen.getByRole('table')).getAllByRole('row');
 
     expect(rows).toHaveLength(3);
@@ -475,7 +485,11 @@ describe('transactions', () => {
 
   it('offers the filters the backend listed and keeps the month and the current selection', () => {
     render(
-      <TransactionsView data={TRANSACTIONS} query={{ type: 'EXPENSE', member: 'member-key-a' }} />,
+      <TransactionsView
+        t={EN}
+        data={TRANSACTIONS}
+        query={{ type: 'EXPENSE', member: 'member-key-a' }}
+      />,
     );
 
     expect(screen.getByLabelText('Type')).toHaveValue('EXPENSE');
@@ -488,7 +502,7 @@ describe('transactions', () => {
   });
 
   it('pages through results keeping the filters', () => {
-    render(<TransactionsView data={TRANSACTIONS} query={{ type: 'EXPENSE' }} />);
+    render(<TransactionsView t={EN} data={TRANSACTIONS} query={{ type: 'EXPENSE' }} />);
 
     expect(screen.getByText('61 transactions · page 1 of 2')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Next' })).toHaveAttribute(
@@ -499,7 +513,7 @@ describe('transactions', () => {
   });
 
   it('offers no way to edit or delete a transaction', () => {
-    render(<TransactionsView data={TRANSACTIONS} query={{}} />);
+    render(<TransactionsView t={EN} data={TRANSACTIONS} query={{}} />);
 
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Apply']);
   });
@@ -507,6 +521,7 @@ describe('transactions', () => {
   it('says when nothing matches', () => {
     render(
       <TransactionsView
+        t={EN}
         data={{ ...TRANSACTIONS, transactions: [], total: 0, pageCount: 1 }}
         query={{}}
       />,
@@ -518,7 +533,7 @@ describe('transactions', () => {
 
 describe('accounts', () => {
   it('lists accounts with ownership, marks joint accounts and keeps currencies apart', () => {
-    render(<AccountsView data={ACCOUNTS} />);
+    render(<AccountsView t={EN} data={ACCOUNTS} />);
 
     expect(panel('Accounts')).toHaveTextContent('Joint AccountBank account · EUR · Joint€2,610.00');
     expect(panel('Accounts')).toHaveTextContent('PersonalBank account · EUR · Member B€500.00');
@@ -531,8 +546,35 @@ describe('accounts', () => {
   });
 
   it('says when a household has no accounts', () => {
-    render(<AccountsView data={{ ...ACCOUNTS, accounts: [], totals: [] }} />);
+    render(<AccountsView t={EN} data={{ ...ACCOUNTS, accounts: [], totals: [] }} />);
 
     expect(screen.getByText('This household has no accounts yet.')).toBeInTheDocument();
+  });
+});
+
+describe('in Brazilian Portuguese', () => {
+  it('writes the month in one line and the panels in Portuguese', () => {
+    render(<OverviewView t={PT_BR} data={overview()} />);
+    const line = screen.getByRole('region', { name: 'O mês em uma linha' });
+
+    expect(line).toHaveTextContent('€3,000.00 entraram, €2,220.00 saíram, €780.00 ficaram.');
+    expect(
+      screen.getByRole('heading', { name: 'Em relação ao período anterior' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Início', level: 1 })).toBeInTheDocument();
+  });
+
+  it('names budget states in Portuguese', () => {
+    render(<BudgetsView t={PT_BR} data={BUDGETS} />);
+
+    expect(screen.getByRole('heading', { name: 'Orçamentos da casa' })).toBeInTheDocument();
+    expect(document.body).toHaveTextContent(/Ultrapassado|Perto do limite|Dentro do previsto/);
+  });
+
+  it('labels transaction kinds and filters in Portuguese', () => {
+    render(<TransactionsView t={PT_BR} data={TRANSACTIONS} query={{}} />);
+
+    expect(screen.getByText('Filtros')).toBeInTheDocument();
+    expect(screen.getAllByText(/Gasto|Receita|Transferência/).length).toBeGreaterThan(0);
   });
 });

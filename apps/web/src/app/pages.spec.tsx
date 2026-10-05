@@ -19,6 +19,13 @@ const apiGet = jest.fn<Promise<unknown>, [string, Record<string, string | undefi
 
 jest.mock('next/cache', () => ({ revalidatePath: (): void => undefined }));
 
+jest.mock('@/lib/session', () => ({
+  currentDictionary: (): Promise<unknown> =>
+    Promise.resolve(
+      jest.requireActual<typeof import('@/lib/i18n/dictionary')>('@/lib/i18n/dictionary').EN,
+    ),
+}));
+
 jest.mock('@/lib/api', () => ({
   apiPost: (): Promise<void> => Promise.resolve(),
   apiGet: (path: string, parameters?: Record<string, string | undefined>): Promise<unknown> =>

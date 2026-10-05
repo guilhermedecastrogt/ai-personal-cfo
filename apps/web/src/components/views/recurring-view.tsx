@@ -6,32 +6,40 @@ import type {
   RecurringView as Recurring,
   StoppedRecurringView,
 } from '@/lib/contracts';
+import type { Dictionary } from '@/lib/i18n/dictionary';
 import { Badge, CurrencySections, Empty, Figure, PageHeading, Panel, Row, Rows } from '../ui';
 
-const SORTS: readonly { readonly key: RecurringSort; readonly label: string }[] = [
-  { key: 'cost', label: 'Cost' },
-  { key: 'next', label: 'Next date' },
-  { key: 'name', label: 'Name' },
-];
+const SORTS: readonly RecurringSort[] = ['cost', 'next', 'name'];
 
 function paidBy(payers: ActiveRecurringView['payers']): string {
   return payers.map((payer) => `${payer.member} (${String(payer.occurrences)})`).join(', ');
 }
 
-function SortLinks({ current }: { readonly current: RecurringSort }): ReactNode {
+function SortLinks({
+  current,
+  t,
+}: {
+  readonly current: RecurringSort;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
-    <nav aria-label="Sort recurring expenses" className="mb-3 flex flex-wrap gap-2 text-sm">
-      <span className="text-muted">Sort by</span>
+    <nav
+      aria-label={t.recurring.sortLabel}
+      className="mb-4 flex flex-wrap items-center gap-2 text-sm"
+    >
+      <span className="text-muted">{t.recurring.sortBy}</span>
       {SORTS.map((sort) => (
         <Link
-          key={sort.key}
-          href={`/recurring?sort=${sort.key}`}
-          aria-current={sort.key === current ? 'true' : undefined}
-          className={
-            sort.key === current ? 'font-medium underline underline-offset-4' : 'text-muted'
-          }
+          key={sort}
+          href={`/recurring?sort=${sort}`}
+          aria-current={sort === current ? 'true' : undefined}
+          className={`rounded-full px-3 py-1.5 ${
+            sort === current
+              ? 'bg-accent font-medium text-accent-ink'
+              : 'border border-line text-ink-soft hover:bg-raised'
+          }`}
         >
-          {sort.label}
+          {t.recurring.sorts[sort]}
         </Link>
       ))}
     </nav>
@@ -40,118 +48,159 @@ function SortLinks({ current }: { readonly current: RecurringSort }): ReactNode 
 
 function PriceChange({
   change,
+  t,
 }: {
   readonly change: NonNullable<ActiveRecurringView['priceChange']>;
+  readonly t: Dictionary;
 }): ReactNode {
   return (
-    <span className="block text-sm text-muted">
-      Was <span className="figure">{change.previousAmount.text}</span> until {change.effectiveDate},
-      now <span className="figure">{change.currentAmount.text}</span>
+    <span className="mt-0.5 block">
+      {t.recurring.was} <span className="figure">{change.previousAmount.text}</span>{' '}
+      {t.recurring.until} {t.date(change.effectiveDate)}, {t.recurring.now}{' '}
+      <span className="figure">{change.currentAmount.text}</span>
       {change.change === null ? null : <span className="figure"> ({change.change.text})</span>}
     </span>
   );
 }
 
-function Commitment({ commitment }: { readonly commitment: ActiveRecurringView }): ReactNode {
+function Commitment({
+  commitment,
+  t,
+}: {
+  readonly commitment: ActiveRecurringView;
+  readonly t: Dictionary;
+}): ReactNode {
   const { priceChange } = commitment;
   return (
     <Row
       label={
         <>
-          {commitment.merchant} {commitment.isNew ? <Badge tone="neutral">New</Badge> : null}{' '}
+          <span className="font-medium">{commitment.merchant}</span>{' '}
+          {commitment.isNew ? <Badge tone="neutral">{t.recurring.isNew}</Badge> : null}{' '}
           {priceChange === null ? null : (
             <Badge tone={priceChange.direction === 'INCREASE' ? 'concern' : 'kept'}>
-              {priceChange.direction === 'INCREASE' ? 'Price up' : 'Price down'}
+              {priceChange.direction === 'INCREASE' ? t.recurring.priceUp : t.recurring.priceDown}
             </Badge>
           )}
         </>
       }
       detail={
         <>
-          {`${commitment.frequency.toLowerCase()} · ${commitment.category} · last ${commitment.lastDate} · next expected ${commitment.nextExpectedDate} · paid by ${paidBy(commitment.payers)}`}
-          {priceChange === null ? null : <PriceChange change={priceChange} />}
+          <span className="block">
+            {t.common.frequency[commitment.frequency]} · {commitment.category}
+          </span>
+          <span className="block">
+            {t.recurring.last} {t.date(commitment.lastDate)} · {t.recurring.nextExpected}{' '}
+            {t.date(commitment.nextExpectedDate)}
+          </span>
+          <span className="block">
+            {t.recurring.paidBy} {paidBy(commitment.payers)}
+          </span>
+          {priceChange === null ? null : <PriceChange change={priceChange} t={t} />}
         </>
       }
     >
       <Figure value={commitment.typicalAmount} />
       <span className="block text-sm text-muted">
-        <span className="figure">{commitment.annualEquivalent.text}</span> a year
+        <span className="figure">{commitment.annualEquivalent.text}</span> {t.common.aYear}
       </span>
     </Row>
   );
 }
 
-function Stopped({ commitment }: { readonly commitment: StoppedRecurringView }): ReactNode {
+function Stopped({
+  commitment,
+  t,
+}: {
+  readonly commitment: StoppedRecurringView;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <Row
-      label={commitment.merchant}
-      detail={`${commitment.frequency.toLowerCase()} · last charged ${commitment.lastDate} · was expected ${commitment.missedDate} · paid by ${paidBy(commitment.payers)}`}
+      label={<span className="font-medium">{commitment.merchant}</span>}
+      detail={
+        <>
+          <span className="block">
+            {t.common.frequency[commitment.frequency]} · {t.recurring.lastCharged}{' '}
+            {t.date(commitment.lastDate)}
+          </span>
+          <span className="block">
+            {t.recurring.wasExpected} {t.date(commitment.missedDate)} · {t.recurring.paidBy}{' '}
+            {paidBy(commitment.payers)}
+          </span>
+        </>
+      }
     >
       <Figure value={commitment.typicalAmount} />
     </Row>
   );
 }
 
-export function RecurringView({ data }: { readonly data: Recurring }): ReactNode {
+export function RecurringView({
+  data,
+  t,
+}: {
+  readonly data: Recurring;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Recurring">
-        <p className="mt-2 text-muted">
-          Regular charges found in your transactions, as of {data.today}
-        </p>
+      <PageHeading title={t.recurring.title} t={t}>
+        <p className="mt-2 text-muted">{t.recurring.intro(t.date(data.today))}</p>
       </PageHeading>
-      <CurrencySections entries={data.currencies}>
+      <CurrencySections entries={data.currencies} t={t}>
         {(entry) =>
           entry.commitments.length === 0 && entry.stopped.length === 0 ? (
-            <Empty>
-              No recurring expense has been detected yet. It takes three regular charges from the
-              same merchant.
-            </Empty>
+            <Empty>{t.recurring.none}</Empty>
           ) : (
             <>
-              <Panel title="Commitment" note="Active recurring expenses only">
-                <p>
-                  <Figure value={entry.monthlyEquivalent} /> a month,{' '}
-                  <Figure value={entry.annualEquivalent} /> a year.
+              <Panel title={t.recurring.commitment} note={t.recurring.commitmentNote}>
+                <p className="font-display text-2xl tracking-tight sm:text-3xl">
+                  <Figure value={entry.monthlyEquivalent} />
+                  <span className="text-lg text-muted">{t.recurring.perMonth}</span>
+                  <Figure value={entry.annualEquivalent} />
+                  <span className="text-lg text-muted">{t.recurring.perYear}</span>
                 </p>
-                <p className="mt-2 text-sm text-muted">
+                <p className="mt-3 text-sm text-muted">
                   {entry.upcoming.merchants.length === 0 ? (
-                    `Nothing is expected in the next ${String(entry.upcoming.withinDays)} days.`
+                    t.recurring.nothingExpected(entry.upcoming.withinDays)
                   ) : (
                     <>
-                      Expected in the next {entry.upcoming.withinDays} days:{' '}
+                      {t.recurring.expectedIn(entry.upcoming.withinDays)}
                       <span className="figure">{entry.upcoming.total.text}</span> (
                       {entry.upcoming.merchants.join(', ')}).
                     </>
                   )}
                 </p>
               </Panel>
-              <Panel title="Recurring expenses" note="Weekly and yearly charges spread evenly">
+              <Panel title={t.recurring.expenses} note={t.recurring.expensesNote}>
                 {entry.commitments.length === 0 ? (
-                  <Empty>No recurring expense is active right now.</Empty>
+                  <Empty>{t.recurring.noneActive}</Empty>
                 ) : (
                   <>
-                    <SortLinks current={data.sort} />
+                    <SortLinks current={data.sort} t={t} />
                     <Rows>
                       {entry.commitments.map((commitment) => (
                         <Commitment
                           key={`${commitment.merchant}-${commitment.frequency}`}
                           commitment={commitment}
+                          t={t}
                         />
                       ))}
                     </Rows>
                   </>
                 )}
               </Panel>
-              <Panel title="Appear to have stopped" note="No charge since the expected date">
+              <Panel title={t.recurring.stopped} note={t.recurring.stoppedNote}>
                 {entry.stopped.length === 0 ? (
-                  <Empty>Nothing appears to have stopped.</Empty>
+                  <Empty>{t.recurring.nothingStopped}</Empty>
                 ) : (
                   <Rows>
                     {entry.stopped.map((commitment) => (
                       <Stopped
                         key={`${commitment.merchant}-${commitment.frequency}`}
                         commitment={commitment}
+                        t={t}
                       />
                     ))}
                   </Rows>

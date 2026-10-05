@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { OverviewView as Overview } from '@/lib/contracts';
+import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
   Change,
   CurrencySections,
@@ -20,52 +21,60 @@ type Entry = Overview['currencies'][number];
 function LedgerLine({
   entry,
   data,
+  t,
 }: {
   readonly entry: Entry;
   readonly data: Overview;
+  readonly t: Dictionary;
 }): ReactNode {
   const { totals } = entry;
   const kept = totals.net.minor >= 0;
   return (
-    <section aria-label="Month in one line" className="rounded-xl bg-ink p-6 text-white sm:p-8">
-      <p className="text-sm uppercase tracking-[0.18em] text-white/60">
+    <section
+      aria-label={t.overview.monthInOneLine}
+      className="relative overflow-hidden rounded-3xl bg-hero p-6 text-hero-ink shadow-panel sm:p-9"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brass to-transparent"
+      />
+      <p className="eyebrow text-brass">
         {data.month.label}
-        {data.month.isComplete ? '' : ' so far'}
+        {data.month.isComplete ? '' : t.overview.soFar}
       </p>
-      <p className="mt-3 font-display text-2xl leading-snug sm:text-4xl">
-        <span className="figure">{totals.income.text}</span> in,{' '}
-        <span className="figure">{totals.expenses.text}</span> out,{' '}
-        <span className="figure">{totals.net.text}</span> {kept ? 'kept' : 'short'}.
+      <p className="mt-4 font-display text-[1.65rem] leading-snug tracking-tight sm:text-[2.6rem] sm:leading-tight">
+        <span className="figure">{totals.income.text}</span> {t.overview.inWord},{' '}
+        <span className="figure">{totals.expenses.text}</span> {t.overview.outWord},{' '}
+        <span className={`figure ${kept ? '' : 'text-concern'}`}>{totals.net.text}</span>{' '}
+        {kept ? t.overview.kept : t.overview.short}.
       </p>
       {totals.savingsRate === null ? (
-        <p className="mt-4 text-sm text-white/70">
-          No income recorded, so there is no savings rate.
-        </p>
+        <p className="mt-5 text-sm text-hero-muted">{t.overview.noSavingsRate}</p>
       ) : (
-        <div className="mt-5">
-          <div className="mb-1.5 flex justify-between text-sm text-white/70">
-            <span>Share of income kept</span>
-            <span className="figure text-white">{totals.savingsRate.text}</span>
+        <div className="mt-7 max-w-md">
+          <div className="mb-2 flex items-baseline justify-between text-sm text-hero-muted">
+            <span>{t.overview.shareKept}</span>
+            <span className="figure text-base text-hero-ink">{totals.savingsRate.text}</span>
           </div>
-          <Meter value={totals.savingsRate} tone="kept" label="Share of income kept" />
+          <Meter value={totals.savingsRate} tone="kept" label={t.overview.shareKept} t={t} onHero />
         </div>
       )}
     </section>
   );
 }
 
-function Findings({ entry }: { readonly entry: Entry }): ReactNode {
+function Findings({ entry, t }: { readonly entry: Entry; readonly t: Dictionary }): ReactNode {
   const strengths = entry.findings.filter((finding) => finding.kind === 'STRENGTH');
   const concerns = entry.findings.filter((finding) => finding.kind === 'CONCERN');
   if (entry.findings.length === 0) {
-    return <Empty>Nothing stands out this month.</Empty>;
+    return <Empty>{t.overview.nothingStandsOut}</Empty>;
   }
   return (
     <div className="grid gap-6 sm:grid-cols-2">
       <div>
-        <h3 className="mb-2 text-sm font-medium text-kept">Going well</h3>
+        <h3 className="eyebrow mb-3 text-kept">{t.overview.goingWell}</h3>
         {strengths.length === 0 ? (
-          <p className="text-sm text-muted">Nothing to report.</p>
+          <p className="text-sm text-muted">{t.common.nothingToReport}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {strengths.map((finding) => (
@@ -75,9 +84,9 @@ function Findings({ entry }: { readonly entry: Entry }): ReactNode {
         )}
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-medium text-concern">Needs attention</h3>
+        <h3 className="eyebrow mb-3 text-concern">{t.overview.needsAttention}</h3>
         {concerns.length === 0 ? (
-          <p className="text-sm text-muted">Nothing to report.</p>
+          <p className="text-sm text-muted">{t.common.nothingToReport}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {concerns.map((finding) => (
@@ -93,50 +102,50 @@ function Findings({ entry }: { readonly entry: Entry }): ReactNode {
 function CurrencyOverview({
   entry,
   data,
+  t,
 }: {
   readonly entry: Entry;
   readonly data: Overview;
+  readonly t: Dictionary;
 }): ReactNode {
   if (!entry.hasTransactions && entry.budgets.length === 0) {
-    return (
-      <Empty>
-        No transactions are recorded for {data.month.label}. Send an expense or a receipt on
-        WhatsApp, then refresh.
-      </Empty>
-    );
+    return <Empty>{t.overview.noTransactions(data.month.label)}</Empty>;
   }
   return (
     <>
-      <LedgerLine entry={entry} data={data} />
-      <Panel title="Compared with the previous period">
+      <LedgerLine entry={entry} data={data} t={t} />
+      <Panel title={t.overview.compared}>
         {entry.comparison === null ? (
-          <Empty>There is no earlier period to compare with yet.</Empty>
+          <Empty>{t.common.noEarlierPeriod}</Empty>
         ) : (
           <Rows>
-            <Row label="Spending">
-              <Change comparison={entry.comparison.expenses} risingIsGood={false} />
+            <Row label={t.overview.spendingLabel}>
+              <Change comparison={entry.comparison.expenses} risingIsGood={false} t={t} />
             </Row>
-            <Row label="Income">
-              <Change comparison={entry.comparison.income} risingIsGood />
+            <Row label={t.overview.incomeLabel}>
+              <Change comparison={entry.comparison.income} risingIsGood t={t} />
             </Row>
-            <Row label="Kept">
-              <Change comparison={entry.comparison.net} risingIsGood />
+            <Row label={t.overview.keptLabel}>
+              <Change comparison={entry.comparison.net} risingIsGood t={t} />
             </Row>
           </Rows>
         )}
       </Panel>
-      <Panel title="What stands out">
-        <Findings entry={entry} />
-        <p className="mt-5 text-sm">
-          <Link href={`/review?month=${data.month.key}`} className="underline underline-offset-4">
-            Read the full review for {data.month.label}
+      <Panel title={t.overview.standsOut}>
+        <Findings entry={entry} t={t} />
+        <p className="mt-6 text-sm">
+          <Link
+            href={`/review?month=${data.month.key}`}
+            className="font-medium text-accent underline decoration-brass underline-offset-4"
+          >
+            {t.overview.readReview(data.month.label)}
           </Link>
         </p>
       </Panel>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Where it went">
+        <Panel title={t.overview.whereItWent}>
           {entry.topCategories.length === 0 ? (
-            <Empty>No spending recorded.</Empty>
+            <Empty>{t.overview.noSpending}</Empty>
           ) : (
             <Rows>
               {entry.topCategories.map((category) => (
@@ -151,48 +160,48 @@ function CurrencyOverview({
             </Rows>
           )}
         </Panel>
-        <Panel title="Budgets">
+        <Panel title={t.overview.budgets}>
           {entry.budgets.length === 0 ? (
-            <Empty>No budgets are set.</Empty>
+            <Empty>{t.overview.noBudgets}</Empty>
           ) : (
-            <BudgetList budgets={entry.budgets} />
+            <BudgetList budgets={entry.budgets} t={t} />
           )}
         </Panel>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="End of month" note="Projection, not an actual figure">
+        <Panel title={t.overview.endOfMonth} note={t.overview.projectionNote}>
           {entry.forecast === null ? (
-            <Empty>This month is complete, so there is nothing to project.</Empty>
+            <Empty>{t.overview.monthComplete}</Empty>
           ) : (
             <Rows>
-              <Row label="Spent so far">
+              <Row label={t.overview.spentSoFar}>
                 <Figure value={entry.forecast.spent} />
               </Row>
               <Row
-                label="Projected spending"
-                detail={`${String(entry.forecast.daysRemaining)} days left`}
+                label={t.overview.projectedSpending}
+                detail={t.common.daysLeft(entry.forecast.daysRemaining)}
               >
                 <Figure value={entry.forecast.projectedTotal} tone="caution" />
               </Row>
               <Row
-                label="Recurring commitments"
-                detail={`${String(entry.recurringCount)} detected`}
+                label={t.overview.recurringCommitments}
+                detail={t.overview.detected(entry.recurringCount)}
               >
                 <Figure value={entry.recurringMonthlyEquivalent} />{' '}
-                <span className="text-muted">a month</span>
+                <span className="text-muted">{t.common.aMonth}</span>
               </Row>
             </Rows>
           )}
         </Panel>
-        <Panel title="Balances" note="As they stand today">
+        <Panel title={t.overview.balances} note={t.overview.balancesNote}>
           {entry.balances === null ? (
-            <Empty>Balances are shown for the current month only.</Empty>
+            <Empty>{t.overview.balancesCurrentOnly}</Empty>
           ) : (
             <Rows>
-              <Row label="Total">
+              <Row label={t.overview.total}>
                 <Figure value={entry.balances.total} />
               </Row>
-              <Row label="Joint accounts">
+              <Row label={t.overview.jointAccounts}>
                 <Figure value={entry.balances.joint} />
               </Row>
               {entry.balances.byMember.map((member) => (
@@ -205,7 +214,7 @@ function CurrencyOverview({
         </Panel>
       </div>
       {entry.spendingByMember.length > 1 ? (
-        <Panel title="By member">
+        <Panel title={t.overview.byMember}>
           <Rows>
             {entry.spendingByMember.map((member) => (
               <Row
@@ -213,8 +222,14 @@ function CurrencyOverview({
                 label={member.member}
                 detail={<Share value={member.spendingShare} />}
               >
-                <Figure value={member.spent} /> <span className="text-muted">spent,</span>{' '}
-                <Figure value={member.income} /> <span className="text-muted">received</span>
+                <span className="block">
+                  <Figure value={member.spent} />{' '}
+                  <span className="text-muted">{t.overview.spent}</span>
+                </span>
+                <span className="block text-sm">
+                  <Figure value={member.income} />{' '}
+                  <span className="text-muted">{t.overview.received}</span>
+                </span>
               </Row>
             ))}
           </Rows>
@@ -224,12 +239,18 @@ function CurrencyOverview({
   );
 }
 
-export function OverviewView({ data }: { readonly data: Overview }): ReactNode {
+export function OverviewView({
+  data,
+  t,
+}: {
+  readonly data: Overview;
+  readonly t: Dictionary;
+}): ReactNode {
   return (
     <>
-      <PageHeading title="Overview" month={data.month} />
-      <CurrencySections entries={data.currencies}>
-        {(entry) => <CurrencyOverview entry={entry} data={data} />}
+      <PageHeading title={t.overview.title} month={data.month} t={t} />
+      <CurrencySections entries={data.currencies} t={t}>
+        {(entry) => <CurrencyOverview entry={entry} data={data} t={t} />}
       </CurrencySections>
     </>
   );

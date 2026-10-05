@@ -95,14 +95,14 @@ describe('sign-in action', () => {
     const empty = await signIn({ error: null }, form('   '));
 
     expect(wrong).toEqual(empty);
-    expect(wrong.error).toContain('not recognised');
+    expect(wrong.error).toBe('INVALID');
     expect(setCookie).not.toHaveBeenCalled();
   });
 
   it('tells the visitor to wait when attempts are being limited', async () => {
     fetchMock.mockResolvedValue(respond(429));
 
-    expect((await signIn({ error: null }, form('guess'))).error).toContain('Too many attempts');
+    expect((await signIn({ error: null }, form('guess'))).error).toBe('TOO_MANY');
     expect(setCookie).not.toHaveBeenCalled();
   });
 
@@ -111,8 +111,7 @@ describe('sign-in action', () => {
 
     const state = await signIn({ error: null }, form('a-valid-code'));
 
-    expect(state.error).toContain('could not be reached');
-    expect(state.error).not.toContain('10.0.0.5');
+    expect(state).toEqual({ error: 'UNAVAILABLE' });
   });
 
   it('puts the access code in the request body, never in the address', async () => {
