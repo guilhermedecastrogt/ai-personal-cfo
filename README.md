@@ -1,8 +1,8 @@
 # AI Personal CFO
 
-An open-source personal finance manager that you talk to over WhatsApp. You send a message such as `I spent €23 at Lidl`, or a photo of a receipt, and it records a structured transaction, tracks it against your budgets and goals, and tells you when something deserves your attention.
+An open-source finance manager for a household, used over WhatsApp. Each member writes to one shared assistant number from their own phone. A message such as `I spent €23 at Lidl`, or a photo of a receipt, becomes a structured transaction attributed to the person who sent it, tracked against the household's budgets and goals. The assistant speaks up when something deserves attention.
 
-This is a personal project built in the open. It is designed for a single user and is not a hosted service.
+This is a personal project built in the open. It is designed for one household, such as a couple managing their money together, and is not a hosted service.
 
 ## Status
 
@@ -12,6 +12,8 @@ Early development. The repository currently contains the project skeleton and do
 
 - **The finance engine is deterministic.** Balances, budgets, forecasts and goal progress are computed by plain code over integer minor units. A language model never performs a financial calculation.
 - **AI is an interface and an advisor, not the source of truth.** Models extract structured data from messages and images and explain verified figures. Every model output passes runtime and domain validation before anything is persisted.
+- **The household is the unit of finance.** Accounts, transactions, budgets, goals and reports belong to the household and are fully shared between its members. Each transaction records which member it is attributed to, so the same data answers both "how much did we spend" and "how much did I spend".
+- **Identity is looked up, never inferred.** The sender of a WhatsApp message is resolved to a household member from the provider's sender identifier before any model is involved.
 - **Ask instead of guessing.** When an amount, category or interpretation is uncertain, the system asks the user.
 - **Structured data only.** Receipt images are processed in a temporary location and discarded. Only the extracted transaction is stored.
 - **One machine, one deployable.** A modular monolith running under Docker Compose on a single ARM64 VM.
@@ -20,7 +22,7 @@ Early development. The repository currently contains the project skeleton and do
 
 ```mermaid
 flowchart TD
-    WA[WhatsApp] --> Provider[Kapso / WhatsApp API]
+    WA[Members on WhatsApp] --> Provider[Kapso / WhatsApp API]
     Provider --> Caddy
     Browser --> Caddy
     Caddy --> Web[Next.js dashboard]
@@ -30,7 +32,8 @@ flowchart TD
     API --> Finance[Finance engine]
     API --> AI[AI layer]
     Finance --> Insights[Insight engine]
-    AI --> ModelProvider[AI provider]
+    AI --> ModelProvider[AIProvider]
+    ModelProvider --> OpenAI[OpenAI]
     Insights --> Advisor[AI advisor]
 ```
 
@@ -40,6 +43,7 @@ flowchart TD
 | --- | --- |
 | Backend | Node.js, TypeScript, NestJS, Drizzle ORM, Zod, Jest |
 | Database | PostgreSQL |
+| AI | OpenAI, isolated behind an internal `AIProvider` interface |
 | Frontend | Next.js, TypeScript, Tailwind CSS, Recharts |
 | Infrastructure | Docker Compose, Caddy, Terraform, Oracle Cloud Always Free (ARM64) |
 | CI | GitHub Actions |
@@ -58,6 +62,7 @@ docs/           Architecture, guides and decision records
 ## Roadmap
 
 - [x] Repository initialization
+- [x] Household, identity and AI provider decisions
 - [ ] Architecture documentation and decision records
 - [ ] Backend bootstrap with health and readiness checks
 - [ ] Database schema and core domain
@@ -71,11 +76,11 @@ docs/           Architecture, guides and decision records
 - [ ] Deployment infrastructure
 - [ ] Security hardening
 
-Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, multi-user accounts and a mobile application.
+Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, expense splitting between members, private per-member data, hosting multiple households and a mobile application.
 
 ## Documentation
 
-See [docs/](docs/README.md).
+See [docs/](docs/README.md) and the [architecture decision records](docs/adr/README.md).
 
 ## License
 

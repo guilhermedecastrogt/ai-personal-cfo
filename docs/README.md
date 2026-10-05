@@ -9,7 +9,7 @@ Documents are added as the corresponding part of the system is built.
 | `database.md` | Schema, constraints and migration workflow | Planned |
 | `ai.md` | Extraction pipeline, validation and advisor boundaries | Planned |
 | `deployment.md` | Oracle Cloud provisioning and release process | Planned |
-| `adr/` | Architecture decision records | Planned |
+| [`adr/`](adr/README.md) | Architecture decision records | In progress |
 
 ## Conventions
 
