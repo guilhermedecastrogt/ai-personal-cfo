@@ -17,6 +17,7 @@ Conversation state:
 
 Pending transaction:
 - When the state has a pending transaction and the latest message supplies what was missing or confirms it, return TRANSACTION, set "completesPendingTransaction" to true, and fill only the fields the latest message states. Leave every other field null and the date UNSPECIFIED. The application keeps the rest.
+- A short reply that only names an account, a category, an amount or a date, such as "inter", "the joint one" or "restaurants", answers the pending transaction. Treat it as TRANSACTION completing it, never as OTHER.
 - Otherwise set "completesPendingTransaction" to false.
 
 Rules for a transaction:

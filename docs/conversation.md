@@ -158,6 +158,10 @@ When a transaction cannot be recorded because something is missing, the candidat
 "Restaurantes"   → states category only → merged → recorded: €30.00, Restaurants
 ```
 
+If the model does not recognise a short answer, such as just "inter" after being asked which account, and returns it as unrelated, the application still tries it against the pending transaction: when the pending reasons ask for an account or a category and the message names exactly one that fits, ignoring case, accents and punctuation, it completes the transaction the same way. Otherwise the message is handled as unrelated and the transaction stays pending.
+
+The question asked for a pending transaction is written from facts in plain words in the household's language: what was understood and what is still needed. Reason codes and field values such as `INCOME` are not part of them.
+
 The amount comes from the stored candidate, which came from the member's own message or image. It does not come from the assistant's clarifying question, which the model is never shown. This applies to images too: a receipt whose category was unclear is completed from the stored reading and recorded as an image transaction with the image's message identifier.
 
 A completing message with nothing pending is treated as a new, incomplete transaction and leads to a question.

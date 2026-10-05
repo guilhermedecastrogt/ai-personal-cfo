@@ -343,7 +343,7 @@ describe('financial image extraction', () => {
       );
 
       expect(harness.provider.replyRequests[0]?.facts).toMatchObject({
-        reasons: ['MISSING_CATEGORY'],
+        needed: ['the category'],
         understood: { amount: '€43.27', merchant: 'Tesco', category: null },
         categoryOptions: expect.arrayContaining(['Groceries', 'Food', 'Other']) as unknown,
       });

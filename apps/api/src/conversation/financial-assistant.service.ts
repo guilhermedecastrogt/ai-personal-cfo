@@ -26,6 +26,7 @@ import { toCategoryOptions } from './category-options.js';
 import { CONVERSATION_POLICY } from './conversation-policy.js';
 import type { ConversationState, QuestionFrame } from './conversation-state.js';
 import { ConversationsRepository, type OpenConversation } from './conversations.repository.js';
+import { answerPendingTransaction } from './extraction/pending-answer.js';
 import { completePendingCandidate } from './extraction/pending-transaction.js';
 import {
   TransactionExtractionService,
@@ -261,11 +262,37 @@ export class FinancialAssistant {
         return this.recordTransaction(context, message, today, state, interpretation);
       case 'QUESTION':
         return this.answerQuestion(context, message, today, state, interpretation.question);
-      case 'CORRECTION':
       case 'UNCLEAR':
-      case 'OTHER':
+      case 'OTHER': {
+        const answered = await this.answerPending(context, message.text, state);
+        return answered === undefined
+          ? { outcome: { kind: interpretation.kind }, state: undefined }
+          : this.recordTransaction(context, message, today, state, {
+              kind: 'TRANSACTION',
+              transaction: answered,
+              completesPending: true,
+            });
+      }
+      case 'CORRECTION':
         return { outcome: { kind: interpretation.kind }, state: undefined };
     }
+  }
+
+  private async answerPending(
+    context: RequestContext,
+    text: string,
+    state: ConversationState,
+  ): Promise<TransactionCandidate | undefined> {
+    const pending = state.pendingTransaction;
+    if (pending === null) {
+      return undefined;
+    }
+    const directory = await this.directories.load(context.householdId);
+    return answerPendingTransaction(text, pending, {
+      accounts: directory.accounts,
+      categories: directory.categories,
+      senderId: context.memberId,
+    });
   }
 
   private async recordTransaction(

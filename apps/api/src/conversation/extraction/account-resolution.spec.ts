@@ -58,6 +58,45 @@ describe('resolveMentionedAccount', () => {
 });
 
 describe('resolveUnmentionedAccount', () => {
+  const A_REAIS = { id: 'a-reais', name: 'Member A Inter', currency: 'BRL', ownerMemberId: 'a' };
+  const B_REAIS = { id: 'b-reais', name: 'Member B Inter', currency: 'BRL', ownerMemberId: 'b' };
+  const JOINT_REAIS = {
+    id: 'joint-reais',
+    name: 'Joint Reais',
+    currency: 'BRL',
+    ownerMemberId: null,
+  };
+
+  it('uses the only account in the stated currency when the default account is in another', () => {
+    expect(
+      resolveUnmentionedAccount([...ACCOUNTS, A_REAIS], A_BANK, { currency: 'BRL', senderId: 'a' }),
+    ).toEqual({ status: 'RESOLVED', account: A_REAIS });
+  });
+
+  it('prefers the sender’s own account, then a joint one, in the stated currency', () => {
+    expect(
+      resolveUnmentionedAccount([A_REAIS, B_REAIS, JOINT_REAIS], A_BANK, {
+        currency: 'BRL',
+        senderId: 'a',
+      }),
+    ).toEqual({ status: 'RESOLVED', account: A_REAIS });
+    expect(
+      resolveUnmentionedAccount([B_REAIS, JOINT_REAIS], A_BANK, { currency: 'BRL', senderId: 'a' }),
+    ).toEqual({ status: 'RESOLVED', account: JOINT_REAIS });
+  });
+
+  it('keeps the default account when it is already in the stated currency', () => {
+    expect(
+      resolveUnmentionedAccount([...ACCOUNTS, A_REAIS], A_BANK, { currency: 'EUR', senderId: 'a' }),
+    ).toEqual({ status: 'RESOLVED', account: A_BANK });
+  });
+
+  it('falls back to the default account when no account holds the stated currency', () => {
+    expect(resolveUnmentionedAccount(ACCOUNTS, A_BANK, { currency: 'GBP', senderId: 'a' })).toEqual(
+      { status: 'RESOLVED', account: A_BANK },
+    );
+  });
+
   it('uses the default account of the sender', () => {
     expect(resolveUnmentionedAccount(ACCOUNTS, A_BANK)).toEqual({
       status: 'RESOLVED',

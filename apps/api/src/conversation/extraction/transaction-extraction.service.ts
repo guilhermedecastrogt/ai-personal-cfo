@@ -21,6 +21,7 @@ import {
   type Understood,
 } from './transaction-draft.js';
 import type { AccountOption } from './account-resolution.js';
+import { describeDate, describeKind, describeNeeds } from './clarification-needs.js';
 
 export type ClarificationReason = DraftProblem | TransactionRejectionReason;
 
@@ -142,7 +143,7 @@ function clarification(
     reasons,
     candidate,
     facts: {
-      reasons,
+      needed: describeNeeds(reasons, locale),
       understood: describe(understood, locale),
       ...(needsCategory
         ? {
@@ -161,7 +162,7 @@ function clarification(
 function describe(understood: Understood, locale: Locale): ReplyFacts {
   const { amountMinor, currency } = understood;
   return {
-    type: understood.type,
+    kind: describeKind(understood.type, locale),
     amount:
       amountMinor === undefined || currency === undefined
         ? null
@@ -170,6 +171,6 @@ function describe(understood: Understood, locale: Locale): ReplyFacts {
     category: understood.category?.name ?? null,
     account: understood.account?.name ?? null,
     transferTo: understood.transferAccount?.name ?? null,
-    date: understood.date ?? null,
+    date: describeDate(understood.date, locale),
   };
 }

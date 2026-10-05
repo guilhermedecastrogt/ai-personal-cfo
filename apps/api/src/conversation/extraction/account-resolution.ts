@@ -37,7 +37,22 @@ export function resolveMentionedAccount<Account extends AccountOption>(
 export function resolveUnmentionedAccount<Account extends AccountOption>(
   accounts: readonly Account[],
   defaultAccount: Account | undefined,
+  stated?: { readonly currency: string; readonly senderId: string },
 ): AccountResolution<Account> {
+  if (
+    stated !== undefined &&
+    defaultAccount !== undefined &&
+    defaultAccount.currency !== stated.currency
+  ) {
+    const inCurrency = accounts.filter((account) => account.currency === stated.currency);
+    const inCurrencyResolution =
+      pickOne(inCurrency.filter((account) => account.ownerMemberId === stated.senderId)) ??
+      pickOne(inCurrency.filter((account) => account.ownerMemberId === null)) ??
+      pickOne(inCurrency);
+    if (inCurrencyResolution !== undefined) {
+      return inCurrencyResolution;
+    }
+  }
   if (defaultAccount !== undefined) {
     return { status: 'RESOLVED', account: defaultAccount };
   }

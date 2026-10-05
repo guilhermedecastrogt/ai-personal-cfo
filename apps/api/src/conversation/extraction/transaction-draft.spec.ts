@@ -114,6 +114,14 @@ describe('draftTransaction', () => {
       });
     });
 
+    it('records in the only account that holds the stated currency when none was named', () => {
+      expect(draft({ currency: 'BRL', amount: '1200' }).fields).toMatchObject({
+        currency: 'BRL',
+        accountId: 'reais',
+        amountMinor: 120000,
+      });
+    });
+
     it('asks instead of converting when the stated currency differs from the account', () => {
       expect(draft({ currency: 'GBP' })).toMatchObject({
         problems: ['CURRENCY_MISMATCH'],

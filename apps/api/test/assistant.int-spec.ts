@@ -157,7 +157,7 @@ describe('financial assistant', () => {
       expect(provider.replyRequests[0]).toMatchObject({
         situation: 'TRANSACTION_RECORDED',
         facts: {
-          type: 'EXPENSE',
+          kind: 'expense',
           amount: '€23.00',
           merchant: 'Lidl',
           category: 'Groceries',

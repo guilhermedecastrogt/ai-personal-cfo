@@ -4,6 +4,7 @@ import { AI_UNAVAILABLE_REPLY } from '../src/ai/reply/fallback-reply.js';
 import {
   completionOf,
   CORRECTION_INTERPRETATION,
+  OTHER_INTERPRETATION,
   imageReading,
   questionInterpretation,
   transactionInterpretation,
@@ -942,6 +943,108 @@ describe('conversational assistant', () => {
       expect(reasonsOf(afterCategory)).toEqual(['AMBIGUOUS_ACCOUNT']);
       expect(afterAccount.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
       expect(await recorded(fixture)).toHaveLength(1);
+    });
+
+    async function twoCurrencyHousehold(
+      name: string,
+      ownsReais: boolean,
+    ): Promise<HouseholdFixture> {
+      const fixture = await createHouseholdFixture(testDatabase.database, name, 3);
+      await harness.accounts.setDefaultAccount(
+        fixture.household.id,
+        memberAt(fixture, 0).id,
+        fixture.jointAccount.id,
+      );
+      await harness.accounts.create(fixture.household.id, {
+        name: 'Inter Reais',
+        type: 'BANK',
+        currency: 'BRL',
+        ownerMemberId: memberAt(fixture, ownsReais ? 0 : 1).id,
+      });
+      if (!ownsReais) {
+        await harness.accounts.create(fixture.household.id, {
+          name: 'Nubank',
+          type: 'BANK',
+          currency: 'BRL',
+          ownerMemberId: memberAt(fixture, 2).id,
+        });
+      }
+      return fixture;
+    }
+
+    const SALARY_IN_REAIS = {
+      type: 'INCOME' as const,
+      amount: '1200',
+      currency: 'BRL',
+      merchant: 'sliftio',
+      category: 'Salary',
+    };
+
+    it('records in the only account of the sender that holds the stated currency', async () => {
+      const fixture = await twoCurrencyHousehold('Reais Owner', true);
+
+      const response = await say(
+        fixture,
+        'Acabei de receber meu salário na sliftio, 1200 reais',
+        transactionInterpretation(SALARY_IN_REAIS),
+      );
+
+      expect(response.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({ type: 'INCOME', currency: 'BRL', amountMinor: 120000 }),
+      ]);
+    });
+
+    it('takes a bare account name as the answer to a pending question, even when the model misses it', async () => {
+      const fixture = await twoCurrencyHousehold('Reais Elsewhere', false);
+      const asked = await say(
+        fixture,
+        'Acabei de receber meu salário na sliftio, 1200 reais',
+        transactionInterpretation(SALARY_IN_REAIS),
+      );
+      const facts = lastFacts();
+
+      const unrelated = await say(fixture, 'hmm', OTHER_INTERPRETATION);
+      const answered = await say(fixture, 'inter', OTHER_INTERPRETATION);
+
+      expect(reasonsOf(asked)).toEqual(['CURRENCY_MISMATCH']);
+      expect(facts).toMatchObject({
+        needed: ['which account to record it in, because the usual account is in another currency'],
+        understood: { kind: 'income', amount: 'R$1,200.00', date: '2026-10-20' },
+        accountOptions: expect.arrayContaining(['Inter Reais (BRL)', 'Nubank (BRL)']) as unknown,
+      });
+      expect(JSON.stringify(facts)).not.toMatch(/CURRENCY_MISMATCH|INCOME/);
+      expect(unrelated.outcome).toEqual({ kind: 'OTHER' });
+      expect(answered.outcome).toMatchObject({
+        kind: 'TRANSACTION',
+        extraction: { status: 'RECORDED' },
+      });
+      expect(harness.provider.replyRequests.at(-1)?.situation).toBe('TRANSACTION_RECORDED');
+      const [salary] = await recorded(fixture);
+      const inter = (await harness.accounts.list(fixture.household.id)).find(
+        (account) => account.name === 'Inter Reais',
+      );
+      expect(salary).toMatchObject({
+        type: 'INCOME',
+        currency: 'BRL',
+        amountMinor: 120000,
+        accountId: inter?.id,
+        memberId: memberAt(fixture, 0).id,
+      });
+    });
+
+    it('does not record when a short reply names no account that fits', async () => {
+      const fixture = await twoCurrencyHousehold('Reais Unanswered', false);
+      await say(
+        fixture,
+        'Acabei de receber meu salário na sliftio, 1200 reais',
+        transactionInterpretation(SALARY_IN_REAIS),
+      );
+
+      const response = await say(fixture, 'obrigado', OTHER_INTERPRETATION);
+
+      expect(response.outcome).toEqual({ kind: 'OTHER' });
+      expect(await recorded(fixture)).toEqual([]);
     });
 
     it('does not complete anything when nothing is pending', async () => {

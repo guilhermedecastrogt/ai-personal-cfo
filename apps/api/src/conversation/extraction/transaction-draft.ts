@@ -84,7 +84,13 @@ export function draftTransaction(
   }
   const accountResolution =
     candidate.account === null
-      ? resolveUnmentionedAccount(context.accounts, context.defaultAccount)
+      ? resolveUnmentionedAccount(
+          context.accounts,
+          context.defaultAccount,
+          hasValidStatedCurrency
+            ? { currency: statedCurrency, senderId: context.senderId }
+            : undefined,
+        )
       : resolveMentionedAccount(candidate.account, context.accounts, context.senderId);
   report(accountProblem(accountResolution, 'UNKNOWN_ACCOUNT', 'AMBIGUOUS_ACCOUNT'));
   const account = resolved(accountResolution);

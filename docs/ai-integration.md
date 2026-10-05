@@ -182,7 +182,7 @@ When something required is missing or unclear, the outcome is `NEEDS_CLARIFICATI
 The model never chooses an account. It reports the name the member wrote, if any, and the application resolves it ([ADR-017](adr/ADR-017-account-resolution.md)).
 
 1. If the member named an account: the account with that exact name, otherwise the one account whose name contains it. If several match, the one owned by the sender. If that still leaves more than one, ask.
-2. If no account was named: the sender's default account.
+2. If no account was named: the sender's default account. When a currency was stated and the default account is in another one, the one account in that currency instead, preferring the sender's own, then a joint one; if there is no single such account, the default account stays and the member is asked.
 3. If the sender has no default: the household's only account, when it has exactly one.
 4. Otherwise ask, listing the accounts.
 
