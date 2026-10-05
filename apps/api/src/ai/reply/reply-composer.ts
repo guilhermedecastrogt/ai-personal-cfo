@@ -5,6 +5,7 @@ import {
   type AIProvider,
   type ReplyRequest,
 } from '../ai-provider.js';
+import { normalizeAssistantVoice } from '../voice.js';
 import { renderFallbackReply } from './fallback-reply.js';
 import { findUnverifiedFigures } from './reply-guard.js';
 
@@ -16,7 +17,7 @@ export class ReplyComposer {
 
   async compose(request: ReplyRequest): Promise<string> {
     try {
-      const reply = (await this.provider.composeReply(request)).trim();
+      const reply = normalizeAssistantVoice(await this.provider.composeReply(request)).trim();
       if (reply === '') {
         return this.fallback(request, 'empty reply');
       }

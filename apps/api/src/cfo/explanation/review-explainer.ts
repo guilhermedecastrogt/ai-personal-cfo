@@ -10,6 +10,7 @@ import {
   reviewNarrativeWireSchema,
   type ReviewNarrative,
 } from '../../ai/review/review-narrative.schema.js';
+import { normalizeAssistantVoice } from '../../ai/voice.js';
 import { renderDeterministicNarrative } from './deterministic-narrative.js';
 
 export type NarrativeSource = 'AI' | 'DETERMINISTIC';
@@ -80,9 +81,9 @@ function validate(output: unknown, request: ReviewExplanationRequest): ReviewNar
 
 function tidy(narrative: ReviewNarrative): ReviewNarrative {
   const clean = (points: readonly string[]): string[] =>
-    points.map((point) => point.trim()).filter((point) => point !== '');
+    points.map((point) => normalizeAssistantVoice(point).trim()).filter((point) => point !== '');
   return {
-    summary: narrative.summary.trim(),
+    summary: normalizeAssistantVoice(narrative.summary).trim(),
     strengths: clean(narrative.strengths),
     concerns: clean(narrative.concerns),
     recommendations: clean(narrative.recommendations),

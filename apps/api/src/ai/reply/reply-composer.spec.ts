@@ -10,6 +10,14 @@ const REQUEST = {
 } as const;
 
 describe('ReplyComposer', () => {
+  it('removes long dashes from the model reply', async () => {
+    const provider = new FakeAIProvider().willReply('Registado — €625.00 na categoria Groceries.');
+
+    expect(await new ReplyComposer(provider).compose(REQUEST)).toBe(
+      'Registado, €625.00 na categoria Groceries.',
+    );
+  });
+
   beforeAll(() => {
     Logger.overrideLogger(false);
   });

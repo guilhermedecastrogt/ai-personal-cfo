@@ -38,6 +38,16 @@ describe('NotificationComposer', () => {
     expect(message).toBe('The Restaurants budget is over: €240.00 of €200.00 spent.');
   });
 
+  it('removes long dashes from model wording', async () => {
+    const provider = new FakeAIProvider().willReply(
+      'Restaurants budget exceeded — €240.00 of €200.00 spent.',
+    );
+
+    const message = await composerWith(provider, true).compose(CONTENT, 'Member A');
+
+    expect(message).toBe('Restaurants budget exceeded, €240.00 of €200.00 spent.');
+  });
+
   it('gives the model only the notification facts', async () => {
     const provider = new FakeAIProvider().willReply('Restaurants budget exceeded.');
 

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AI_PROVIDER, AIProviderError, type AIProvider } from '../ai/ai-provider.js';
 import { findUnverifiedFigures } from '../ai/reply/reply-guard.js';
+import { normalizeAssistantVoice } from '../ai/voice.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PROACTIVE_POLICY } from './proactive-policy.js';
 
@@ -38,13 +39,13 @@ export class NotificationComposer {
       detail: content.body,
     };
     try {
-      const written = (
+      const written = normalizeAssistantVoice(
         await this.provider.composeReply({
           situation: 'PROACTIVE_NOTIFICATION',
           userMessage: '',
           senderName: recipientName,
           facts,
-        })
+        }),
       ).trim();
       const isUsable =
         written !== '' &&
