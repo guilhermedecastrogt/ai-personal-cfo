@@ -6,6 +6,9 @@ const REQUIRED = {
   DATABASE_URL,
   OPENAI_API_KEY: 'test-key',
   OPENAI_MODEL: 'test-model',
+  KAPSO_API_KEY: 'kapso-key',
+  KAPSO_WEBHOOK_SECRET: 'kapso-secret',
+  KAPSO_PHONE_NUMBER_ID: '123456789012345',
 };
 
 function captureError(action: () => unknown): unknown {
@@ -31,6 +34,10 @@ describe('loadAppConfig', () => {
       openaiApiKey: 'test-key',
       openaiModel: 'test-model',
       aiConfidenceThreshold: 0.8,
+      kapsoApiKey: 'kapso-key',
+      kapsoWebhookSecret: 'kapso-secret',
+      kapsoPhoneNumberId: '123456789012345',
+      kapsoApiBaseUrl: 'https://api.kapso.ai/meta/whatsapp/v24.0',
     });
   });
 
@@ -63,6 +70,9 @@ describe('loadAppConfig', () => {
     expect(error).toBeInstanceOf(InvalidEnvironmentError);
     expect((error as InvalidEnvironmentError).variables).toEqual([
       'DATABASE_URL',
+      'KAPSO_API_KEY',
+      'KAPSO_PHONE_NUMBER_ID',
+      'KAPSO_WEBHOOK_SECRET',
       'OPENAI_API_KEY',
       'OPENAI_MODEL',
     ]);
@@ -85,6 +95,16 @@ describe('loadAppConfig', () => {
     ]);
   });
 
+  it('rejects a Kapso phone number id that is not numeric and a base url that is not https', () => {
+    expect(
+      invalidVariables({
+        ...REQUIRED,
+        KAPSO_PHONE_NUMBER_ID: '+1 555 0100',
+        KAPSO_API_BASE_URL: 'http://api.kapso.ai',
+      }),
+    ).toEqual(['KAPSO_API_BASE_URL', 'KAPSO_PHONE_NUMBER_ID']);
+  });
+
   it.each(['-0.1', '1.1', 'high'])('rejects a confidence threshold of %s', (threshold) => {
     expect(invalidVariables({ ...REQUIRED, AI_CONFIDENCE_THRESHOLD: threshold })).toEqual([
       'AI_CONFIDENCE_THRESHOLD',
@@ -104,6 +124,8 @@ describe('loadAppConfig', () => {
         DATABASE_URL: 'mysql://cfo:database-secret@localhost:3306/cfo',
         OPENAI_API_KEY: 'sk-secret-key',
         OPENAI_MODEL: '',
+        KAPSO_API_KEY: '',
+        KAPSO_WEBHOOK_SECRET: '',
       }),
     );
 

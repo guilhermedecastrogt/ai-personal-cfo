@@ -9,6 +9,10 @@ export interface AppConfig {
   readonly openaiApiKey: string;
   readonly openaiModel: string;
   readonly aiConfidenceThreshold: number;
+  readonly kapsoApiKey: string;
+  readonly kapsoWebhookSecret: string;
+  readonly kapsoPhoneNumberId: string;
+  readonly kapsoApiBaseUrl: string;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -41,6 +45,10 @@ export function loadAppConfig(variables: Variables): AppConfig {
     openaiApiKey: environment.OPENAI_API_KEY,
     openaiModel: environment.OPENAI_MODEL,
     aiConfidenceThreshold: environment.AI_CONFIDENCE_THRESHOLD,
+    kapsoApiKey: environment.KAPSO_API_KEY,
+    kapsoWebhookSecret: environment.KAPSO_WEBHOOK_SECRET,
+    kapsoPhoneNumberId: environment.KAPSO_PHONE_NUMBER_ID,
+    kapsoApiBaseUrl: environment.KAPSO_API_BASE_URL,
   };
 }
 

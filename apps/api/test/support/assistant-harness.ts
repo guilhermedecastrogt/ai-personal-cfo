@@ -33,6 +33,10 @@ export const TEST_CONFIG: AppConfig = {
   openaiApiKey: 'unused',
   openaiModel: 'unused',
   aiConfidenceThreshold: 0.8,
+  kapsoApiKey: 'unused',
+  kapsoWebhookSecret: 'unused',
+  kapsoPhoneNumberId: '000000000000000',
+  kapsoApiBaseUrl: 'https://api.kapso.invalid/meta/whatsapp/v24.0',
 };
 
 export interface AssistantHarness {

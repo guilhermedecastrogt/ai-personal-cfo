@@ -37,7 +37,7 @@ apps/api/src
     └── image-transaction.service.ts   orchestration
 ```
 
-`FinancialAssistant.handleImage(context, { media, caption, sourceMessageId }, instant)` is the entry point. Like the text entry point, it is an internal service that the messaging integration will call once the sender has been resolved.
+`FinancialAssistant.handleImage(context, { media, caption, sourceMessageId }, instant)` is the entry point. Like the text entry point, it is called by the messaging integration once the sender has been resolved.
 
 ## Where images come from
 
@@ -55,7 +55,7 @@ interface MediaSource {
 
 A media reference is an opaque identifier issued by the messaging provider. It is not a URL. The image layer contains no code that fetches from the network, so there is no address a caption, an image or a model could supply that would be fetched. Turning a reference into bytes is the job of a `MediaSource` implementation that talks only to its own provider ([ADR-018](adr/ADR-018-temporary-media.md)).
 
-No real implementation exists yet. The application is wired with a source that reports every download as failed. The WhatsApp integration provides the real one.
+The implementation for WhatsApp is `KapsoMediaSource`, described in [whatsapp-integration.md](whatsapp-integration.md).
 
 ## Temporary storage lifecycle
 

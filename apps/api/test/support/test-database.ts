@@ -7,6 +7,7 @@ import type { Database } from '../../src/database/database.js';
 import { applyMigrations } from '../../src/database/migrations.js';
 
 export interface TestDatabase {
+  readonly url: string;
   readonly database: Database;
   readonly pool: Pool;
   destroy(): Promise<void>;
@@ -21,6 +22,7 @@ export async function createEmptyTestDatabase(): Promise<TestDatabase> {
   databaseUrl.pathname = `/${name}`;
   const pool = new Pool({ connectionString: databaseUrl.toString() });
   return {
+    url: databaseUrl.toString(),
     database: drizzle(pool),
     pool,
     async destroy(): Promise<void> {

@@ -40,7 +40,7 @@ apps/api/src
     └── financial-assistant.service.ts   the entry point
 ```
 
-`FinancialAssistant.handle(context, message, instant)` is the single entry point. It is an internal service. No HTTP endpoint exposes it yet, and the WhatsApp integration will call it once the sender has been resolved.
+`FinancialAssistant.handle(context, message, instant)` is the single entry point. It is an internal service with no HTTP endpoint of its own. The WhatsApp webhook calls it once the sender has been resolved ([whatsapp-integration.md](whatsapp-integration.md)).
 
 ## AIProvider
 

@@ -22,3 +22,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [016](ADR-016-task-level-ai-capabilities.md)         | AIProvider exposes task-level capabilities, and questions become intents            | Accepted |
 | [017](ADR-017-account-resolution.md)                 | Accounts are resolved by rule, with a default account per member                    | Accepted |
 | [018](ADR-018-temporary-media.md)                    | Media is fetched through an opaque reference and held only in a temporary directory | Accepted |
+| [019](ADR-019-webhook-processing.md)                 | Webhooks are claimed by message, acknowledged, then processed in the background     | Accepted |

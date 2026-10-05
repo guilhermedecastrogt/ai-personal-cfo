@@ -84,7 +84,7 @@ The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the
 - [x] Finance engine
 - [x] AI transaction extraction from text and financial questions
 - [x] AI transaction extraction from images
-- [ ] WhatsApp integration with webhook idempotency
+- [x] WhatsApp integration with webhook idempotency
 - [ ] Insight engine and AI advisor
 - [ ] Dashboard
 - [ ] Monthly reports

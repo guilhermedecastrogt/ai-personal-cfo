@@ -59,17 +59,21 @@ A change is ready to commit when formatting, lint, type checking, tests and the 
 
 The backend reads its configuration from the environment once, at startup, and validates it. If a variable is missing or invalid the process exits and names the offending variables without printing their values.
 
-| Variable                  | Required | Default       | Purpose                                                               |
-| ------------------------- | -------- | ------------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`            | Yes      |               | PostgreSQL connection string, `postgres://` or `postgresql://`        |
-| `PORT`                    | No       | `3000`        | Port the API listens on                                               |
-| `NODE_ENV`                | No       | `development` | `development`, `test` or `production`                                 |
-| `LOG_LEVEL`               | No       | `log`         | `error`, `warn`, `log` or `debug`                                     |
-| `OPENAI_API_KEY`          | Yes      |               | Credential for the OpenAI API                                         |
-| `OPENAI_MODEL`            | Yes      |               | Model used for interpretation and replies                             |
-| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`         | Below this, an extracted transaction is confirmed instead of recorded |
+| Variable                  | Required | Default              | Purpose                                                               |
+| ------------------------- | -------- | -------------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`            | Yes      |                      | PostgreSQL connection string, `postgres://` or `postgresql://`        |
+| `PORT`                    | No       | `3000`               | Port the API listens on                                               |
+| `NODE_ENV`                | No       | `development`        | `development`, `test` or `production`                                 |
+| `LOG_LEVEL`               | No       | `log`                | `error`, `warn`, `log` or `debug`                                     |
+| `OPENAI_API_KEY`          | Yes      |                      | Credential for the OpenAI API                                         |
+| `OPENAI_MODEL`            | Yes      |                      | Model used for interpretation and replies                             |
+| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`                | Below this, an extracted transaction is confirmed instead of recorded |
+| `KAPSO_API_KEY`           | Yes      |                      | Kapso project API key                                                 |
+| `KAPSO_WEBHOOK_SECRET`    | Yes      |                      | Secret for verifying webhook signatures                               |
+| `KAPSO_PHONE_NUMBER_ID`   | Yes      |                      | WhatsApp phone number identifier of the assistant                     |
+| `KAPSO_API_BASE_URL`      | No       | Kapso's WhatsApp API | Base URL of the provider API                                          |
 
-The example file has a placeholder API key. The application starts with it, and calls to the model fail gracefully until a real key is set. Database commands and tests need only `DATABASE_URL`.
+The example file has placeholder credentials. The application starts with them, and calls to the model and to WhatsApp fail gracefully until real ones are set. Database commands and tests need only `DATABASE_URL`.
 
 Application code never reads `process.env`. It receives a typed configuration object by injection, which keeps configuration in one place and makes it replaceable in tests.
 
