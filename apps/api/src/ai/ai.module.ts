@@ -18,6 +18,6 @@ import { ImageTransactionReader } from './vision/image-transaction-reader.js';
     ImageTransactionReader,
     ReplyComposer,
   ],
-  exports: [MessageInterpreter, ImageTransactionReader, ReplyComposer],
+  exports: [AI_PROVIDER, MessageInterpreter, ImageTransactionReader, ReplyComposer],
 })
 export class AiModule {}

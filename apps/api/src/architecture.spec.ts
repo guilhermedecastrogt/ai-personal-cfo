@@ -80,6 +80,53 @@ describe('architecture', () => {
     ).toEqual([]);
   });
 
+  it('gives the AI layer no access to repositories, services or the finance engine', () => {
+    const reachesData = /\.repository\.js|\.service\.js|\/finance\/|\/cfo\/|\/conversation\//;
+
+    expect(
+      offenders(within('ai/'), (file) => importsOf(file).some((name) => reachesData.test(name))),
+    ).toEqual([]);
+  });
+
+  it('builds the review from the finance engine, with no persistence or AI in the analysis', () => {
+    const forbidden = /drizzle-orm|^pg$|\/database\/|\.repository\.js|\/ai\/|^openai/;
+
+    expect(
+      offenders(within('cfo/analysis/', 'cfo/context/'), (file) =>
+        importsOf(file)
+          .filter((name) => !name.endsWith('/ai/ai-provider.js'))
+          .some((name) => forbidden.test(name)),
+      ),
+    ).toEqual([]);
+  });
+
+  it('reads financial data for the review only through the finance service', () => {
+    const readsLedger =
+      /ledger\.repository|transactions\.repository|transactions\.schema|budgets\.repository/;
+
+    expect(
+      offenders(within('cfo/'), (file) => importsOf(file).some((name) => readsLedger.test(name))),
+    ).toEqual([]);
+  });
+
+  it('performs no money arithmetic in the review context or explanation', () => {
+    const arithmetic =
+      /money-math|sumMinor|multiplyThenDivide|divideRounded|Minor\s*[-+*/]|[-+*/]\s*\w+Minor/;
+
+    expect(
+      offenders(within('cfo/context/', 'cfo/explanation/', 'ai/'), (file) =>
+        arithmetic.test(file.text),
+      ),
+    ).toEqual([]);
+  });
+
+  it('scopes every review to the household of the request context', () => {
+    const service = files.find((file) => file.path === 'cfo/cfo.service.ts');
+
+    expect(service?.text).toContain('const { householdId } = context;');
+    expect(service?.text).not.toMatch(/householdId:\s*(request|month|review)\./);
+  });
+
   it('gives the AI and media layers no access to the database', () => {
     expect(
       offenders(within('ai/', 'media/'), (file) =>

@@ -32,6 +32,12 @@ export interface FinancePolicy {
     readonly sharpSpendingIncreaseBasisPoints: number;
     readonly minimumSpendingIncreaseMinor: number;
   };
+  readonly review: {
+    readonly healthySavingsRateBasisPoints: number;
+    readonly lowSavingsRateBasisPoints: number;
+    readonly topCategories: number;
+    readonly categoryChanges: number;
+  };
 }
 
 export const DEFAULT_FINANCE_POLICY: FinancePolicy = {
@@ -64,5 +70,11 @@ export const DEFAULT_FINANCE_POLICY: FinancePolicy = {
     spendingIncreaseBasisPoints: 2_500,
     sharpSpendingIncreaseBasisPoints: 5_000,
     minimumSpendingIncreaseMinor: 2_000,
+  },
+  review: {
+    healthySavingsRateBasisPoints: 2_000,
+    lowSavingsRateBasisPoints: 500,
+    topCategories: 5,
+    categoryChanges: 3,
   },
 };

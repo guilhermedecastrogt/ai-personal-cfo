@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AccountsModule } from '../accounts/accounts.module.js';
 import { AiModule } from '../ai/ai.module.js';
 import { CategoriesModule } from '../categories/categories.module.js';
+import { CfoModule } from '../cfo/cfo.module.js';
 import { FinanceModule } from '../finance/finance.module.js';
 import { GoalsModule } from '../goals/goals.module.js';
 import { HouseholdsModule } from '../households/households.module.js';
@@ -16,6 +17,7 @@ import { FinancialQueryService } from './queries/financial-query.service.js';
 @Module({
   imports: [
     AiModule,
+    CfoModule,
     FinanceModule,
     TransactionsModule,
     AccountsModule,

@@ -223,6 +223,8 @@ An insight holds a type, a severity, a key and the result that triggered it. It 
 
 Every threshold named in this document is a field of `FinancePolicy` in `domain/finance-policy.ts`, with the defaults stated here. Calculations receive the policy as an argument. No threshold is written into a calculation.
 
+The policy also holds the thresholds of the monthly review: the savings rate regarded as healthy (20%) and as low (5%), and how many categories a review lists ([cfo-intelligence.md](cfo-intelligence.md)).
+
 There is no generic rule engine and no `financial_rules` table. Rules are typed functions. A threshold that needs to vary per household would become a column or a policy override at that point.
 
 ## Deterministic, and what is left to AI

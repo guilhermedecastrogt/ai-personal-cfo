@@ -45,9 +45,16 @@ export interface ReplyRequest {
   readonly facts: ReplyFacts;
 }
 
+export interface ReviewExplanationRequest {
+  readonly userMessage: string | null;
+  readonly senderName: string;
+  readonly reviews: readonly ReplyFacts[];
+}
+
 export interface AIProvider {
   interpretMessage(request: InterpretationRequest): Promise<unknown>;
   extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown>;
+  explainMonthlyReview(request: ReviewExplanationRequest): Promise<unknown>;
   composeReply(request: ReplyRequest): Promise<string>;
 }
 

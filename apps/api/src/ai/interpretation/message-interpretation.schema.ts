@@ -26,6 +26,7 @@ export const FINANCIAL_INTENTS = [
   'ACCOUNT_BALANCE',
   'FORECAST',
   'INSIGHTS',
+  'MONTHLY_REVIEW',
 ] as const;
 
 export const dateReferenceSchema = z.object({

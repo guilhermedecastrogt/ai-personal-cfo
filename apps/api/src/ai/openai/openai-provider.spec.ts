@@ -278,6 +278,45 @@ describe('OpenAIProvider', () => {
     });
   });
 
+  describe('explainMonthlyReview', () => {
+    const narrative = {
+      summary: 'Income was €4,500.00.',
+      strengths: [],
+      concerns: [],
+      recommendations: [],
+      priorities: [],
+    };
+    const request = {
+      userMessage: 'Como estamos este mês?',
+      senderName: 'Member A',
+      reviews: [{ currency: 'EUR', totals: { income: '€4,500.00' } }],
+    };
+
+    it('sends the review context with a strict schema and without storing it', async () => {
+      responses.push(completed(JSON.stringify(narrative)));
+
+      const explained = await provider().explainMonthlyReview(request);
+      const body = requests[0]?.body;
+
+      expect(explained).toEqual(narrative);
+      expect(body).toMatchObject({
+        model: 'configured-model',
+        store: false,
+        text: { format: { type: 'json_schema', name: 'monthly_review_narrative', strict: true } },
+      });
+      expect(body?.input).toEqual(expect.stringContaining('"income": "€4,500.00"'));
+      expect(body?.instructions).toEqual(expect.stringContaining('You never calculate'));
+    });
+
+    it('reports a failure by category', async () => {
+      responses.push(failed(429));
+
+      expect(await failureOf(provider().explainMonthlyReview(request))).toMatchObject({
+        category: 'RATE_LIMITED',
+      });
+    });
+  });
+
   describe('composeReply', () => {
     it('sends the facts and returns the text', async () => {
       responses.push(completed('Registrado: €23.00 no Lidl.'));

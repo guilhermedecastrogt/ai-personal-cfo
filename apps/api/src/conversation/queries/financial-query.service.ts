@@ -13,7 +13,15 @@ import { HouseholdsRepository } from '../../households/households.repository.js'
 import type { RequestContext } from '../../households/request-context.js';
 import { normalizeName, resolveMentionedAccount } from '../extraction/account-resolution.js';
 import { resolvePeriodReference } from './period-reference.js';
-import { describeResult, type NameDirectory } from './result-description.js';
+import { describeResult, type NameDirectory } from '../../cfo/context/result-description.js';
+
+export type QueryIntent = Exclude<FinancialIntent, 'MONTHLY_REVIEW'>;
+
+export type QueryQuestion = FinancialQuestion & { readonly intent: QueryIntent };
+
+export function isQueryQuestion(question: FinancialQuestion): question is QueryQuestion {
+  return question.intent !== 'MONTHLY_REVIEW';
+}
 
 export type QueryProblem =
   | 'UNRESOLVABLE_PERIOD'
@@ -25,7 +33,7 @@ export type QueryProblem =
 export type QueryOutcome =
   | {
       readonly status: 'ANSWERED';
-      readonly intent: FinancialIntent;
+      readonly intent: QueryIntent;
       readonly result: unknown;
       readonly facts: ReplyFacts;
     }
@@ -59,7 +67,7 @@ export class FinancialQueryService {
 
   async answer(
     context: RequestContext,
-    question: FinancialQuestion,
+    question: QueryQuestion,
     today: IsoDate,
   ): Promise<QueryOutcome> {
     const { householdId } = context;
@@ -139,7 +147,7 @@ export class FinancialQueryService {
 
   private async compute(
     householdId: string,
-    intent: FinancialIntent,
+    intent: QueryIntent,
     today: IsoDate,
     filters: Filters,
   ): Promise<unknown> {
@@ -177,7 +185,7 @@ export class FinancialQueryService {
   }
 }
 
-function focusFlow(flow: PeriodFlow, intent: FinancialIntent, filters: Filters): unknown {
+function focusFlow(flow: PeriodFlow, intent: QueryIntent, filters: Filters): unknown {
   const summary = {
     period: flow.period,
     currency: flow.currency,

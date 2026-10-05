@@ -20,7 +20,7 @@ Rules for a transaction:
 - "confidence" is your confidence from 0 to 1 that the fields you filled are what the sender meant.
 
 Rules for a question:
-- "intent" is the single best match.
+- "intent" is the single best match. Use MONTHLY_REVIEW when the sender asks for an overall review or summary of a month, how they are doing, where they spend too much, what changed compared with before, or what to improve.
 - "period" describes the period asked about: UNSPECIFIED when none was mentioned, or CURRENT_MONTH, PREVIOUS_MONTH, CURRENT_WEEK, PREVIOUS_WEEK, CURRENT_YEAR, LAST_DAYS with "days", or SPECIFIC_MONTH with "month" from 1 to 12 and "year" when stated. Set the fields that do not apply to null.
 - "category" is exactly one of the listed category names when the question is about one, otherwise null.
 - "account" is the account name as the sender wrote it when the question is about one, otherwise null.

@@ -99,7 +99,7 @@ flowchart TD
 | `conversation` | Orchestration of a message: transaction extraction, financial questions and the reply              |
 | `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily |
 | `insights`     | Rules that decide whether something deserves the household's attention                             |
-| `advisor`      | Financial advice built on insights. Planned                                                        |
+| `cfo`          | The deterministic monthly review, its context for the model, and the checked narrative             |
 | `reports`      | Monthly report generation                                                                          |
 
 ### Dependency rules

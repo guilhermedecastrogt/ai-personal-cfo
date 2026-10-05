@@ -15,6 +15,7 @@ import {
   type ImageExtractionRequest,
   type InterpretationRequest,
   type ReplyRequest,
+  type ReviewExplanationRequest,
 } from '../ai-provider.js';
 import { buildInterpretationInstructions } from '../interpretation/interpretation-instructions.js';
 import {
@@ -22,6 +23,14 @@ import {
   messageInterpretationJsonSchema,
 } from '../interpretation/message-interpretation.schema.js';
 import { buildReplyInput, buildReplyInstructions } from '../reply/reply-instructions.js';
+import {
+  buildReviewExplanationInput,
+  buildReviewExplanationInstructions,
+} from '../review/review-explanation-instructions.js';
+import {
+  REVIEW_NARRATIVE_SCHEMA_NAME,
+  reviewNarrativeJsonSchema,
+} from '../review/review-narrative.schema.js';
 import {
   buildImageCaptionText,
   buildImageExtractionInstructions,
@@ -42,7 +51,8 @@ export interface OpenAIProviderOptions {
   readonly maximumRetries?: number;
 }
 
-type Operation = 'interpretMessage' | 'extractTransactionFromImage' | 'composeReply';
+type Operation =
+  'interpretMessage' | 'extractTransactionFromImage' | 'explainMonthlyReview' | 'composeReply';
 
 export class OpenAIProvider implements AIProvider {
   private readonly logger = new Logger(OpenAIProvider.name);
@@ -104,6 +114,22 @@ export class OpenAIProvider implements AIProvider {
           name: IMAGE_EXTRACTION_SCHEMA_NAME,
           strict: true,
           schema: imageExtractionJsonSchema(),
+        },
+      },
+    });
+    return parseStructuredOutput(output);
+  }
+
+  async explainMonthlyReview(request: ReviewExplanationRequest): Promise<unknown> {
+    const output = await this.respond('explainMonthlyReview', {
+      instructions: buildReviewExplanationInstructions(),
+      input: buildReviewExplanationInput(request),
+      text: {
+        format: {
+          type: 'json_schema',
+          name: REVIEW_NARRATIVE_SCHEMA_NAME,
+          strict: true,
+          schema: reviewNarrativeJsonSchema(),
         },
       },
     });

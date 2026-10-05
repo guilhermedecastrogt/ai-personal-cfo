@@ -5,6 +5,7 @@ import {
   type ImageExtractionRequest,
   type InterpretationRequest,
   type ReplyRequest,
+  type ReviewExplanationRequest,
 } from '../ai-provider.js';
 import type {
   DateReference,
@@ -85,6 +86,8 @@ export class FakeAIProvider implements AIProvider {
   readonly replyRequests: ReplyRequest[] = [];
   readonly imageRequests: ImageExtractionRequest[] = [];
   private imageReadings: ScriptedInterpretation[] = [];
+  readonly reviewRequests: ReviewExplanationRequest[] = [];
+  private reviewExplanation: ScriptedInterpretation = { failure: 'UNAVAILABLE' };
   private interpretations: ScriptedInterpretation[] = [];
   private replyScript: ReplyScript = (request) => `[${request.situation}]`;
 
@@ -105,6 +108,16 @@ export class FakeAIProvider implements AIProvider {
 
   willFailToReadImage(failure: AIFailureCategory): this {
     this.imageReadings = [{ failure }];
+    return this;
+  }
+
+  willExplainReviewAs(output: unknown): this {
+    this.reviewExplanation = { output };
+    return this;
+  }
+
+  willFailToExplainReview(failure: AIFailureCategory): this {
+    this.reviewExplanation = { failure };
     return this;
   }
 
@@ -140,6 +153,14 @@ export class FakeAIProvider implements AIProvider {
     return 'failure' in next
       ? Promise.reject(new AIProviderError(next.failure))
       : Promise.resolve(next.output);
+  }
+
+  explainMonthlyReview(request: ReviewExplanationRequest): Promise<unknown> {
+    this.reviewRequests.push(request);
+    const scripted = this.reviewExplanation;
+    return 'failure' in scripted
+      ? Promise.reject(new AIProviderError(scripted.failure))
+      : Promise.resolve(scripted.output);
   }
 
   async composeReply(request: ReplyRequest): Promise<string> {

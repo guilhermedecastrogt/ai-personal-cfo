@@ -7,13 +7,18 @@ import {
   type ReplyFacts,
   type ReplySituation,
 } from '../ai/ai-provider.js';
-import type { MessageInterpretation } from '../ai/interpretation/message-interpretation.schema.js';
+import type {
+  MessageInterpretation,
+  PeriodReference,
+} from '../ai/interpretation/message-interpretation.schema.js';
 import { MessageInterpreter } from '../ai/interpretation/message-interpreter.js';
 import { AI_UNAVAILABLE_REPLY } from '../ai/reply/fallback-reply.js';
 import { ReplyComposer } from '../ai/reply/reply-composer.js';
 import { CategoriesRepository } from '../categories/categories.repository.js';
+import { CfoService, type MonthlyReviewResult } from '../cfo/cfo.service.js';
+import { formatNarrative } from '../cfo/explanation/narrative-format.js';
 import { FinanceService } from '../finance/application/finance.service.js';
-import type { IsoDate } from '../finance/domain/period/period.js';
+import { monthContaining, type IsoDate } from '../finance/domain/period/period.js';
 import { HouseholdsRepository } from '../households/households.repository.js';
 import type { RequestContext } from '../households/request-context.js';
 import { ConversationsRepository } from './conversations.repository.js';
@@ -27,7 +32,12 @@ import {
   type ImageOutcome,
 } from './image/image-transaction.service.js';
 import { toCategoryOptions } from './category-options.js';
-import { FinancialQueryService, type QueryOutcome } from './queries/financial-query.service.js';
+import {
+  FinancialQueryService,
+  isQueryQuestion,
+  type QueryOutcome,
+} from './queries/financial-query.service.js';
+import { resolvePeriodReference } from './queries/period-reference.js';
 
 const HISTORY_TURNS = 6;
 const IMAGE_PLACEHOLDER = '[image]';
@@ -41,6 +51,7 @@ export type AssistantOutcome =
   | { readonly kind: 'TRANSACTION'; readonly extraction: ExtractionOutcome }
   | { readonly kind: 'QUESTION'; readonly query: QueryOutcome }
   | { readonly kind: 'IMAGE'; readonly image: ImageOutcome }
+  | { readonly kind: 'REVIEW'; readonly review: MonthlyReviewResult }
   | { readonly kind: 'OTHER' }
   | { readonly kind: 'AI_UNAVAILABLE'; readonly category: AIFailureCategory };
 
@@ -64,6 +75,7 @@ export class FinancialAssistant {
     private readonly extraction: TransactionExtractionService,
     private readonly queries: FinancialQueryService,
     private readonly images: ImageTransactionService,
+    private readonly cfo: CfoService,
     private readonly finance: FinanceService,
     private readonly conversations: ConversationsRepository,
     private readonly households: HouseholdsRepository,
@@ -163,6 +175,9 @@ export class FinancialAssistant {
       throw error;
     }
     const outcome = await this.act(context, message, today, interpretation);
+    if (outcome.kind === 'REVIEW') {
+      return { reply: formatNarrative(outcome.review.narrative), outcome };
+    }
     const plan = planReply(outcome);
     const reply = await this.replies.compose({
       ...plan,
@@ -177,7 +192,7 @@ export class FinancialAssistant {
     message: IncomingMessage,
     today: IsoDate,
     interpretation: MessageInterpretation,
-  ): Promise<Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' }>> {
+  ): Promise<Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' | 'IMAGE' }>> {
     switch (interpretation.kind) {
       case 'TRANSACTION':
         return {
@@ -193,13 +208,39 @@ export class FinancialAssistant {
           }),
         };
       case 'QUESTION':
-        return {
-          kind: 'QUESTION',
-          query: await this.queries.answer(context, interpretation.question, today),
-        };
+        return isQueryQuestion(interpretation.question)
+          ? {
+              kind: 'QUESTION',
+              query: await this.queries.answer(context, interpretation.question, today),
+            }
+          : this.review(context, message, today, interpretation.question.period);
       case 'OTHER':
         return { kind: 'OTHER' };
     }
+  }
+
+  private async review(
+    context: RequestContext,
+    message: IncomingMessage,
+    today: IsoDate,
+    periodReference: PeriodReference,
+  ): Promise<Extract<AssistantOutcome, { kind: 'REVIEW' | 'QUESTION' }>> {
+    const period = resolvePeriodReference(periodReference, today);
+    if (period === undefined || monthContaining(period.start).start > today) {
+      const reasons = ['UNRESOLVABLE_PERIOD'] as const;
+      return {
+        kind: 'QUESTION',
+        query: { status: 'NEEDS_CLARIFICATION', reasons, facts: { reasons } },
+      };
+    }
+    return {
+      kind: 'REVIEW',
+      review: await this.cfo.monthlyReview(context, {
+        month: monthContaining(period.end < today ? period.end : today),
+        today,
+        userMessage: message.text,
+      }),
+    };
   }
 
   private async buildInterpretationRequest(
@@ -223,7 +264,9 @@ export class FinancialAssistant {
   }
 }
 
-function planReply(outcome: Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' }>): ReplyPlan {
+function planReply(
+  outcome: Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' | 'REVIEW' }>,
+): ReplyPlan {
   switch (outcome.kind) {
     case 'TRANSACTION':
       return {
@@ -268,6 +311,8 @@ function summarize(outcome: AssistantOutcome): string {
       return `question:${outcome.query.status}`;
     case 'IMAGE':
       return `image:${outcome.image.status}`;
+    case 'REVIEW':
+      return `review:${outcome.review.narrativeSource}`;
     case 'OTHER':
       return 'other';
     case 'AI_UNAVAILABLE':

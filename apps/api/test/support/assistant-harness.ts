@@ -8,6 +8,9 @@ import { FakeAIProvider } from '../../src/ai/testing/fake-ai-provider.fixture.js
 import { ImageTransactionReader } from '../../src/ai/vision/image-transaction-reader.js';
 import { BudgetsRepository } from '../../src/budgets/budgets.repository.js';
 import { CategoriesRepository } from '../../src/categories/categories.repository.js';
+import { FinancialSnapshotBuilder } from '../../src/cfo/analysis/financial-snapshot.builder.js';
+import { CfoService } from '../../src/cfo/cfo.service.js';
+import { ReviewExplainer } from '../../src/cfo/explanation/review-explainer.js';
 import type { AppConfig } from '../../src/config/app-config.js';
 import { ConversationsRepository } from '../../src/conversation/conversations.repository.js';
 import { TransactionExtractionService } from '../../src/conversation/extraction/transaction-extraction.service.js';
@@ -41,6 +44,8 @@ export const TEST_CONFIG: AppConfig = {
 
 export interface AssistantHarness {
   readonly assistant: FinancialAssistant;
+  readonly cfo: CfoService;
+  readonly households: HouseholdsRepository;
   readonly provider: FakeAIProvider;
   readonly mediaSource: FakeMediaSource;
   readonly finance: FinanceService;
@@ -85,6 +90,14 @@ export async function createAssistantHarness(
     categories,
     TEST_CONFIG,
   );
+  const cfo = new CfoService(
+    new FinancialSnapshotBuilder(finance),
+    new ReviewExplainer(provider),
+    households,
+    accounts,
+    categories,
+    goals,
+  );
   const assistant = new FinancialAssistant(
     new MessageInterpreter(provider),
     new ReplyComposer(provider),
@@ -98,6 +111,7 @@ export async function createAssistantHarness(
       accounts,
       categories,
     ),
+    cfo,
     finance,
     new ConversationsRepository(database),
     households,
@@ -106,6 +120,8 @@ export async function createAssistantHarness(
   );
   return {
     assistant,
+    cfo,
+    households,
     provider,
     mediaSource,
     finance,

@@ -48,11 +48,12 @@ apps/api/src
 interface AIProvider {
   interpretMessage(request: InterpretationRequest): Promise<unknown>;
   extractTransactionFromImage(request: ImageExtractionRequest): Promise<unknown>;
+  explainMonthlyReview(request: ReviewExplanationRequest): Promise<unknown>;
   composeReply(request: ReplyRequest): Promise<string>;
 }
 ```
 
-The interface has three task-level capabilities and nothing generic ([ADR-016](adr/ADR-016-task-level-ai-capabilities.md)). There is no method that accepts an arbitrary prompt.
+The interface has four task-level capabilities and nothing generic ([ADR-016](adr/ADR-016-task-level-ai-capabilities.md)). There is no method that accepts an arbitrary prompt.
 
 - `interpretMessage` and `extractTransactionFromImage` return `unknown` on purpose. Whatever a provider returns is untrusted until `MessageInterpreter` has parsed it.
 - No request type has a field for a household or member identifier. The provider is given names of members, accounts and categories so that it can recognise them in a message, and nothing else about the household.
@@ -140,9 +141,9 @@ A message that mentions no date is taken to be about the day it was sent. This i
 | `memberScope`         | `HOUSEHOLD`, `SENDER` or `NAMED_MEMBER`                                                          |
 | `memberName`          | The member named, when the scope is `NAMED_MEMBER`                                               |
 
-Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`.
+Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`, `MONTHLY_REVIEW`.
 
-A question without a period is about the current month. Each intent maps to one method of the finance engine ([finance-engine.md](finance-engine.md)).
+A question without a period is about the current month. Each intent maps to one method of the finance engine ([finance-engine.md](finance-engine.md)), except `MONTHLY_REVIEW`, which is handled by the CFO layer ([cfo-intelligence.md](cfo-intelligence.md)).
 
 `memberScope` is a filter over data the sender is already entitled to see. `SENDER` resolves to the member in the request context. `NAMED_MEMBER` is matched by name against the members of the sender's household, and a name that matches none of them leads to a question.
 
