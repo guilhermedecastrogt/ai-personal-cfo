@@ -91,4 +91,42 @@ describe('web architecture', () => {
   it('never names a household or member identifier', () => {
     expect(offenders(files, /householdId|household_id|memberId|member_id/)).toEqual([]);
   });
+
+  it('reads no secret and no server credential in code that can reach the browser', () => {
+    expect(
+      offenders(files, /NEXT_PUBLIC_|OPENAI|KAPSO|DATABASE_URL|WEBHOOK_SECRET|API_KEY/),
+    ).toEqual([]);
+    expect(offenders(files, /process\.env\.(?!NODE_ENV|API_URL)/)).toEqual([]);
+  });
+
+  it('keeps the session token on the server side of the application', () => {
+    const clientFiles = files.filter((file) => file.text.startsWith("'use client'"));
+
+    expect(clientFiles.length).toBeGreaterThan(0);
+    expect(offenders(clientFiles, /SESSION_COOKIE|Authorization|Bearer|cookies\(\)/)).toEqual([]);
+  });
+
+  it('sends every dashboard request through the session-bearing client', () => {
+    expect(
+      offenders(
+        files.filter((file) => file.path.includes('(dashboard)')),
+        /\bfetch\(|apiUrl\(/,
+      ),
+    ).toEqual([]);
+  });
+
+  it('sends security headers on every route', () => {
+    const headers = files.find((file) => file.path === 'lib/security-headers.ts');
+
+    for (const header of [
+      'Content-Security-Policy',
+      'X-Content-Type-Options',
+      'X-Frame-Options',
+      'Referrer-Policy',
+      'Permissions-Policy',
+      'Strict-Transport-Security',
+    ]) {
+      expect(headers?.text).toContain(header);
+    }
+  });
 });

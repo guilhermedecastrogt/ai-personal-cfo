@@ -282,6 +282,8 @@ flowchart TD
 
 ## Security
 
+The controls are described in full, with their limitations, in [security.md](security.md).
+
 | Concern                | Approach                                                                                                                                  |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Transport              | HTTPS terminated at Caddy with automatically managed certificates                                                                         |

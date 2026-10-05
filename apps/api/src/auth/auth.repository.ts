@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, lte } from 'drizzle-orm';
+import { and, desc, eq, gt, lte, notInArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { members } from '../households/households.schema.js';
 import { dashboardSessions, memberAccessCodes } from './auth.schema.js';
@@ -14,11 +14,56 @@ export interface SessionOwner {
 export class AuthRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
 
-  async saveAccessCode(householdId: string, memberId: string, codeHash: string): Promise<void> {
+  async replaceAccessCode(householdId: string, memberId: string, codeHash: string): Promise<void> {
+    await this.database.transaction(async (transaction) => {
+      await transaction
+        .insert(memberAccessCodes)
+        .values({ householdId, memberId, codeHash })
+        .onConflictDoUpdate({ target: memberAccessCodes.memberId, set: { codeHash } });
+      await transaction
+        .delete(dashboardSessions)
+        .where(
+          and(
+            eq(dashboardSessions.householdId, householdId),
+            eq(dashboardSessions.memberId, memberId),
+          ),
+        );
+    });
+  }
+
+  async revokeAccess(householdId: string, memberId: string): Promise<void> {
+    await this.database.transaction(async (transaction) => {
+      await transaction
+        .delete(memberAccessCodes)
+        .where(
+          and(
+            eq(memberAccessCodes.householdId, householdId),
+            eq(memberAccessCodes.memberId, memberId),
+          ),
+        );
+      await transaction
+        .delete(dashboardSessions)
+        .where(
+          and(
+            eq(dashboardSessions.householdId, householdId),
+            eq(dashboardSessions.memberId, memberId),
+          ),
+        );
+    });
+  }
+
+  async keepNewestSessions(memberId: string, maximum: number): Promise<void> {
+    const newest = this.database
+      .select({ id: dashboardSessions.id })
+      .from(dashboardSessions)
+      .where(eq(dashboardSessions.memberId, memberId))
+      .orderBy(desc(dashboardSessions.createdAt), desc(dashboardSessions.id))
+      .limit(maximum);
     await this.database
-      .insert(memberAccessCodes)
-      .values({ householdId, memberId, codeHash })
-      .onConflictDoUpdate({ target: memberAccessCodes.memberId, set: { codeHash } });
+      .delete(dashboardSessions)
+      .where(
+        and(eq(dashboardSessions.memberId, memberId), notInArray(dashboardSessions.id, newest)),
+      );
   }
 
   async findOwnerOfAccessCode(codeHash: string): Promise<SessionOwner | undefined> {

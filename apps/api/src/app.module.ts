@@ -12,6 +12,7 @@ import { GoalsModule } from './goals/goals.module.js';
 import { HealthModule } from './health/health.module.js';
 import { HouseholdsModule } from './households/households.module.js';
 import { ProactiveModule } from './proactive/proactive.module.js';
+import { SecurityModule } from './security/security.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { KapsoModule } from './whatsapp/kapso/kapso.module.js';
 import { WhatsAppModule } from './whatsapp/whatsapp.module.js';
@@ -19,6 +20,7 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module.js';
 @Module({
   imports: [
     ConfigModule,
+    SecurityModule,
     DatabaseModule,
     HealthModule,
     HouseholdsModule,

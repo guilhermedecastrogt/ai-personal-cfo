@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-export const SESSION_COOKIE = 'cfo_session';
+export const SESSION_COOKIE =
+  process.env.NODE_ENV === 'production' ? '__Host-cfo_session' : 'cfo_session';
 
 const HTTP_UNAUTHORIZED = 401;
 const DEFAULT_API_URL = 'http://localhost:3000';

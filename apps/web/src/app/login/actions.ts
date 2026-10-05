@@ -15,7 +15,9 @@ interface IssuedSession {
 
 const SIGN_IN_FAILED = 'That access code was not recognised. Check it and try again.';
 const SERVICE_UNAVAILABLE = 'The service could not be reached. Try again in a moment.';
+const TOO_MANY_ATTEMPTS = 'Too many attempts. Wait a minute and try again.';
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_TOO_MANY_REQUESTS = 429;
 
 export async function signIn(_previous: SignInState, form: FormData): Promise<SignInState> {
   const accessCode = form.get('accessCode');
@@ -28,6 +30,9 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
     body: JSON.stringify({ accessCode: accessCode.trim() }),
     cache: 'no-store',
   }).catch(() => undefined);
+  if (response?.status === HTTP_TOO_MANY_REQUESTS) {
+    return { error: TOO_MANY_ATTEMPTS };
+  }
   if (response === undefined || (!response.ok && response.status !== HTTP_UNAUTHORIZED)) {
     return { error: SERVICE_UNAVAILABLE };
   }
@@ -35,7 +40,9 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
     return { error: SIGN_IN_FAILED };
   }
   const session = (await response.json()) as IssuedSession;
-  (await cookies()).set(SESSION_COOKIE, session.token, {
+  const store = await cookies();
+  await endSession(store.get(SESSION_COOKIE)?.value);
+  store.set(SESSION_COOKIE, session.token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -45,9 +52,7 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
   redirect('/');
 }
 
-export async function signOut(): Promise<void> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+async function endSession(token: string | undefined): Promise<void> {
   if (token !== undefined) {
     await fetch(apiUrl('/auth/sessions/current'), {
       method: 'DELETE',
@@ -55,6 +60,11 @@ export async function signOut(): Promise<void> {
       cache: 'no-store',
     }).catch(() => undefined);
   }
+}
+
+export async function signOut(): Promise<void> {
+  const store = await cookies();
+  await endSession(store.get(SESSION_COOKIE)?.value);
   store.delete(SESSION_COOKIE);
   redirect('/login');
 }

@@ -1,10 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { RequestContext } from '../households/request-context.js';
+import {
+  SECURITY_POLICY,
+  SECURITY_POLICY_TOKEN,
+  type SecurityPolicy,
+} from '../security/security-policy.js';
 import { AuthRepository } from './auth.repository.js';
 
 const SECRET_BYTES = 32;
-const SESSION_LIFETIME_IN_DAYS = 7;
 const MILLISECONDS_PER_DAY = 86_400_000;
 
 export interface IssuedSession {
@@ -23,12 +27,19 @@ function newSecret(): string {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly repository: AuthRepository) {}
+  constructor(
+    private readonly repository: AuthRepository,
+    @Inject(SECURITY_POLICY_TOKEN) private readonly policy: SecurityPolicy = SECURITY_POLICY,
+  ) {}
 
   async issueAccessCode(householdId: string, memberId: string): Promise<string> {
     const code = newSecret();
-    await this.repository.saveAccessCode(householdId, memberId, hashOf(code));
+    await this.repository.replaceAccessCode(householdId, memberId, hashOf(code));
     return code;
+  }
+
+  async revokeAccess(householdId: string, memberId: string): Promise<void> {
+    await this.repository.revokeAccess(householdId, memberId);
   }
 
   async signIn(accessCode: string, instant: Date): Promise<IssuedSession | undefined> {
@@ -37,9 +48,11 @@ export class AuthService {
       return undefined;
     }
     const token = newSecret();
-    const expiresAt = new Date(instant.getTime() + SESSION_LIFETIME_IN_DAYS * MILLISECONDS_PER_DAY);
+    const { lifetimeInDays, maximumPerMember } = this.policy.sessions;
+    const expiresAt = new Date(instant.getTime() + lifetimeInDays * MILLISECONDS_PER_DAY);
     await this.repository.deleteExpiredSessions(instant);
     await this.repository.createSession(owner, hashOf(token), expiresAt);
+    await this.repository.keepNewestSessions(owner.memberId, maximumPerMember);
     return { token, expiresAt, memberName: owner.memberName };
   }
 

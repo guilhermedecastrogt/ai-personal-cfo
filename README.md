@@ -93,7 +93,7 @@ The API listens on port 3000 and the dashboard on port 3001. To sign in to the d
 - [x] Recurring expense and subscription intelligence
 - [ ] Monthly reports
 - [ ] Deployment infrastructure
-- [ ] Security hardening
+- [x] Security hardening
 
 Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, expense splitting between members, private per-member data, self-service household sign-up and a mobile application.
 

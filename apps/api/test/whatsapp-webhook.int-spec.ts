@@ -176,6 +176,7 @@ describe('WhatsApp webhook', () => {
       kapsoApiBaseUrl: kapso.baseUrl,
       proactiveEvaluationEnabled: false,
       proactiveAiMessages: false,
+      trustedProxyHops: 0,
     };
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(APP_CONFIG)

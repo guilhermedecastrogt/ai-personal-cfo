@@ -1,4 +1,14 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Logger } from '@nestjs/common';
@@ -137,13 +147,47 @@ describe('TemporaryMediaStore', () => {
       expect(first).not.toBe(second);
     });
 
-    it('removes anything left behind by a previous run when the application starts', async () => {
+    it('removes what a previous run abandoned when the application starts', async () => {
       await mkdir(join(root, 'abandoned'), { recursive: true });
       await writeFile(join(root, 'abandoned', 'media'), pngImage());
+      const longAgo = new Date(Date.now() - 2 * 3_600_000);
+      await utimes(join(root, 'abandoned'), longAgo, longAgo);
 
       await store().onApplicationBootstrap();
 
       expect(await remaining()).toEqual([]);
+    });
+
+    it('leaves alone an image another process is still working on', async () => {
+      await mkdir(join(root, 'in-progress'), { recursive: true });
+      await writeFile(join(root, 'in-progress', 'media'), pngImage());
+
+      await store().onApplicationBootstrap();
+
+      expect(await remaining()).toEqual(['in-progress']);
+      expect(await readdir(join(root, 'in-progress'))).toEqual(['media']);
+    });
+
+    it('keeps the directory private to the user running the application', async () => {
+      source.holds(REFERENCE.mediaId, pngImage());
+
+      await store().withImage(REFERENCE, () => Promise.resolve());
+
+      expect((await stat(root)).mode & 0o777).toBe(0o700);
+    });
+
+    it('refuses to store anything when the directory is a link to somewhere else', async () => {
+      const elsewhere = await mkdtemp(join(tmpdir(), 'cfo-media-elsewhere-'));
+      await rm(root, { recursive: true, force: true });
+      await symlink(elsewhere, root);
+
+      await expect(store().withImage(REFERENCE, () => Promise.resolve())).rejects.toMatchObject({
+        problem: 'STORAGE_FAILED',
+      });
+      expect(await readdir(elsewhere)).toEqual([]);
+      expect(source.requests).toEqual([]);
+      await rm(root, { force: true });
+      await rm(elsewhere, { recursive: true, force: true });
     });
   });
 

@@ -1,5 +1,9 @@
 import type { z } from 'zod';
-import { environmentSchema, type Environment } from './environment.schema.js';
+import {
+  databaseEnvironmentSchema,
+  environmentSchema,
+  type Environment,
+} from './environment.schema.js';
 
 export interface AppConfig {
   readonly environment: Environment['NODE_ENV'];
@@ -15,6 +19,7 @@ export interface AppConfig {
   readonly kapsoApiBaseUrl: string;
   readonly proactiveEvaluationEnabled: boolean;
   readonly proactiveAiMessages: boolean;
+  readonly trustedProxyHops: number;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -53,9 +58,10 @@ export function loadAppConfig(variables: Variables): AppConfig {
     kapsoApiBaseUrl: environment.KAPSO_API_BASE_URL,
     proactiveEvaluationEnabled: environment.PROACTIVE_EVALUATION_ENABLED,
     proactiveAiMessages: environment.PROACTIVE_AI_MESSAGES,
+    trustedProxyHops: environment.TRUSTED_PROXY_HOPS,
   };
 }
 
 export function loadDatabaseUrl(variables: Variables): string {
-  return parse(environmentSchema.pick({ DATABASE_URL: true }), variables).DATABASE_URL;
+  return parse(databaseEnvironmentSchema, variables).DATABASE_URL;
 }

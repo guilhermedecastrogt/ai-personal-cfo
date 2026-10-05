@@ -26,6 +26,7 @@ import { HouseholdsRepository } from '../../src/households/households.repository
 import { DEFAULT_MEDIA_POLICY, type MediaPolicy } from '../../src/media/media-policy.js';
 import { TemporaryMediaStore } from '../../src/media/temporary-media-store.js';
 import { FakeMediaSource } from '../../src/media/testing/fake-media-source.fixture.js';
+import { SECURITY_POLICY, type SecurityPolicy } from '../../src/security/security-policy.js';
 import { TransactionsRepository } from '../../src/transactions/transactions.repository.js';
 import { TransactionsService } from '../../src/transactions/transactions.service.js';
 
@@ -43,6 +44,16 @@ export const TEST_CONFIG: AppConfig = {
   kapsoApiBaseUrl: 'https://api.kapso.invalid/meta/whatsapp/v24.0',
   proactiveEvaluationEnabled: false,
   proactiveAiMessages: false,
+  trustedProxyHops: 0,
+};
+
+const UNLIMITED = { limit: 1_000_000, windowInSeconds: 60 };
+
+export const RELAXED_SECURITY_POLICY: SecurityPolicy = {
+  ...SECURITY_POLICY,
+  rateLimits: { AUTHENTICATION: UNLIMITED, DASHBOARD: UNLIMITED, WEBHOOK: UNLIMITED },
+  sessions: { ...SECURITY_POLICY.sessions, maximumPerMember: 10_000 },
+  inboundMessages: { text: UNLIMITED, image: UNLIMITED },
 };
 
 export interface AssistantHarness {

@@ -37,7 +37,8 @@ import {
 import { GoalsRepository } from '../src/goals/goals.repository.js';
 import { ProactiveCfoService } from '../src/proactive/proactive-cfo.service.js';
 import { transactions } from '../src/transactions/transactions.schema.js';
-import { TEST_CONFIG } from './support/assistant-harness.js';
+import { SECURITY_POLICY_TOKEN } from '../src/security/security-policy.js';
+import { RELAXED_SECURITY_POLICY, TEST_CONFIG } from './support/assistant-harness.js';
 import {
   createHouseholdFixture,
   memberAt,
@@ -176,6 +177,8 @@ describe('dashboard API', () => {
       .useValue({ ...TEST_CONFIG, databaseUrl: testDatabase.url })
       .overrideProvider(AI_PROVIDER)
       .useValue(ai)
+      .overrideProvider(SECURITY_POLICY_TOKEN)
+      .useValue(RELAXED_SECURITY_POLICY)
       .compile();
     app = moduleRef.createNestApplication<INestApplication<Server>>({ rawBody: true });
     await app.init();

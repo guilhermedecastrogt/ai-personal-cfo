@@ -46,7 +46,7 @@ cd apps/api
 HOUSEHOLD_NAME="Demo Household" MEMBER_NAME="Member A" npm run auth:issue-access-code
 ```
 
-Issuing a new code for a member replaces the old one. Sessions last seven days and end on sign-out. Session tokens are stored as hashes.
+Issuing a new code for a member replaces the old one and ends that member's sessions. `npm run auth:revoke-access` removes a member's access altogether. Sessions last seven days and end on sign-out. Session tokens are stored as hashes. The full set of controls is in [security.md](security.md).
 
 The browser never talks to the API directly and never holds an identifier.
 

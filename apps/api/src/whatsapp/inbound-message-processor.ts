@@ -4,6 +4,8 @@ import {
   type AssistantResponse,
 } from '../conversation/financial-assistant.service.js';
 import type { RequestContext } from '../households/request-context.js';
+import { RateLimiter } from '../security/rate-limiter.js';
+import { SECURITY_POLICY_TOKEN, type SecurityPolicy } from '../security/security-policy.js';
 import { WhatsAppIdentityResolver } from '../households/whatsapp-identity-resolver.js';
 import { WebhookEventsRepository, type WebhookEventOutcome } from './webhook-events.repository.js';
 import {
@@ -12,6 +14,9 @@ import {
   type InboundMessage,
   type WhatsAppProvider,
 } from './whatsapp-provider.js';
+
+export const SLOW_DOWN_REPLY =
+  'You are sending messages faster than I can handle. Please wait a minute and try again.';
 
 export const PROCESSING_FAILED_REPLY =
   'Something went wrong on my side and I could not process that. Please try again in a moment.';
@@ -29,6 +34,8 @@ export class InboundMessageProcessor {
     private readonly identities: WhatsAppIdentityResolver,
     private readonly assistant: FinancialAssistant,
     private readonly events: WebhookEventsRepository,
+    private readonly limiter: RateLimiter,
+    @Inject(SECURITY_POLICY_TOKEN) private readonly policy: SecurityPolicy,
   ) {}
 
   async process(message: InboundMessage, receivedAt: Date): Promise<void> {
@@ -48,6 +55,19 @@ export class InboundMessageProcessor {
     }
     if (!isSupported(message)) {
       this.logger.log(`event=ignored reason=unsupported-message provider=${this.provider.name}`);
+      return 'IGNORED';
+    }
+    const kind = message.content.kind === 'IMAGE' ? 'image' : 'text';
+    const allowance = this.limiter.consume(
+      `MESSAGE:${kind}:${context.memberId}`,
+      this.policy.inboundMessages[kind],
+      receivedAt,
+    );
+    if (!allowance.isAllowed) {
+      this.logger.warn(`event=ignored reason=rate-limited provider=${this.provider.name}`);
+      if (allowance.isFirstRejection) {
+        await this.reply(message.sender, SLOW_DOWN_REPLY);
+      }
       return 'IGNORED';
     }
     const response = await this.respond(context, message, instantOf(message, receivedAt));

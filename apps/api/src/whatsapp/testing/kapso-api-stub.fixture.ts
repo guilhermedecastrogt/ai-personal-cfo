@@ -81,6 +81,7 @@ export class KapsoApiStub {
   readonly media = new Map<string, Buffer>();
   sendStatus = 200;
   downloadOrigin: string | undefined;
+  redirectDownloadsTo: string | undefined;
   private server: Server | undefined;
 
   get origin(): string {
@@ -114,6 +115,7 @@ export class KapsoApiStub {
     this.media.clear();
     this.sendStatus = 200;
     this.downloadOrigin = undefined;
+    this.redirectDownloadsTo = undefined;
   }
 
   private async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -134,6 +136,11 @@ export class KapsoApiStub {
         messaging_product: 'whatsapp',
         messages: [{ id: 'wamid.out' }],
       });
+      return;
+    }
+    if (url.pathname.endsWith('/media_download') && this.redirectDownloadsTo !== undefined) {
+      response.writeHead(302, { location: this.redirectDownloadsTo });
+      response.end();
       return;
     }
     if (url.pathname.endsWith('/media_download')) {

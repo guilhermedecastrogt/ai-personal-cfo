@@ -11,6 +11,13 @@ const REQUIRED = {
   KAPSO_PHONE_NUMBER_ID: '123456789012345',
 };
 
+const PRODUCTION = {
+  ...REQUIRED,
+  NODE_ENV: 'production',
+  DATABASE_URL: 'postgres://cfo_app:a-long-generated-password@database:5432/cfo',
+  KAPSO_WEBHOOK_SECRET: 'a-long-generated-webhook-secret',
+};
+
 function captureError(action: () => unknown): unknown {
   try {
     action();
@@ -40,16 +47,17 @@ describe('loadAppConfig', () => {
       kapsoApiBaseUrl: 'https://api.kapso.ai/meta/whatsapp/v24.0',
       proactiveEvaluationEnabled: false,
       proactiveAiMessages: false,
+      trustedProxyHops: 0,
     });
   });
 
   it('reads every supported variable', () => {
     const config = loadAppConfig({
-      ...REQUIRED,
-      NODE_ENV: 'production',
+      ...PRODUCTION,
       PORT: '8080',
       LOG_LEVEL: 'warn',
       AI_CONFIDENCE_THRESHOLD: '0.9',
+      TRUSTED_PROXY_HOPS: '1',
     });
 
     expect(config).toMatchObject({
@@ -57,6 +65,7 @@ describe('loadAppConfig', () => {
       port: 8080,
       logLevel: 'warn',
       aiConfidenceThreshold: 0.9,
+      trustedProxyHops: 1,
     });
   });
 
@@ -146,5 +155,52 @@ describe('loadDatabaseUrl', () => {
     expect(() => loadDatabaseUrl({ DATABASE_URL: 'https://example.com' })).toThrow(
       InvalidEnvironmentError,
     );
+  });
+});
+
+describe('production configuration', () => {
+  it('starts with real-looking secrets', () => {
+    expect(loadAppConfig(PRODUCTION).environment).toBe('production');
+  });
+
+  it.each([
+    ['OPENAI_API_KEY', 'replace-with-your-openai-api-key'],
+    ['KAPSO_API_KEY', 'replace-with-your-kapso-api-key'],
+    ['KAPSO_WEBHOOK_SECRET', 'replace-with-your-kapso-webhook-secret'],
+    ['KAPSO_WEBHOOK_SECRET', 'short'],
+    ['KAPSO_API_KEY', 'changeme'],
+    ['OPENAI_API_KEY', 'unused'],
+    ['DATABASE_URL', 'postgres://cfo:cfo@localhost:5432/cfo'],
+    ['KAPSO_PHONE_NUMBER_ID', '000000000000000'],
+  ])('refuses to start in production when %s is %s', (name, value) => {
+    expect(invalidVariables({ ...PRODUCTION, [name]: value })).toEqual([name]);
+  });
+
+  it('accepts the same placeholders outside production', () => {
+    const development = {
+      ...REQUIRED,
+      DATABASE_URL: 'postgres://cfo:cfo@localhost:5432/cfo',
+      OPENAI_API_KEY: 'replace-with-your-openai-api-key',
+      KAPSO_WEBHOOK_SECRET: 'short',
+      KAPSO_PHONE_NUMBER_ID: '000000000000000',
+    };
+
+    expect(loadAppConfig(development).environment).toBe('development');
+    expect(loadAppConfig({ ...development, NODE_ENV: 'test' }).environment).toBe('test');
+  });
+
+  it('never includes a value in the error it reports', () => {
+    const error = captureError(() =>
+      loadAppConfig({ ...PRODUCTION, KAPSO_WEBHOOK_SECRET: 'replace-with-a-leaked-value' }),
+    ) as Error;
+
+    expect(error.message).not.toContain('leaked');
+    expect(error.message).toContain('KAPSO_WEBHOOK_SECRET');
+  });
+
+  it.each(['-1', '6', 'many'])('rejects %s as the number of trusted proxies', (hops) => {
+    expect(invalidVariables({ ...REQUIRED, TRUSTED_PROXY_HOPS: hops })).toEqual([
+      'TRUSTED_PROXY_HOPS',
+    ]);
   });
 });

@@ -20,6 +20,7 @@ const TEST_CONFIG: AppConfig = {
   kapsoApiBaseUrl: 'https://api.kapso.invalid/meta/whatsapp/v24.0',
   proactiveEvaluationEnabled: false,
   proactiveAiMessages: false,
+  trustedProxyHops: 0,
 };
 
 class StubDatabaseHealth {

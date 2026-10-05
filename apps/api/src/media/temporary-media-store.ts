@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { describeImage, type ImageDescription } from './image-inspection.js';
@@ -12,6 +12,7 @@ export interface TemporaryImage extends ImageDescription {
 
 const OWNER_ONLY = 0o700;
 const DOWNLOAD_FILE_NAME = 'media';
+const MILLISECONDS_PER_MINUTE = 60_000;
 
 export class TemporaryMediaStore implements OnApplicationBootstrap {
   private readonly logger = new Logger(TemporaryMediaStore.name);
@@ -23,7 +24,30 @@ export class TemporaryMediaStore implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.remove(this.rootDirectory);
+    try {
+      await this.prepareRoot();
+    } catch {
+      this.logger.error('Temporary media directory is not usable');
+      return;
+    }
+    const oldest = Date.now() - this.policy.abandonedAfterInMinutes * MILLISECONDS_PER_MINUTE;
+    for (const name of await readdir(this.rootDirectory).catch((): string[] => [])) {
+      const path = join(this.rootDirectory, name);
+      const entry = await lstat(path).catch(() => undefined);
+      if (entry !== undefined && entry.mtimeMs <= oldest) {
+        await this.remove(path);
+      }
+    }
+  }
+
+  private async prepareRoot(): Promise<void> {
+    await mkdir(this.rootDirectory, { recursive: true, mode: OWNER_ONLY });
+    const root = await lstat(this.rootDirectory);
+    const isOwned = typeof process.getuid !== 'function' || root.uid === process.getuid();
+    if (!root.isDirectory() || root.isSymbolicLink() || !isOwned) {
+      throw new MediaError('STORAGE_FAILED');
+    }
+    await chmod(this.rootDirectory, OWNER_ONLY);
   }
 
   async withImage<Result>(
@@ -42,7 +66,8 @@ export class TemporaryMediaStore implements OnApplicationBootstrap {
   private async download(reference: MediaReference, directory: string): Promise<string> {
     const destinationPath = join(directory, DOWNLOAD_FILE_NAME);
     try {
-      await mkdir(directory, { recursive: true, mode: OWNER_ONLY });
+      await this.prepareRoot();
+      await mkdir(directory, { mode: OWNER_ONLY });
     } catch {
       throw new MediaError('STORAGE_FAILED');
     }

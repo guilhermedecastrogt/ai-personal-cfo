@@ -16,6 +16,7 @@ import {
 import { z } from 'zod';
 import { CurrentContext, SessionGuard } from '../auth/session.guard.js';
 import { FutureMonthError } from '../cfo/cfo.service.js';
+import { RateLimit, RateLimitGuard } from '../security/rate-limit.guard.js';
 import type { RequestContext } from '../households/request-context.js';
 import { TRANSACTION_TYPES } from '../transactions/transaction-vocabulary.js';
 import { RECURRING_SORTS } from './dashboard.contracts.js';
@@ -78,7 +79,8 @@ class InvalidMonthFilter implements ExceptionFilter {
 }
 
 @Controller('dashboard')
-@UseGuards(SessionGuard)
+@UseGuards(RateLimitGuard, SessionGuard)
+@RateLimit('DASHBOARD')
 @UseFilters(InvalidMonthFilter)
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}

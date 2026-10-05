@@ -28,3 +28,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [022](ADR-022-dashboard-sessions.md)                          | The dashboard signs in with member access codes and server-side sessions behind the web server | Accepted |
 | [023](ADR-023-proactive-notifications.md)                     | Proactive notifications are decided by a deterministic policy over persistent event state      | Accepted |
 | [024](ADR-024-derived-recurring-expenses.md)                  | Recurring expenses are derived from transactions on every read                                 | Accepted |
+| [025](ADR-025-in-process-security-controls.md)                | Security controls run inside the application, with in-memory rate limiting                     | Accepted |

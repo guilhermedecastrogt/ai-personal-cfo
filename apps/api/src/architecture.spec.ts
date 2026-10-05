@@ -163,7 +163,7 @@ describe('architecture', () => {
     const routes = controller?.text.match(/@(Get|Post)\(/g) ?? [];
     const contexts = controller?.text.match(/@CurrentContext\(\) context: RequestContext/g) ?? [];
 
-    expect(controller?.text).toContain('@UseGuards(SessionGuard)');
+    expect(controller?.text).toContain('@UseGuards(RateLimitGuard, SessionGuard)');
     expect(routes.length).toBeGreaterThan(8);
     expect(contexts).toHaveLength(routes.length);
     expect(
@@ -505,6 +505,125 @@ describe('architecture', () => {
         /\.(insert|update|delete)\((transactions|recurringExpenses)\)/.test(file.text),
       ),
     ).toEqual([]);
+  });
+
+  it('keeps the financial domain independent of security, sessions and HTTP', () => {
+    const domain = within(
+      'finance/',
+      'money/',
+      'cfo/',
+      'transactions/',
+      'budgets/',
+      'goals/',
+      'accounts/',
+      'categories/',
+      'directory/',
+    );
+
+    expect(
+      offenders(domain, (file) =>
+        importsOf(file).some((name) => /\/security\/|\/auth\/|\/dashboard\/|node:http/.test(name)),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(within('finance/domain/', 'money/'), (file) =>
+        importsOf(file).some((name) => name.startsWith('@nestjs')),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps every security threshold in the security policy', () => {
+    const policy = files.find((file) => file.path === 'security/security-policy.ts');
+    const security = within('security/').filter(
+      (file) => file.path !== 'security/security-policy.ts',
+    );
+
+    for (const setting of [
+      'requestBodyLimitInBytes',
+      'rateLimits',
+      'inboundMessages',
+      'maximumPerMember',
+      'lifetimeInDays',
+      'minimumWebhookSecretLength',
+    ]) {
+      expect(policy?.text).toContain(setting);
+    }
+    expect(
+      offenders(security, (file) => /limit:\s*\d|windowInSeconds:\s*\d/.test(file.text)),
+    ).toEqual([]);
+    expect(
+      offenders(within('auth/'), (file) =>
+        /LIFETIME_IN_DAYS\s*=|MAXIMUM_SESSIONS\s*=/.test(file.text),
+      ),
+    ).toEqual([]);
+  });
+
+  it('rate limits every public controller and hardens HTTP at startup', () => {
+    const controllers = files.filter(
+      (file) => file.path.endsWith('.controller.ts') && !file.path.startsWith('health/'),
+    );
+    const main = files.find((file) => file.path === 'main.ts');
+
+    expect(controllers.map((file) => file.path).sort()).toEqual([
+      'auth/auth.controller.ts',
+      'dashboard/dashboard.controller.ts',
+      'whatsapp/whatsapp-webhook.controller.ts',
+    ]);
+    for (const controller of controllers) {
+      expect(controller.text).toMatch(/@RateLimit\('(AUTHENTICATION|DASHBOARD|WEBHOOK)'\)/);
+      expect(controller.text).toContain('RateLimitGuard');
+    }
+    expect(main?.text).toContain('hardenHttp(app, config)');
+    expect(
+      offenders(files, (file) => /enableCors|Access-Control-Allow-Origin/.test(file.text)),
+    ).toEqual([]);
+  });
+
+  it('logs unexpected errors only through the safe filter, never with their message', () => {
+    const filter = files.find((file) => file.path === 'security/safe-exception.filter.ts');
+
+    expect(filter?.text).toContain('@Catch()');
+    expect(filter?.text).not.toMatch(/error\.message|\.stack\)|JSON\.stringify\(error/);
+    expect(
+      offenders(files, (file) =>
+        /logger\.(log|warn|error|debug)\([^)]*(\.message|\.stack|rawBody|\.text\b|accessCode|token\b|apiKey|\.sender|amountMinor|merchant)/.test(
+          file.text,
+        ),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(files, (file) => /console\.(log|error|warn|info|debug)\(/.test(file.text)),
+    ).toEqual([]);
+  });
+
+  it('reads the environment only in the configuration loader and the entry scripts', () => {
+    expect(offenders(files, (file) => file.text.includes('process.env')).sort()).toEqual([
+      'auth/issue-access-code.ts',
+      'auth/revoke-access.ts',
+      'config/config.module.ts',
+      'database/run-migrations.ts',
+      'database/seed/run-seed.ts',
+    ]);
+  });
+
+  it('compares secrets in constant time and stores only their hashes', () => {
+    const kapso = files.find((file) => file.path === 'whatsapp/kapso/kapso-whatsapp-provider.ts');
+    const auth = files.find((file) => file.path === 'auth/auth.service.ts');
+
+    expect(kapso?.text).toContain('timingSafeEqual(');
+    expect(kapso?.text).not.toMatch(/expected\s*[!=]==|[!=]==\s*expected|digest\('hex'\)\s*[!=]==/);
+    expect(auth?.text).toContain('randomBytes(SECRET_BYTES)');
+    expect(auth?.text).toMatch(/SECRET_BYTES = 32/);
+    expect(auth?.text).not.toMatch(/Math\.random|randomUUID/);
+  });
+
+  it('fetches remote content only from the provider origin, without following redirects', () => {
+    const media = files.find((file) => file.path === 'whatsapp/kapso/kapso-media-source.ts');
+
+    expect(media?.text).toContain("redirect: 'error'");
+    expect(media?.text).toContain('url.origin !== new URL(this.options.apiBaseUrl).origin');
+    expect(media?.text).toContain('signal: timeoutOf(this.options)');
+    expect(media?.text).toContain('limitTo(request.maximumBytes)');
   });
 
   it('keeps financial calculation out of the messaging layer', () => {
