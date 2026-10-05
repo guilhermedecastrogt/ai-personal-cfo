@@ -40,6 +40,10 @@ describe('readConversationState', () => {
     expect(read({}, 0, null)).toEqual(EMPTY_CONVERSATION_STATE);
   });
 
+  it('keeps a state saved by a message received a moment later but handled first', () => {
+    expect(read(STATE, -0.5)).toEqual(STATE);
+  });
+
   it('ignores a state dated in the future', () => {
     expect(read(STATE, -5)).toEqual(EMPTY_CONVERSATION_STATE);
   });

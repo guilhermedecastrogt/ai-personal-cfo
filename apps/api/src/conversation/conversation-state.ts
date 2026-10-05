@@ -47,6 +47,7 @@ export const EMPTY_CONVERSATION_STATE: ConversationState = {
 };
 
 const MILLISECONDS_PER_MINUTE = 60_000;
+const OUT_OF_ORDER_TOLERANCE_IN_MILLISECONDS = 60_000;
 
 export function readConversationState(
   stored: unknown,
@@ -56,6 +57,8 @@ export function readConversationState(
 ): ConversationState {
   const parsed = conversationStateSchema.safeParse(stored);
   const age = storedAt === null ? Number.POSITIVE_INFINITY : instant.getTime() - storedAt.getTime();
-  const isCurrent = age >= 0 && age <= lifetimeInMinutes * MILLISECONDS_PER_MINUTE;
+  const isCurrent =
+    age >= -OUT_OF_ORDER_TOLERANCE_IN_MILLISECONDS &&
+    age <= lifetimeInMinutes * MILLISECONDS_PER_MINUTE;
   return parsed.success && isCurrent ? parsed.data : EMPTY_CONVERSATION_STATE;
 }
