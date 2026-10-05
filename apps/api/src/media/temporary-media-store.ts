@@ -13,6 +13,8 @@ export interface TemporaryImage extends ImageDescription {
 const OWNER_ONLY = 0o700;
 const DOWNLOAD_FILE_NAME = 'media';
 const MILLISECONDS_PER_MINUTE = 60_000;
+const REMOVAL_RETRIES = 5;
+const REMOVAL_RETRY_DELAY_IN_MILLISECONDS = 50;
 
 export class TemporaryMediaStore implements OnApplicationBootstrap {
   private readonly logger = new Logger(TemporaryMediaStore.name);
@@ -115,7 +117,12 @@ export class TemporaryMediaStore implements OnApplicationBootstrap {
 
   private async remove(directory: string): Promise<void> {
     try {
-      await rm(directory, { recursive: true, force: true });
+      await rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: REMOVAL_RETRIES,
+        retryDelay: REMOVAL_RETRY_DELAY_IN_MILLISECONDS,
+      });
     } catch {
       this.logger.error('Temporary media could not be removed');
     }
