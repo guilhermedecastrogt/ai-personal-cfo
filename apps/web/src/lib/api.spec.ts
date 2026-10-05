@@ -1,4 +1,4 @@
-import { ApiError, apiGet, apiUrl } from './api';
+import { ApiError, apiGet, apiPost, apiUrl } from './api';
 
 const cookieValue = jest.fn<string | undefined, []>();
 const redirect = jest.fn((path: string): never => {
@@ -77,4 +77,43 @@ describe('apiGet', () => {
       await expect(apiGet('/dashboard/overview')).rejects.toEqual(new ApiError(status));
     },
   );
+});
+
+describe('apiPost', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    cookieValue.mockReturnValue('session-token');
+  });
+
+  it('posts with the session as a bearer token and no body', async () => {
+    respondWith(204);
+
+    await apiPost('/dashboard/notifications/notification-1/read');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/dashboard/notifications/notification-1/read',
+      { method: 'POST', headers: { Authorization: 'Bearer session-token' }, cache: 'no-store' },
+    );
+  });
+
+  it('sends the visitor to sign in when there is no session or it is refused', async () => {
+    respondWith(401);
+    await expect(apiPost('/dashboard/notifications/x/read')).rejects.toThrow(
+      'redirected to /login',
+    );
+
+    cookieValue.mockReturnValue(undefined);
+    fetchMock.mockClear();
+    await expect(apiPost('/dashboard/notifications/x/read')).rejects.toThrow(
+      'redirected to /login',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a notification that does not belong to the household as an error', async () => {
+    respondWith(404);
+
+    await expect(apiPost('/dashboard/notifications/x/read')).rejects.toEqual(new ApiError(404));
+  });
 });

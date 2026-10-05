@@ -1,13 +1,24 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { ACCOUNTS, SEPTEMBER, TRANSACTIONS, overview } from '@/testing/fixtures';
+import {
+  ACCOUNTS,
+  NOTIFICATIONS,
+  SEPTEMBER,
+  SIGNALS,
+  TRANSACTIONS,
+  overview,
+} from '@/testing/fixtures';
 import AccountsPage from './(dashboard)/accounts/page';
 import OverviewPage from './(dashboard)/page';
+import SignalsPage from './(dashboard)/signals/page';
 import TransactionsPage from './(dashboard)/transactions/page';
 
 const apiGet = jest.fn<Promise<unknown>, [string, Record<string, string | undefined>?]>();
 
+jest.mock('next/cache', () => ({ revalidatePath: (): void => undefined }));
+
 jest.mock('@/lib/api', () => ({
+  apiPost: (): Promise<void> => Promise.resolve(),
   apiGet: (path: string, parameters?: Record<string, string | undefined>): Promise<unknown> =>
     apiGet(path, parameters),
 }));
@@ -91,5 +102,20 @@ describe('dashboard pages', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/dashboard/accounts', undefined);
     expect(screen.getByRole('heading', { name: 'Accounts', level: 1 })).toBeInTheDocument();
+  });
+
+  it('shows the notifications of the household under the signals of the month', async () => {
+    apiGet.mockImplementation((path) =>
+      Promise.resolve(path === '/dashboard/notifications' ? NOTIFICATIONS : SIGNALS),
+    );
+
+    render(
+      (await SignalsPage({ searchParams: searchParams({ month: '2026-10' }) })) as ReactElement,
+    );
+
+    expect(apiGet).toHaveBeenCalledWith('/dashboard/signals', { month: '2026-10' });
+    expect(apiGet).toHaveBeenCalledWith('/dashboard/notifications', undefined);
+    expect(screen.getByRole('heading', { name: 'Notifications', level: 2 })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Mark as read' })).toHaveLength(1);
   });
 });

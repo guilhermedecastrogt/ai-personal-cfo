@@ -38,6 +38,8 @@ describe('loadAppConfig', () => {
       kapsoWebhookSecret: 'kapso-secret',
       kapsoPhoneNumberId: '123456789012345',
       kapsoApiBaseUrl: 'https://api.kapso.ai/meta/whatsapp/v24.0',
+      proactiveEvaluationEnabled: false,
+      proactiveAiMessages: false,
     });
   });
 

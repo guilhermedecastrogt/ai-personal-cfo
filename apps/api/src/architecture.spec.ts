@@ -160,7 +160,7 @@ describe('architecture', () => {
 
   it('guards every dashboard route and takes the household only from the session', () => {
     const controller = files.find((file) => file.path === 'dashboard/dashboard.controller.ts');
-    const routes = controller?.text.match(/@Get\(/g) ?? [];
+    const routes = controller?.text.match(/@(Get|Post)\(/g) ?? [];
     const contexts = controller?.text.match(/@CurrentContext\(\) context: RequestContext/g) ?? [];
 
     expect(controller?.text).toContain('@UseGuards(SessionGuard)');
@@ -294,6 +294,122 @@ describe('architecture', () => {
         importsOf(file).some((name) => /(^|\/)whatsapp\//.test(name)),
       ),
     ).toEqual([]);
+  });
+
+  it('keeps the finance engine, the finance domain and the review free of notifications', () => {
+    const financial = within(
+      'finance/',
+      'money/',
+      'cfo/',
+      'transactions/',
+      'budgets/',
+      'goals/',
+      'accounts/',
+      'categories/',
+    );
+
+    expect(financial.length).toBeGreaterThan(30);
+    expect(
+      offenders(financial, (file) =>
+        importsOf(file).some((name) => /proactive|notification|(^|\/)whatsapp\//.test(name)),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps the notification policy pure, with no persistence, AI or delivery', () => {
+    const policy = files.find((file) => file.path === 'proactive/proactive-policy.ts');
+    const candidates = files.find((file) => file.path === 'proactive/proactive-candidates.ts');
+
+    expect(importsOf(policy ?? { path: '', text: '' })).toEqual([
+      '../finance/domain/insights/insight-engine.js',
+    ]);
+    for (const file of [policy, candidates]) {
+      expect(file?.text).not.toMatch(
+        /drizzle-orm|\.repository\.js|\.schema\.js|@nestjs|AI_PROVIDER|ai-provider|notification-channel|new Date\(\)|Date\.now|Math\.random/,
+      );
+    }
+  });
+
+  it('decides what to send without the model, and never lets the composer decide', () => {
+    const service = files.find((file) => file.path === 'proactive/proactive-cfo.service.ts');
+    const composer = files.find((file) => file.path === 'proactive/notification-composer.ts');
+
+    expect(service?.text).toContain('decideNotification(');
+    expect(service?.text).toContain('deliveryHold(');
+    expect(service?.text).not.toMatch(/AI_PROVIDER|ai-provider|composeReply|\/ai\//);
+    expect(composer?.text).toContain('findUnverifiedFigures(');
+    expect(composer?.text).not.toMatch(
+      /\.repository\.js|notification-channel|decideNotification|deliveryHold|drizzle-orm|severity\s*=/,
+    );
+    expect(
+      offenders(
+        within('proactive/'),
+        (file) =>
+          file.path !== 'proactive/notification-composer.ts' &&
+          importsOf(file).some((name) => /\/ai\/(?!ai\.module)/.test(name)),
+      ),
+    ).toEqual([]);
+  });
+
+  it('gives the AI layer no way to send, store or decide notifications', () => {
+    expect(
+      offenders(within('ai/'), (file) =>
+        importsOf(file).some((name) => /proactive|notification|whatsapp|households/.test(name)),
+      ),
+    ).toEqual([]);
+  });
+
+  it('delivers notifications only through the channel abstraction', () => {
+    const proactive = within('proactive/').filter(
+      (file) => file.path !== 'proactive/proactive.module.ts',
+    );
+    const adapter = files.find((file) => file.path === 'whatsapp/whatsapp-notification-channel.ts');
+
+    expect(proactive.length).toBeGreaterThan(6);
+    expect(
+      offenders(
+        proactive,
+        (file) =>
+          importsOf(file).some((name) => /whatsapp/i.test(name)) ||
+          /sendText|WHATSAPP_PROVIDER/.test(file.text),
+      ),
+    ).toEqual([]);
+    expect(adapter?.text).toContain('@Inject(WHATSAPP_PROVIDER)');
+    expect(adapter?.text).toContain('this.provider.sendText(');
+    expect(adapter?.text).toContain('listWhatsAppAddresses(');
+    expect(
+      offenders(
+        files,
+        (file) => file.text.includes('.sendText(') && !file.path.startsWith('whatsapp/'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('does no financial calculation in the notification layer', () => {
+    const arithmetic =
+      /money-math|sumMinor|multiplyThenDivide|divideRounded|Minor\s*[-+*/]\s*\w|\w\s*[-+*/]\s*\w+Minor/;
+    const notification = [
+      ...within('proactive/'),
+      ...files.filter((file) => file.path === 'whatsapp/whatsapp-notification-channel.ts'),
+    ];
+
+    expect(offenders(notification, (file) => arithmetic.test(file.text))).toEqual([]);
+  });
+
+  it('scopes every notification query to a household and claims by unique key', () => {
+    const repository = files.find(
+      (file) => file.path === 'proactive/proactive-notifications.repository.ts',
+    );
+    const schema = files.find(
+      (file) => file.path === 'proactive/proactive-notifications.schema.ts',
+    );
+
+    expect(repository?.text.match(/onConflictDo(Nothing|Update)\(/g)).toHaveLength(3);
+    expect(repository?.text).toMatch(/async markRead\(householdId: string/);
+    expect(repository?.text).toMatch(/async listRecent\(householdId: string/);
+    expect(schema?.text).toContain('proactive_notifications_household_event_key_unique');
+    expect(schema?.text).toContain('notification_deliveries_once_per_recipient_unique');
+    expect(schema?.text).not.toMatch(/jsonb|payload|phone|address/);
   });
 
   it('keeps financial calculation out of the messaging layer', () => {

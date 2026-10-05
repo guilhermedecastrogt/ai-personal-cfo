@@ -174,6 +174,8 @@ describe('WhatsApp webhook', () => {
       kapsoWebhookSecret: KAPSO_TEST_SECRET,
       kapsoPhoneNumberId: KAPSO_TEST_PHONE_NUMBER_ID,
       kapsoApiBaseUrl: kapso.baseUrl,
+      proactiveEvaluationEnabled: false,
+      proactiveAiMessages: false,
     };
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(APP_CONFIG)

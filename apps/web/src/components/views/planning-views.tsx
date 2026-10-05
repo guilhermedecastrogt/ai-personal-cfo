@@ -3,6 +3,8 @@ import type {
   BudgetsView as Budgets,
   GoalView,
   GoalsView as Goals,
+  NotificationView,
+  NotificationsView as Notifications,
   OutlookView as Outlook,
   SignalView,
   SignalsView as Signals,
@@ -212,6 +214,72 @@ export function OutlookView({ data }: { readonly data: Outlook }): ReactNode {
         )}
       </CurrencySections>
     </>
+  );
+}
+
+const NOTIFICATION_STATUS: Record<
+  NotificationView['status'],
+  { readonly label: string; readonly tone: Tone }
+> = {
+  SENT: { label: 'Sent', tone: 'kept' },
+  PENDING: { label: 'Waiting to send', tone: 'neutral' },
+  FAILED: { label: 'Not delivered', tone: 'concern' },
+  SUPPRESSED: { label: 'Shown here only', tone: 'neutral' },
+};
+
+const DATE_LENGTH = 10;
+
+export function NotificationsPanel({
+  data,
+  markRead,
+}: {
+  readonly data: Notifications;
+  readonly markRead: (form: FormData) => Promise<void>;
+}): ReactNode {
+  return (
+    <Panel title="Notifications" note="What the CFO raised on its own, newest first">
+      {data.notifications.length === 0 ? (
+        <Empty>Nothing has been raised yet. Notable changes will appear here.</Empty>
+      ) : (
+        <ul className="divide-y divide-line">
+          {data.notifications.map((notification) => (
+            <li
+              key={notification.key}
+              className={`flex flex-wrap items-start justify-between gap-3 py-3 ${notification.isRead ? 'opacity-70' : ''}`}
+            >
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {notification.title}{' '}
+                  <Badge tone={SEVERITY[notification.severity]}>
+                    {notification.severity.toLowerCase()}
+                  </Badge>{' '}
+                  <Badge tone={NOTIFICATION_STATUS[notification.status].tone}>
+                    {NOTIFICATION_STATUS[notification.status].label}
+                  </Badge>
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  <span className="figure">{notification.detail}</span>
+                  {` · ${notification.detectedAt.slice(0, DATE_LENGTH)}`}
+                </p>
+              </div>
+              {notification.isRead ? (
+                <span className="text-sm text-muted">Read</span>
+              ) : (
+                <form action={markRead}>
+                  <input type="hidden" name="key" value={notification.key} />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-line px-3 py-1 text-sm hover:bg-mist focus-visible:outline-2"
+                  >
+                    Mark as read
+                  </button>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 

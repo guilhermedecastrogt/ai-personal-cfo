@@ -7,6 +7,11 @@ const DEFAULT_PORT = 3000;
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
 const DEFAULT_KAPSO_API_BASE_URL = 'https://api.kapso.ai/meta/whatsapp/v24.0';
 
+const flag = z
+  .enum(['true', 'false'])
+  .default('false')
+  .transform((value) => value === 'true');
+
 export const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(LOWEST_PORT).max(HIGHEST_PORT).default(DEFAULT_PORT),
@@ -18,6 +23,8 @@ export const environmentSchema = z.object({
   KAPSO_WEBHOOK_SECRET: z.string().min(1),
   KAPSO_PHONE_NUMBER_ID: z.string().regex(/^\d+$/),
   KAPSO_API_BASE_URL: z.url({ protocol: /^https$/ }).default(DEFAULT_KAPSO_API_BASE_URL),
+  PROACTIVE_EVALUATION_ENABLED: flag,
+  PROACTIVE_AI_MESSAGES: flag,
   AI_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(DEFAULT_CONFIDENCE_THRESHOLD),
 });
 

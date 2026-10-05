@@ -89,6 +89,7 @@ The API listens on port 3000 and the dashboard on port 3001. To sign in to the d
 - [x] Insight engine and monthly financial review
 - [x] Multi-turn conversations with follow-up questions
 - [x] Dashboard
+- [x] Proactive notifications
 - [ ] Monthly reports
 - [ ] Deployment infrastructure
 - [ ] Security hardening

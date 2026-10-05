@@ -103,6 +103,7 @@ flowchart TD
 | `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily                     |
 | `insights`     | Rules that decide whether something deserves the household's attention                                                 |
 | `cfo`          | The deterministic monthly review, its context for the model, and the checked narrative                                 |
+| `proactive`    | Proactive notifications: candidate events, the notification policy, persistent state, composition and scheduling       |
 | `reports`      | Monthly report generation                                                                                              |
 
 ### Dependency rules
@@ -112,6 +113,7 @@ flowchart TD
 - The OpenAI SDK is imported only inside the `ai` module's provider implementation. See [ADR-005](adr/ADR-005-openai-behind-provider-abstraction.md).
 - Provider-specific WhatsApp code lives behind a `WhatsAppProvider` interface inside the `whatsapp` module. Nothing else knows which provider is in use.
 - A module reads another module's data through that module's service, never through its tables.
+- The `proactive` module sends only through its `NotificationChannel` interface. The finance engine, the domain modules and the review do not depend on it. See [ADR-023](adr/ADR-023-proactive-notifications.md).
 
 ## Request context
 
@@ -218,6 +220,8 @@ The details are in [ai-integration.md](ai-integration.md).
 After a transaction is recorded, the finance engine recomputes the affected figures and the insight engine applies rules to them. Each rule yields nothing or an insight with a severity from `INFO` to `CRITICAL`.
 
 The insight engine is separate from the advisor on purpose. Deciding whether something is worth saying is a deterministic rule that can be tested. Deciding how to say it is a language task. Only insights above a severity threshold are appended to a reply, and an insight that was already delivered for the same budget and period is not repeated. This is what keeps the assistant from commenting on every purchase.
+
+Delivering insights unprompted is the job of the proactive layer, described in [proactive-cfo.md](proactive-cfo.md). It evaluates periodically, applies a deterministic notification policy, and records each event under its stable key so it is sent once.
 
 ## Data model
 

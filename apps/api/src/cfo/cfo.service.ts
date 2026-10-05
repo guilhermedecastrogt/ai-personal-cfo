@@ -85,7 +85,7 @@ export class CfoService {
   }
 
   async monthlyAnalysis(
-    context: RequestContext,
+    context: Pick<RequestContext, 'householdId'>,
     request: Pick<MonthlyReviewRequest, 'month' | 'today'>,
   ): Promise<MonthlyAnalysis> {
     const { householdId } = context;

@@ -215,7 +215,7 @@ The insight engine decides whether a result deserves attention. It receives resu
 
 Expected income is the larger of this month's income so far and the previous month's income. With no income on record there is no warning.
 
-Each insight has a stable key, such as `BUDGET_EXCEEDED:<budget>:<period start>`. The same finding produces the same key every time it is evaluated, which lets a later phase deliver it once instead of on every transaction.
+Each insight has a stable key, such as `BUDGET_EXCEEDED:<budget>:<period start>`. The same finding produces the same key every time it is evaluated, which lets the [proactive layer](proactive-cfo.md) deliver it once instead of on every evaluation.
 
 An insight holds a type, a severity, a key and the result that triggered it. It holds no sentence. Wording belongs to the advisor.
 

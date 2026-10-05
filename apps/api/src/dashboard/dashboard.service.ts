@@ -12,6 +12,7 @@ import {
 import { FinanceService, HouseholdNotFoundError } from '../finance/application/finance.service.js';
 import type { IsoDate } from '../finance/domain/period/period.js';
 import type { RequestContext } from '../households/request-context.js';
+import { ProactiveCfoService } from '../proactive/proactive-cfo.service.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
 import { TRANSACTION_TYPES, type TransactionType } from '../transactions/transaction-vocabulary.js';
 import {
@@ -23,6 +24,7 @@ import {
   overviewSchema,
   reviewSchema,
   sessionSchema,
+  notificationsSchema,
   signalsSchema,
   spendingSchema,
   transactionsSchema,
@@ -34,12 +36,13 @@ import {
   type OverviewView,
   type ReviewView,
   type SessionView,
+  type NotificationsView,
   type SignalsView,
   type SpendingView,
   type TransactionsView,
 } from './dashboard.contracts.js';
 import { listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
-import { describeAnomalies, describeInsights } from './signal-descriptions.js';
+import { describeAnomalies, describeInsights } from '../cfo/context/signal-descriptions.js';
 
 export interface TransactionFilters {
   readonly month?: string | undefined;
@@ -64,6 +67,7 @@ export class DashboardService {
     private readonly cfo: CfoService,
     private readonly directories: HouseholdDirectoryService,
     private readonly transactions: TransactionsService,
+    private readonly proactive: ProactiveCfoService,
   ) {}
 
   async session(context: RequestContext, instant: Date): Promise<SessionView> {
@@ -264,6 +268,33 @@ export class DashboardService {
         anomalies: describeAnomalies(review.anomalies, analysis.directory),
       })),
     });
+  }
+
+  async notifications(context: RequestContext): Promise<NotificationsView> {
+    const recent = await this.proactive.recent(context.householdId);
+    return notificationsSchema.parse({
+      notifications: recent.map((notification) => ({
+        key: notification.id,
+        type: notification.type,
+        severity: notification.severity,
+        status: notification.status,
+        title: notification.title,
+        detail: notification.body,
+        currency: notification.currency,
+        period: notification.period,
+        detectedAt: notification.lastDetectedAt.toISOString(),
+        notifiedAt: notification.lastNotifiedAt?.toISOString() ?? null,
+        isRead: notification.readAt !== null,
+      })),
+    });
+  }
+
+  markNotificationRead(
+    context: RequestContext,
+    notificationId: string,
+    instant: Date,
+  ): Promise<boolean> {
+    return this.proactive.markRead(context.householdId, notificationId, instant);
   }
 
   async review(

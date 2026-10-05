@@ -10,6 +10,8 @@ export type {
   Money,
   MonthOption,
   MonthView,
+  NotificationView,
+  NotificationsView,
   OutlookView,
   OverviewView,
   Ratio,

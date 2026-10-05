@@ -19,6 +19,7 @@ import {
   incomeSchema,
   outlookViewSchema,
   overviewSchema,
+  notificationsSchema,
   reviewSchema,
   sessionSchema,
   signalsSchema,
@@ -33,6 +34,7 @@ import {
   type DateRange,
 } from '../src/finance/domain/period/period.js';
 import { GoalsRepository } from '../src/goals/goals.repository.js';
+import { ProactiveCfoService } from '../src/proactive/proactive-cfo.service.js';
 import { transactions } from '../src/transactions/transactions.schema.js';
 import { TEST_CONFIG } from './support/assistant-harness.js';
 import {
@@ -795,6 +797,65 @@ describe('dashboard API', () => {
       expect(history).toMatchObject({ total: 0, transactions: [], pageCount: 1 });
       expect(signals.currencies[0]).toMatchObject({ insights: [], anomalies: [] });
       expect(review.summary).toContain('No transactions are recorded');
+    });
+  });
+
+  describe('notifications', () => {
+    async function post(path: string, token?: string): Promise<number> {
+      const call = request(app.getHttpServer()).post(path);
+      const response = await (token === undefined
+        ? call
+        : call.set('Authorization', `Bearer ${token}`));
+      return response.status;
+    }
+
+    it('lists the proactive notifications of the household with their status', async () => {
+      const fixture = await establishedHousehold('Notified Dashboard');
+      const token = await tokenFor(fixture);
+      await app.get(ProactiveCfoService).evaluateHousehold(fixture.household.id, new Date());
+
+      const listed = await view(notificationsSchema, '/dashboard/notifications', token);
+
+      const exceeded = listed.notifications.find((entry) => entry.type === 'BUDGET_EXCEEDED');
+      expect(exceeded).toMatchObject({
+        severity: 'HIGH',
+        status: 'SUPPRESSED',
+        title: 'Restaurants budget exceeded',
+        currency: 'EUR',
+        period: keyOf(THIS_MONTH),
+        notifiedAt: null,
+        isRead: false,
+      });
+      expect(exceeded?.detail).toContain('€180.00 of €150.00');
+      expect(
+        JSON.stringify(listed.notifications.map((entry) => ({ ...entry, key: '' }))),
+      ).not.toMatch(UUID);
+    });
+
+    it('marks a notification read, once and only for its own household', async () => {
+      const fixture = await establishedHousehold('Reading Dashboard');
+      const other = await establishedHousehold('Other Reading Dashboard');
+      const token = await tokenFor(fixture);
+      const otherToken = await tokenFor(other, 1);
+      await app.get(ProactiveCfoService).evaluateHousehold(fixture.household.id, new Date());
+      const before = await view(notificationsSchema, '/dashboard/notifications', token);
+      const key = before.notifications[0]?.key ?? '';
+
+      expect(await post(`/dashboard/notifications/${key}/read`, otherToken)).toBe(404);
+      expect(await post(`/dashboard/notifications/${key}/read`)).toBe(401);
+      expect(await post('/dashboard/notifications/not-a-key/read', token)).toBe(404);
+      expect(await post(`/dashboard/notifications/${key}/read`, token)).toBe(204);
+      expect(await post(`/dashboard/notifications/${key}/read`, token)).toBe(204);
+
+      const after = await view(notificationsSchema, '/dashboard/notifications', token);
+      const others = await view(notificationsSchema, '/dashboard/notifications', otherToken);
+      expect(after.notifications.find((entry) => entry.key === key)?.isRead).toBe(true);
+      expect(after.notifications.filter((entry) => entry.isRead)).toHaveLength(1);
+      expect(others.notifications).toEqual([]);
+    });
+
+    it('requires a session to list notifications', async () => {
+      expect((await get('/dashboard/notifications')).status).toBe(401);
     });
   });
 });

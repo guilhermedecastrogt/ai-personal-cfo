@@ -7,6 +7,7 @@ import type {
   IncomeView,
   Money,
   MonthView,
+  NotificationsView,
   OutlookView,
   OverviewView,
   Ratio,
@@ -444,4 +445,35 @@ export const ACCOUNTS: AccountsView = {
     },
   ],
   members: [{ name: 'Member A' }, { name: 'Member B' }, { name: 'Member C' }],
+};
+
+export const NOTIFICATIONS: NotificationsView = {
+  notifications: [
+    {
+      key: 'notification-1',
+      type: 'BUDGET_EXCEEDED',
+      severity: 'HIGH',
+      status: 'SENT',
+      title: 'Restaurants budget exceeded',
+      detail: '€180.00 of €150.00 spent (120%).',
+      currency: 'EUR',
+      period: '2026-10',
+      detectedAt: '2026-10-20T12:00:00.000Z',
+      notifiedAt: '2026-10-20T12:00:00.000Z',
+      isRead: false,
+    },
+    {
+      key: 'notification-2',
+      type: 'RECURRING_EXPENSE_DUE',
+      severity: 'LOW',
+      status: 'SUPPRESSED',
+      title: 'Streaming is expected soon',
+      detail: 'Usually €17.99, expected around 2026-10-22.',
+      currency: 'EUR',
+      period: '2026-10',
+      detectedAt: '2026-10-19T09:00:00.000Z',
+      notifiedAt: null,
+      isRead: true,
+    },
+  ],
 };

@@ -66,6 +66,26 @@ export class HouseholdsRepository {
     return member;
   }
 
+  async listHouseholds(): Promise<Household[]> {
+    return this.database.select().from(households).orderBy(asc(households.createdAt));
+  }
+
+  async listWhatsAppAddresses(
+    householdId: string,
+    provider: string,
+  ): Promise<{ memberId: string; memberName: string; address: string }[]> {
+    return this.database
+      .select({
+        memberId: members.id,
+        memberName: members.name,
+        address: whatsappIdentities.externalUserId,
+      })
+      .from(whatsappIdentities)
+      .innerJoin(members, eq(members.id, whatsappIdentities.memberId))
+      .where(and(eq(members.householdId, householdId), eq(whatsappIdentities.provider, provider)))
+      .orderBy(asc(members.createdAt), asc(whatsappIdentities.createdAt));
+  }
+
   async registerWhatsAppIdentity(
     householdId: string,
     identity: NewWhatsAppIdentity,

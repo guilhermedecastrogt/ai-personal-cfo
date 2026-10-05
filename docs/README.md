@@ -14,6 +14,7 @@ Documents are added as the corresponding part of the system is built.
 | [`cfo-intelligence.md`](cfo-intelligence.md)         | Monthly review, findings, model context and the numeric-truth check     | Written                                 |
 | [`conversation.md`](conversation.md)                 | Multi-turn conversations, follow-ups, trusted and untrusted context     | Written                                 |
 | [`web-dashboard.md`](web-dashboard.md)               | Dashboard architecture, API, authentication and views                   | Written                                 |
+| [`proactive-cfo.md`](proactive-cfo.md)               | Proactive notifications: events, policy, state, scheduling and delivery | Written                                 |
 | `deployment.md`                                      | Oracle Cloud provisioning and release process                           | Planned                                 |
 | [`adr/`](adr/README.md)                              | Architecture decision records                                           | Written, extended as decisions are made |
 

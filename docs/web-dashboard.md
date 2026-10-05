@@ -1,6 +1,6 @@
 # Web dashboard
 
-The dashboard is the household's view of its own finances in a browser: where the month stands, where the money went, how budgets and goals are doing, what is projected, and what the review says. It is read-only. Transactions are recorded through WhatsApp.
+The dashboard is the household's view of its own finances in a browser: where the month stands, where the money went, how budgets and goals are doing, what is projected, and what the review says. It is read-only for financial data: the one thing it changes is the read mark on a notification. Transactions are recorded through WhatsApp.
 
 Every figure on every page is calculated by the backend. The web application renders what it is given.
 
@@ -57,21 +57,23 @@ The browser never talks to the API directly and never holds an identifier.
 
 ## API
 
-All routes are `GET`, require a session, and take an optional `month=YYYY-MM`.
+All routes require a session. All are `GET` and take an optional `month=YYYY-MM`, except the two notification routes.
 
-| Route                     | Returns                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------ |
-| `/dashboard/session`      | Member and household names, currency, time zone, today, selectable months            |
-| `/dashboard/overview`     | Totals, comparison, top categories, members, budgets, forecast, balances, findings   |
-| `/dashboard/spending`     | Total, categories, members, accounts, biggest changes, largest expenses              |
-| `/dashboard/income`       | Total, sources, members, comparison                                                  |
-| `/dashboard/budgets`      | Each budget with usage, status, projection and member attribution                    |
-| `/dashboard/goals`        | Each goal with progress, remainder and state                                         |
-| `/dashboard/outlook`      | Forecast, cash-flow outlook, budgets projected over, recurring commitments           |
-| `/dashboard/signals`      | Insights and anomalies, described                                                    |
-| `/dashboard/review`       | The monthly review narrative and whether it came from the model                      |
-| `/dashboard/transactions` | A page of transactions, with filters `type`, `category`, `account`, `member`, `page` |
-| `/dashboard/accounts`     | Accounts with balances and ownership, totals per currency, members                   |
+| Route                                     | Returns                                                                                       |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `/dashboard/session`                      | Member and household names, currency, time zone, today, selectable months                     |
+| `/dashboard/overview`                     | Totals, comparison, top categories, members, budgets, forecast, balances, findings            |
+| `/dashboard/spending`                     | Total, categories, members, accounts, biggest changes, largest expenses                       |
+| `/dashboard/income`                       | Total, sources, members, comparison                                                           |
+| `/dashboard/budgets`                      | Each budget with usage, status, projection and member attribution                             |
+| `/dashboard/goals`                        | Each goal with progress, remainder and state                                                  |
+| `/dashboard/outlook`                      | Forecast, cash-flow outlook, budgets projected over, recurring commitments                    |
+| `/dashboard/signals`                      | Insights and anomalies, described                                                             |
+| `/dashboard/review`                       | The monthly review narrative and whether it came from the model                               |
+| `/dashboard/transactions`                 | A page of transactions, with filters `type`, `category`, `account`, `member`, `page`          |
+| `/dashboard/accounts`                     | Accounts with balances and ownership, totals per currency, members                            |
+| `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month |
+| `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                |
 
 Sessions: `POST /auth/sessions` with an access code, and `DELETE /auth/sessions/current`.
 
@@ -100,7 +102,7 @@ The web application imports the TypeScript types of these schemas and nothing el
 | Budgets      | Usage, status, remainder, projection and who spent what                                             |
 | Goals        | Progress, remainder, date and required monthly saving                                               |
 | Outlook      | Actual figures beside projected ones, budgets projected over, recurring commitments                 |
-| Signals      | Insights by severity and unusual spending                                                           |
+| Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read     |
 | Review       | Summary, strengths, concerns, suggestions and priorities                                            |
 | Transactions | Read-only history with filters and paging                                                           |
 | Accounts     | Accounts, ownership, balances, totals per currency, members                                         |
@@ -148,7 +150,7 @@ The web application runs on port 3001 and reads the API's address from `API_URL`
 
 ## Limitations
 
-- Read-only. There is no editing of transactions, budgets, goals or accounts.
+- Read-only for financial data. There is no editing of transactions, budgets, goals or accounts. Marking a notification as read is the only write.
 - Access codes are issued by an operator with a script. There is no self-service sign-up, code rotation screen or sign-in rate limiting yet.
 - The review is generated on each visit and is not stored.
 - Text is in English. Amounts are formatted in one locale.

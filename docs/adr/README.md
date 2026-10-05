@@ -26,3 +26,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [020](ADR-020-deterministic-review-with-checked-narrative.md) | The monthly review is deterministic, and the model's narrative is checked against it           | Accepted |
 | [021](ADR-021-structured-conversation-state.md)               | Conversations carry structured state, and the model never sees its earlier replies             | Accepted |
 | [022](ADR-022-dashboard-sessions.md)                          | The dashboard signs in with member access codes and server-side sessions behind the web server | Accepted |
+| [023](ADR-023-proactive-notifications.md)                     | Proactive notifications are decided by a deterministic policy over persistent event state      | Accepted |

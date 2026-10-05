@@ -20,6 +20,8 @@ const SITUATIONS: Record<ReplySituation, string> = {
     'The member sent an image and nothing was recorded from it. Explain why in one sentence using the reason in the facts, and say what to do instead: send a clearer photo, send one transaction at a time, or type the amount and where it was spent.',
   EDIT_NOT_SUPPORTED:
     'The member wants to change or remove something that was already recorded. Changing or deleting recorded transactions is not supported yet. Say so briefly, make clear that nothing was changed, and do not state any amount.',
+  PROACTIVE_NOTIFICATION:
+    'The finance system decided to tell the household about something it detected. No message was received. Write a notification of at most two short sentences that says what happened using the title and detail in the facts, and why it matters. Do not change its urgency, do not add advice with figures, and do not ask a question.',
   OUT_OF_SCOPE:
     'The message is neither a transaction nor a question about the household finances. Say briefly what you can help with: recording expenses and income, and answering questions about spending, budgets, goals and balances.',
 };

@@ -2,6 +2,10 @@ import {
   BadRequestException,
   Controller,
   Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
   Query,
   UseFilters,
   UseGuards,
@@ -19,6 +23,7 @@ import type {
   BudgetsView,
   GoalsView,
   IncomeView,
+  NotificationsView,
   OutlookView,
   OverviewView,
   ReviewView,
@@ -38,6 +43,7 @@ const monthQuerySchema = z.object({
 });
 
 const MAXIMUM_PAGE = 10_000;
+const HTTP_NO_CONTENT = 204;
 
 const transactionsQuerySchema = monthQuerySchema.extend({
   type: z.enum(TRANSACTION_TYPES).optional(),
@@ -126,6 +132,26 @@ export class DashboardController {
     @Query() query: unknown,
   ): Promise<SignalsView> {
     return this.dashboard.signals(context, parseQuery(monthQuerySchema, query).month, new Date());
+  }
+
+  @Get('notifications')
+  notifications(@CurrentContext() context: RequestContext): Promise<NotificationsView> {
+    return this.dashboard.notifications(context);
+  }
+
+  @Post('notifications/:key/read')
+  @HttpCode(HTTP_NO_CONTENT)
+  async markNotificationRead(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+  ): Promise<void> {
+    const parsed = z.uuid().safeParse(key);
+    if (
+      !parsed.success ||
+      !(await this.dashboard.markNotificationRead(context, parsed.data, new Date()))
+    ) {
+      throw new NotFoundException();
+    }
   }
 
   @Get('review')

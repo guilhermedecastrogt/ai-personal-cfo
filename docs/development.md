@@ -47,6 +47,8 @@ Run from the repository root. Each delegates to every workspace that defines the
 | `npm run test:integration` | Tests against a real PostgreSQL. Needs `DATABASE_URL` |
 | `npm run build`            | Compile every workspace                               |
 
+`npm run proactive:evaluate -w apps/api` runs one proactive evaluation and exits, for use from an external scheduler. See [proactive-cfo.md](proactive-cfo.md).
+
 The dashboard has its own environment file, `apps/web/.env.example`, with one variable: `API_URL`, the address of the API as seen from the web server.
 
 Each integration test file creates its own database from the migrations and drops it afterwards, so the tests never touch development data. To run them against the local PostgreSQL:
@@ -61,19 +63,21 @@ A change is ready to commit when formatting, lint, type checking, tests and the 
 
 The backend reads its configuration from the environment once, at startup, and validates it. If a variable is missing or invalid the process exits and names the offending variables without printing their values.
 
-| Variable                  | Required | Default              | Purpose                                                               |
-| ------------------------- | -------- | -------------------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`            | Yes      |                      | PostgreSQL connection string, `postgres://` or `postgresql://`        |
-| `PORT`                    | No       | `3000`               | Port the API listens on                                               |
-| `NODE_ENV`                | No       | `development`        | `development`, `test` or `production`                                 |
-| `LOG_LEVEL`               | No       | `log`                | `error`, `warn`, `log` or `debug`                                     |
-| `OPENAI_API_KEY`          | Yes      |                      | Credential for the OpenAI API                                         |
-| `OPENAI_MODEL`            | Yes      |                      | Model used for interpretation and replies                             |
-| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`                | Below this, an extracted transaction is confirmed instead of recorded |
-| `KAPSO_API_KEY`           | Yes      |                      | Kapso project API key                                                 |
-| `KAPSO_WEBHOOK_SECRET`    | Yes      |                      | Secret for verifying webhook signatures                               |
-| `KAPSO_PHONE_NUMBER_ID`   | Yes      |                      | WhatsApp phone number identifier of the assistant                     |
-| `KAPSO_API_BASE_URL`      | No       | Kapso's WhatsApp API | Base URL of the provider API                                          |
+| Variable                       | Required | Default              | Purpose                                                                     |
+| ------------------------------ | -------- | -------------------- | --------------------------------------------------------------------------- |
+| `DATABASE_URL`                 | Yes      |                      | PostgreSQL connection string, `postgres://` or `postgresql://`              |
+| `PORT`                         | No       | `3000`               | Port the API listens on                                                     |
+| `NODE_ENV`                     | No       | `development`        | `development`, `test` or `production`                                       |
+| `LOG_LEVEL`                    | No       | `log`                | `error`, `warn`, `log` or `debug`                                           |
+| `OPENAI_API_KEY`               | Yes      |                      | Credential for the OpenAI API                                               |
+| `OPENAI_MODEL`                 | Yes      |                      | Model used for interpretation and replies                                   |
+| `AI_CONFIDENCE_THRESHOLD`      | No       | `0.8`                | Below this, an extracted transaction is confirmed instead of recorded       |
+| `KAPSO_API_KEY`                | Yes      |                      | Kapso project API key                                                       |
+| `KAPSO_WEBHOOK_SECRET`         | Yes      |                      | Secret for verifying webhook signatures                                     |
+| `KAPSO_PHONE_NUMBER_ID`        | Yes      |                      | WhatsApp phone number identifier of the assistant                           |
+| `KAPSO_API_BASE_URL`           | No       | Kapso's WhatsApp API | Base URL of the provider API                                                |
+| `PROACTIVE_EVALUATION_ENABLED` | No       | `false`              | Run the periodic proactive evaluation inside the API process                |
+| `PROACTIVE_AI_MESSAGES`        | No       | `false`              | Let the model phrase proactive notifications, with a deterministic fallback |
 
 The example file has placeholder credentials. The application starts with them, and calls to the model and to WhatsApp fail gracefully until real ones are set. Database commands and tests need only `DATABASE_URL`.
 

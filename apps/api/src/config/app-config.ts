@@ -13,6 +13,8 @@ export interface AppConfig {
   readonly kapsoWebhookSecret: string;
   readonly kapsoPhoneNumberId: string;
   readonly kapsoApiBaseUrl: string;
+  readonly proactiveEvaluationEnabled: boolean;
+  readonly proactiveAiMessages: boolean;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -49,6 +51,8 @@ export function loadAppConfig(variables: Variables): AppConfig {
     kapsoWebhookSecret: environment.KAPSO_WEBHOOK_SECRET,
     kapsoPhoneNumberId: environment.KAPSO_PHONE_NUMBER_ID,
     kapsoApiBaseUrl: environment.KAPSO_API_BASE_URL,
+    proactiveEvaluationEnabled: environment.PROACTIVE_EVALUATION_ENABLED,
+    proactiveAiMessages: environment.PROACTIVE_AI_MESSAGES,
   };
 }
 

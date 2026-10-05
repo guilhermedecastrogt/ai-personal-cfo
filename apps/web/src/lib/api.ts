@@ -42,3 +42,21 @@ export async function apiGet<View>(path: string, parameters: QueryParameters = {
   }
   return (await response.json()) as View;
 }
+
+export async function apiPost(path: string): Promise<void> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (token === undefined) {
+    redirect('/login');
+  }
+  const response = await fetch(apiUrl(path), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (response.status === HTTP_UNAUTHORIZED) {
+    redirect('/login');
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status);
+  }
+}

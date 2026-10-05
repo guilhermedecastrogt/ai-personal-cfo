@@ -16,6 +16,7 @@
     "db:migrate": "nest build && node --env-file-if-exists=.env dist/database/run-migrations.js",
     "db:seed": "nest build && node --env-file-if-exists=.env dist/database/seed/run-seed.js",
     "test:live": "node --experimental-vm-modules --disable-warning=ExperimentalWarning ../../node_modules/jest/bin/jest.js --config jest.live.config.js",
+    "proactive:evaluate": "nest build && node --env-file-if-exists=.env dist/proactive/run-proactive-evaluation.js",
     "auth:issue-access-code": "nest build && node --env-file-if-exists=.env dist/auth/issue-access-code.js"
   },
   "dependencies": {

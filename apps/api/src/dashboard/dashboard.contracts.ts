@@ -247,6 +247,24 @@ export const signalsSchema = z.object({
   ),
 });
 
+export const notificationSchema = z.object({
+  key: z.string(),
+  type: z.string(),
+  severity: z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  status: z.enum(['PENDING', 'SENT', 'FAILED', 'SUPPRESSED']),
+  title: z.string(),
+  detail: z.string(),
+  currency: z.string(),
+  period: z.string(),
+  detectedAt: z.string(),
+  notifiedAt: z.string().nullable(),
+  isRead: z.boolean(),
+});
+
+export const notificationsSchema = z.object({
+  notifications: z.array(notificationSchema),
+});
+
 export const reviewSchema = z.object({
   month: monthSchema,
   source: z.enum(['AI', 'DETERMINISTIC']),
@@ -316,6 +334,8 @@ export type IncomeView = z.infer<typeof incomeSchema>;
 export type BudgetsView = z.infer<typeof budgetsSchema>;
 export type GoalsView = z.infer<typeof goalsSchema>;
 export type OutlookView = z.infer<typeof outlookViewSchema>;
+export type NotificationsView = z.infer<typeof notificationsSchema>;
+export type NotificationView = z.infer<typeof notificationSchema>;
 export type SignalsView = z.infer<typeof signalsSchema>;
 export type ReviewView = z.infer<typeof reviewSchema>;
 export type TransactionsView = z.infer<typeof transactionsSchema>;

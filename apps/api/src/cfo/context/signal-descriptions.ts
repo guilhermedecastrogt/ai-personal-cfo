@@ -1,6 +1,6 @@
-import type { Anomaly } from '../finance/domain/anomaly/anomaly-detector.js';
-import type { Insight } from '../finance/domain/insights/insight-engine.js';
-import { describeResult, type NameDirectory } from '../cfo/context/result-description.js';
+import type { Anomaly } from '../../finance/domain/anomaly/anomaly-detector.js';
+import type { Insight } from '../../finance/domain/insights/insight-engine.js';
+import { describeResult, type NameDirectory } from './result-description.js';
 
 export interface SignalDescription {
   readonly type: string;

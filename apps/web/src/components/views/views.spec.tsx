@@ -10,6 +10,7 @@ import {
   OUTLOOK,
   REVIEW,
   SEPTEMBER,
+  NOTIFICATIONS,
   SIGNALS,
   SPENDING,
   TRANSACTIONS,
@@ -17,7 +18,13 @@ import {
 } from '@/testing/fixtures';
 import { IncomeView, SpendingView } from './flow-views';
 import { OverviewView } from './overview-view';
-import { BudgetsView, GoalsView, OutlookView, SignalsView } from './planning-views';
+import {
+  BudgetsView,
+  GoalsView,
+  NotificationsPanel,
+  OutlookView,
+  SignalsView,
+} from './planning-views';
 import { AccountsView, ReviewView, TransactionsView } from './record-views';
 
 function panel(title: string): HTMLElement {
@@ -287,6 +294,40 @@ describe('outlook and signals', () => {
 
     expect(panel('Insights')).toHaveTextContent('Nothing needs attention.');
     expect(panel('Unusual spending')).toHaveTextContent('needs a few months of history');
+  });
+});
+
+describe('notifications', () => {
+  const markRead = (): Promise<void> => Promise.resolve();
+
+  it('lists what was raised with its severity, delivery status and date', () => {
+    render(<NotificationsPanel data={NOTIFICATIONS} markRead={markRead} />);
+    const items = within(panel('Notifications')).getAllByRole('listitem');
+
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent('Restaurants budget exceeded high Sent');
+    expect(items[0]).toHaveTextContent('€180.00 of €150.00 spent (120%). · 2026-10-20');
+    expect(items[1]).toHaveTextContent('Streaming is expected soon low Shown here only');
+  });
+
+  it('offers to mark only unread notifications as read, by their key', () => {
+    render(<NotificationsPanel data={NOTIFICATIONS} markRead={markRead} />);
+    const items = within(panel('Notifications')).getAllByRole('listitem');
+    const unread = items[0] ?? document.body;
+    const read = items[1] ?? document.body;
+    const button = within(unread).getByRole('button', { name: 'Mark as read' });
+
+    expect(button.closest('form')?.querySelector('input[name="key"]')).toHaveValue(
+      'notification-1',
+    );
+    expect(within(read).queryByRole('button')).toBeNull();
+    expect(read).toHaveTextContent('Read');
+  });
+
+  it('says when nothing has been raised', () => {
+    render(<NotificationsPanel data={{ notifications: [] }} markRead={markRead} />);
+
+    expect(panel('Notifications')).toHaveTextContent('Nothing has been raised yet.');
   });
 });
 

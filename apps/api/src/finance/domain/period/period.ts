@@ -179,6 +179,13 @@ export function isSupportedTimeZone(timeZone: string): boolean {
   }
 }
 
+export function currentHourIn(timeZone: string, instant: Date): number {
+  const hour = new Intl.DateTimeFormat('en', { timeZone, hour: 'numeric', hourCycle: 'h23' })
+    .formatToParts(instant)
+    .find((part) => part.type === 'hour')?.value;
+  return Number(hour ?? 0);
+}
+
 export function currentDateIn(timeZone: string, instant: Date): IsoDate {
   const parts = new Intl.DateTimeFormat('en', {
     timeZone,
