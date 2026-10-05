@@ -14,3 +14,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [008](ADR-008-household-authorization-boundary.md) | Household as the authorization boundary | Accepted |
 | [009](ADR-009-transaction-attribution.md) | Transaction attribution and expense scope | Accepted |
 | [010](ADR-010-household-budgets-and-goals.md) | Budgets and goals belong to the household | Accepted |
+| [011](ADR-011-multi-household-multi-member.md) | Any number of households, any number of members | Accepted |

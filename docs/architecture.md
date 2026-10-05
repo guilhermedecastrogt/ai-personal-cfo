@@ -4,7 +4,7 @@ This document describes how the system is structured and why the pieces are arra
 
 ## System context
 
-A household's members write to one assistant number on WhatsApp and look at one shared dashboard in a browser. Everything runs on a single ARM64 virtual machine.
+The system is a multi-household, multi-member personal finance platform. The members of a household write to one assistant number on WhatsApp and look at one shared dashboard in a browser. A household has one or more members, and the application can hold any number of households, each isolated from the others ([ADR-011](adr/ADR-011-multi-household-multi-member.md)). Everything runs on a single ARM64 virtual machine.
 
 ```mermaid
 flowchart TD
@@ -37,7 +37,7 @@ Four constraints shape almost every other choice.
 
 1. **Financial figures are computed, never generated.** Balances, budget usage, trends, forecasts and goal progress come from deterministic code over integer minor units. A model never produces a number that is presented as fact.
 2. **Model output is untrusted input.** Whatever a model returns is parsed, validated against the domain, and only then allowed to cause a write. See [ADR-004](adr/ADR-004-ai-output-validation.md).
-3. **The household is the unit of ownership and of security.** Every financial row belongs to a household. Members exist for attribution. See [ADR-006](adr/ADR-006-household-and-members.md) and [ADR-008](adr/ADR-008-household-authorization-boundary.md).
+3. **The household is the unit of ownership and of security.** Every financial row belongs to a household. Members exist for attribution, and nothing depends on how many there are. See [ADR-006](adr/ADR-006-household-and-members.md), [ADR-008](adr/ADR-008-household-authorization-boundary.md) and [ADR-011](adr/ADR-011-multi-household-multi-member.md).
 4. **One deployable on one machine.** There are no queues, caches or separate services until a concrete need appears. See [ADR-001](adr/ADR-001-modular-monolith.md).
 
 ## Backend modules
@@ -122,7 +122,7 @@ Every request, from either entry point, is resolved to a context before applicat
 }
 ```
 
-For WhatsApp the context comes from a lookup of the sender's identity ([ADR-007](adr/ADR-007-whatsapp-identity-resolution.md)). For the dashboard it comes from the authenticated session. Services receive the context explicitly, and repositories require its `householdId` on every query.
+For WhatsApp the context comes from a lookup that follows identity to member to household ([ADR-007](adr/ADR-007-whatsapp-identity-resolution.md)). For the dashboard it comes from the authenticated session. Services receive the context explicitly, and repositories require its `householdId` on every query.
 
 ## Inbound message flow
 
@@ -236,12 +236,14 @@ erDiagram
 
 Conventions that hold across the schema:
 
+- Members are rows related to a household, one to many. No table has positional or per-member columns, and no constraint limits how many members a household has.
+- An account's `owner_member_id` references any member of the household, or is null for a joint account.
 - UUID primary keys, `created_at` everywhere and `updated_at` on mutable rows.
 - Money is stored as an integer amount in minor units next to an ISO 4217 currency code. Amounts in different currencies are never summed or converted.
 - A transfer is one movement between two accounts of the household. It is excluded from income and expense figures by its type, so moving money between accounts never changes spending or net worth.
 - Constraints carry the invariants the application relies on: positive amounts, valid enumerations, members belonging to the household they are used in, and unique provider event identifiers.
 
-Supporting tables for conversations, messages and webhook events sit outside the financial model. The column-level schema is documented in `database.md` when the schema is implemented. The reasoning for the household model is in ADRs [006](adr/ADR-006-household-and-members.md), [009](adr/ADR-009-transaction-attribution.md) and [010](adr/ADR-010-household-budgets-and-goals.md).
+Supporting tables for conversations, messages and webhook events sit outside the financial model. The column-level schema is documented in `database.md` when the schema is implemented. The reasoning for the household model is in ADRs [006](adr/ADR-006-household-and-members.md), [009](adr/ADR-009-transaction-attribution.md), [010](adr/ADR-010-household-budgets-and-goals.md) and [011](adr/ADR-011-multi-household-multi-member.md).
 
 ## Finance engine
 
@@ -258,7 +260,7 @@ The engine is a set of pure calculators:
 | `SpendingTrendAnalyzer` | Change in category spending between periods |
 | `AnomalyDetector` | Transactions that are unusual against the household's history |
 
-Each takes transactions and definitions as input and returns values. The same calculator serves household and per-member analytics, since a member's figures are the same calculation over a filtered set. Calculators operate on one currency at a time. Percentages are derived from integer amounts with explicit rounding rules.
+Each takes transactions and definitions as input and returns values. The same calculator serves household and per-member analytics, since a member's figures are the same calculation over a filtered set. Breakdowns are computed per member over however many members the household has. Calculators operate on one currency at a time. Percentages are derived from integer amounts with explicit rounding rules.
 
 ## Deployment
 

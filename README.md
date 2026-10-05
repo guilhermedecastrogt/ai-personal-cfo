@@ -1,8 +1,8 @@
 # AI Personal CFO
 
-An open-source finance manager for a household, used over WhatsApp. Each member writes to one shared assistant number from their own phone. A message such as `I spent €23 at Lidl`, or a photo of a receipt, becomes a structured transaction attributed to the person who sent it, tracked against the household's budgets and goals. The assistant speaks up when something deserves attention.
+An open-source, multi-household, multi-member personal finance platform, used over WhatsApp. Each member writes to one shared assistant number from their own phone. A message such as `I spent €23 at Lidl`, or a photo of a receipt, becomes a structured transaction attributed to the person who sent it, tracked against the household's budgets and goals. The assistant speaks up when something deserves attention.
 
-This is a personal project built in the open. It is designed for one household, such as a couple managing their money together, and is not a hosted service.
+This is a personal project built in the open. A household can have one member, two, or more, and the application can hold several independent households. Its first real use is a couple. It is self-hosted and is not offered as a service.
 
 ## Status
 
@@ -76,7 +76,7 @@ docs/           Architecture, guides and decision records
 - [ ] Deployment infrastructure
 - [ ] Security hardening
 
-Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, expense splitting between members, private per-member data, hosting multiple households and a mobile application.
+Out of scope for the first version: open banking and bank synchronization, permanent receipt storage, PDF statements, investment tracking, net worth history, currency conversion, expense splitting between members, private per-member data, self-service household sign-up and a mobile application.
 
 ## Documentation
 
