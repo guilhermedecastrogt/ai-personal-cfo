@@ -11,6 +11,7 @@ import {
   REVIEW,
   SEPTEMBER,
   NOTIFICATIONS,
+  RECURRING,
   SIGNALS,
   SPENDING,
   TRANSACTIONS,
@@ -26,6 +27,7 @@ import {
   SignalsView,
 } from './planning-views';
 import { AccountsView, ReviewView, TransactionsView } from './record-views';
+import { RecurringView } from './recurring-view';
 
 function panel(title: string): HTMLElement {
   const heading = screen.getByRole('heading', { name: title, level: 2 });
@@ -328,6 +330,98 @@ describe('notifications', () => {
     render(<NotificationsPanel data={{ notifications: [] }} markRead={markRead} />);
 
     expect(panel('Notifications')).toHaveTextContent('Nothing has been raised yet.');
+  });
+});
+
+describe('recurring', () => {
+  it('shows the monthly and annual commitment and what is coming up, as given', () => {
+    render(<RecurringView data={RECURRING} />);
+
+    expect(panel('Commitment')).toHaveTextContent('€1,826.98 a month, €21,923.76 a year.');
+    expect(panel('Commitment')).toHaveTextContent(
+      'Expected in the next 14 days: €1,802.99 (Cloud, Landlord).',
+    );
+  });
+
+  it('lists each recurring expense with cadence, dates, payers and annual cost', () => {
+    render(<RecurringView data={RECURRING} />);
+    const rows = within(panel('Recurring expenses')).getAllByRole('listitem');
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent(
+      'Landlord monthly · Rent · last 2026-10-01 · next expected 2026-10-31 · paid by Member A (6)',
+    );
+    expect(rows[0]).toHaveTextContent('€1,800.00€21,600.00 a year');
+    expect(rows[1]).toHaveTextContent('paid by Member A (4), Member B (3)');
+  });
+
+  it('marks a price change with both amounts and its date, and a new commitment', () => {
+    render(<RecurringView data={RECURRING} />);
+    const rows = within(panel('Recurring expenses')).getAllByRole('listitem');
+
+    expect(rows[1]).toHaveTextContent('Price up');
+    expect(rows[1]).toHaveTextContent('Was €15.99 until 2026-09-15, now €18.99 (18.76%)');
+    expect(rows[2]).toHaveTextContent('Cloud New');
+    expect(rows[0]).not.toHaveTextContent(/New|Price/);
+  });
+
+  it('lists what appears to have stopped without saying why', () => {
+    render(<RecurringView data={RECURRING} />);
+    const stopped = panel('Appear to have stopped');
+
+    expect(stopped).toHaveTextContent(
+      'Old Gymmonthly · last charged 2026-07-05 · was expected 2026-08-04 · paid by Member A (5)',
+    );
+    expect(stopped).not.toHaveTextContent(/cancel/i);
+  });
+
+  it('offers sorting and marks the current order', () => {
+    render(<RecurringView data={{ ...RECURRING, sort: 'next' }} />);
+    const sorting = screen.getByRole('navigation', { name: 'Sort recurring expenses' });
+
+    expect(within(sorting).getByRole('link', { name: 'Next date' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(within(sorting).getByRole('link', { name: 'Name' })).toHaveAttribute(
+      'href',
+      '/recurring?sort=name',
+    );
+  });
+
+  it('explains what is needed when nothing has been detected', () => {
+    const [eur] = RECURRING.currencies;
+    render(
+      <RecurringView
+        data={{
+          ...RECURRING,
+          currencies: eur === undefined ? [] : [{ ...eur, commitments: [], stopped: [] }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/It takes three regular charges/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Commitment' })).toBeNull();
+  });
+
+  it('keeps currencies in separate sections', () => {
+    const [eur] = RECURRING.currencies;
+    render(
+      <RecurringView
+        data={{
+          ...RECURRING,
+          currencies:
+            eur === undefined
+              ? []
+              : [eur, { ...eur, currency: 'USD', commitments: [], stopped: [] }],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Figures in EUR' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Figures in USD' })).toHaveTextContent(
+      'No recurring expense has been detected yet.',
+    );
   });
 });
 

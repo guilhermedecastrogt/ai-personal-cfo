@@ -12,6 +12,7 @@ const SECTIONS = [
   { href: '/budgets', label: 'Budgets' },
   { href: '/goals', label: 'Goals' },
   { href: '/outlook', label: 'Outlook' },
+  { href: '/recurring', label: 'Recurring' },
   { href: '/signals', label: 'Signals' },
   { href: '/review', label: 'Review' },
   { href: '/transactions', label: 'Transactions' },

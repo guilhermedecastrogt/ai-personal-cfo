@@ -59,21 +59,22 @@ The browser never talks to the API directly and never holds an identifier.
 
 All routes require a session. All are `GET` and take an optional `month=YYYY-MM`, except the two notification routes.
 
-| Route                                     | Returns                                                                                       |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `/dashboard/session`                      | Member and household names, currency, time zone, today, selectable months                     |
-| `/dashboard/overview`                     | Totals, comparison, top categories, members, budgets, forecast, balances, findings            |
-| `/dashboard/spending`                     | Total, categories, members, accounts, biggest changes, largest expenses                       |
-| `/dashboard/income`                       | Total, sources, members, comparison                                                           |
-| `/dashboard/budgets`                      | Each budget with usage, status, projection and member attribution                             |
-| `/dashboard/goals`                        | Each goal with progress, remainder and state                                                  |
-| `/dashboard/outlook`                      | Forecast, cash-flow outlook, budgets projected over, recurring commitments                    |
-| `/dashboard/signals`                      | Insights and anomalies, described                                                             |
-| `/dashboard/review`                       | The monthly review narrative and whether it came from the model                               |
-| `/dashboard/transactions`                 | A page of transactions, with filters `type`, `category`, `account`, `member`, `page`          |
-| `/dashboard/accounts`                     | Accounts with balances and ownership, totals per currency, members                            |
-| `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month |
-| `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                |
+| Route                                     | Returns                                                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `/dashboard/session`                      | Member and household names, currency, time zone, today, selectable months                                                   |
+| `/dashboard/overview`                     | Totals, comparison, top categories, members, budgets, forecast, balances, findings                                          |
+| `/dashboard/spending`                     | Total, categories, members, accounts, biggest changes, largest expenses                                                     |
+| `/dashboard/income`                       | Total, sources, members, comparison                                                                                         |
+| `/dashboard/budgets`                      | Each budget with usage, status, projection and member attribution                                                           |
+| `/dashboard/goals`                        | Each goal with progress, remainder and state                                                                                |
+| `/dashboard/outlook`                      | Forecast, cash-flow outlook, budgets projected over, recurring commitments                                                  |
+| `/dashboard/signals`                      | Insights and anomalies, described                                                                                           |
+| `/dashboard/review`                       | The monthly review narrative and whether it came from the model                                                             |
+| `/dashboard/transactions`                 | A page of transactions, with filters `type`, `category`, `account`, `member`, `page`                                        |
+| `/dashboard/accounts`                     | Accounts with balances and ownership, totals per currency, members                                                          |
+| `/dashboard/recurring`                    | Recurring commitments per currency with totals, upcoming charges, price changes and stopped ones. Takes `sort`, not `month` |
+| `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month                               |
+| `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                                              |
 
 Sessions: `POST /auth/sessions` with an access code, and `DELETE /auth/sessions/current`.
 
@@ -94,18 +95,19 @@ The web application imports the TypeScript types of these schemas and nothing el
 
 ## Views
 
-| Page         | Shows                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| Overview     | The month in one line, comparison, findings, top categories, budgets, projection, balances, members |
-| Spending     | Total, categories with subcategories, members, accounts, risers and fallers, largest expenses       |
-| Income       | Total, sources, members                                                                             |
-| Budgets      | Usage, status, remainder, projection and who spent what                                             |
-| Goals        | Progress, remainder, date and required monthly saving                                               |
-| Outlook      | Actual figures beside projected ones, budgets projected over, recurring commitments                 |
-| Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read     |
-| Review       | Summary, strengths, concerns, suggestions and priorities                                            |
-| Transactions | Read-only history with filters and paging                                                           |
-| Accounts     | Accounts, ownership, balances, totals per currency, members                                         |
+| Page         | Shows                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview     | The month in one line, comparison, findings, top categories, budgets, projection, balances, members                                   |
+| Spending     | Total, categories with subcategories, members, accounts, risers and fallers, largest expenses                                         |
+| Income       | Total, sources, members                                                                                                               |
+| Budgets      | Usage, status, remainder, projection and who spent what                                                                               |
+| Goals        | Progress, remainder, date and required monthly saving                                                                                 |
+| Outlook      | Actual figures beside projected ones, budgets projected over, recurring commitments                                                   |
+| Recurring    | Monthly and annual commitment, each recurring expense with cadence, dates, payers and price changes, and what appears to have stopped |
+| Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read                                       |
+| Review       | Summary, strengths, concerns, suggestions and priorities                                                                              |
+| Transactions | Read-only history with filters and paging                                                                                             |
+| Accounts     | Accounts, ownership, balances, totals per currency, members                                                                           |
 
 ## Periods
 

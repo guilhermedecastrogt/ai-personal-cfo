@@ -41,28 +41,32 @@ The finance engine, the financial domain modules and the CFO review know nothing
 
 Events are built from the monthly analysis of the current month in the household's time zone, once per currency. Most are the finance engine's existing insights. Two are derived from facts already in the review.
 
-| Event                   | Source                                                 | Severity           |
-| ----------------------- | ------------------------------------------------------ | ------------------ |
-| `BUDGET_NEAR_LIMIT`     | Insight: budget past its alert threshold               | `MEDIUM`           |
-| `BUDGET_EXCEEDED`       | Insight: budget over its limit                         | `HIGH`, `CRITICAL` |
-| `BUDGET_FORECAST_RISK`  | Review: a budget still on track, projected to run over | `MEDIUM`           |
-| `SPENDING_INCREASE`     | Insight: a category well above the previous period     | `LOW`, `MEDIUM`    |
-| `UNUSUAL_SPENDING`      | Insight: an anomaly against the household's history    | `MEDIUM`           |
-| `CASH_FLOW_WARNING`     | Insight: projected spending above expected income      | `HIGH`             |
-| `GOAL_PROGRESS`         | Insight: a goal reached, or past its date              | `INFO`, `MEDIUM`   |
-| `RECURRING_EXPENSE`     | Insight: a recurring charge was detected               | `INFO`             |
-| `RECURRING_EXPENSE_DUE` | Review: a recurring charge expected within 3 days      | `LOW`              |
+| Event                       | Source                                                 | Severity           |
+| --------------------------- | ------------------------------------------------------ | ------------------ |
+| `BUDGET_NEAR_LIMIT`         | Insight: budget past its alert threshold               | `MEDIUM`           |
+| `BUDGET_EXCEEDED`           | Insight: budget over its limit                         | `HIGH`, `CRITICAL` |
+| `BUDGET_FORECAST_RISK`      | Review: a budget still on track, projected to run over | `MEDIUM`           |
+| `SPENDING_INCREASE`         | Insight: a category well above the previous period     | `LOW`, `MEDIUM`    |
+| `UNUSUAL_SPENDING`          | Insight: an anomaly against the household's history    | `MEDIUM`           |
+| `CASH_FLOW_WARNING`         | Insight: projected spending above expected income      | `HIGH`             |
+| `GOAL_PROGRESS`             | Insight: a goal reached, or past its date              | `INFO`, `MEDIUM`   |
+| `RECURRING_EXPENSE`         | Insight: an established recurring charge exists        | `INFO`             |
+| `NEW_RECURRING_EXPENSE`     | Insight: a recurring charge was newly established      | `MEDIUM`           |
+| `RECURRING_PRICE_INCREASE`  | Insight: a recurring charge costs more than before     | `MEDIUM`           |
+| `RECURRING_EXPENSE_STOPPED` | Insight: a recurring charge appears to have stopped    | `MEDIUM`           |
+| `RECURRING_EXPENSE_DUE`     | Review: a recurring charge expected within 3 days      | `LOW`              |
 
 ### Stable keys
 
 Every event has a key that is the same each time the same situation is evaluated. Keys are built from the currency, the kind of event, its subject and its period, never from the time of evaluation.
 
-| Event             | Key                                                   |
-| ----------------- | ----------------------------------------------------- |
-| Budget usage      | `<currency>:BUDGET:<budget>:<period start>`           |
-| Budget forecast   | `<currency>:BUDGET_FORECAST:<budget>:<month start>`   |
-| Recurring due     | `<currency>:RECURRING_DUE:<merchant>:<expected date>` |
-| Any other insight | `<currency>:<insight key>`                            |
+| Event               | Key                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Budget usage        | `<currency>:BUDGET:<budget>:<period start>`                                                                      |
+| Budget forecast     | `<currency>:BUDGET_FORECAST:<budget>:<month start>`                                                              |
+| Recurring due       | `<currency>:RECURRING_DUE:<merchant>:<expected date>`                                                            |
+| Recurring lifecycle | `<currency>:<event>:<merchant>:<cadence>:<transaction date>`. See [recurring-expenses.md](recurring-expenses.md) |
+| Any other insight   | `<currency>:<insight key>`                                                                                       |
 
 "Near its limit" and "exceeded" share one key for a budget and period, because they are stages of the same situation. What distinguishes them is the level.
 

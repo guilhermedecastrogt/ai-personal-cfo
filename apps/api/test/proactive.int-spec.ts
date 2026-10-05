@@ -261,7 +261,7 @@ describe('proactive CFO notifications', () => {
       const { fixture } = await household('Recurring');
       await record(
         fixture,
-        ['07', '08', '09'].map((month) => ({
+        ['04', '05', '06', '07', '08', '09'].map((month) => ({
           amountMinor: 1799,
           merchant: 'Streaming',
           categoryId: category('Subscriptions'),

@@ -139,7 +139,11 @@ export class FinancialQueryService {
       case 'LARGEST_EXPENSES':
         return this.finance.largestExpenses(householdId, filters.period, filters);
       case 'RECURRING_EXPENSES':
-        return this.finance.recurringExpenses(householdId, today);
+        return this.finance.recurringCommitments(householdId, today);
+      case 'RECURRING_UPCOMING':
+        return this.finance.upcomingRecurring(householdId, today);
+      case 'RECURRING_CHANGES':
+        return this.finance.recurringChanges(householdId, today);
       case 'ACCOUNT_BALANCE':
         return focusBalances(await this.finance.accountBalances(householdId), filters);
       case 'FORECAST':

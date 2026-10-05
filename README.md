@@ -90,6 +90,7 @@ The API listens on port 3000 and the dashboard on port 3001. To sign in to the d
 - [x] Multi-turn conversations with follow-up questions
 - [x] Dashboard
 - [x] Proactive notifications
+- [x] Recurring expense and subscription intelligence
 - [ ] Monthly reports
 - [ ] Deployment infrastructure
 - [ ] Security hardening

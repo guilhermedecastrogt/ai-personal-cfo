@@ -20,6 +20,7 @@ import {
   outlookViewSchema,
   overviewSchema,
   notificationsSchema,
+  recurringSchema,
   reviewSchema,
   sessionSchema,
   signalsSchema,
@@ -517,7 +518,7 @@ describe('dashboard API', () => {
         date: null,
       });
       expect(insights.map((insight) => insight.type)).toEqual(
-        expect.arrayContaining(['RECURRING_EXPENSE']),
+        expect.arrayContaining(['NEW_RECURRING_EXPENSE']),
       );
     });
 
@@ -856,6 +857,104 @@ describe('dashboard API', () => {
 
     it('requires a session to list notifications', async () => {
       expect((await get('/dashboard/notifications')).status).toBe(401);
+    });
+  });
+
+  describe('recurring commitments', () => {
+    it('lists commitments with monthly and annual equivalents, payers and what is new', async () => {
+      const fixture = await establishedHousehold('Recurring Dashboard');
+      const token = await tokenFor(fixture);
+
+      const recurring = await view(recurringSchema, '/dashboard/recurring', token);
+      const [eur] = recurring.currencies;
+
+      expect(recurring.sort).toBe('cost');
+      expect(eur).toMatchObject({
+        currency: 'EUR',
+        monthlyEquivalent: { minor: 204000, text: '€2,040.00' },
+        annualEquivalent: { minor: 2448000, text: '€24,480.00' },
+        stopped: [],
+      });
+      expect(eur?.commitments).toMatchObject([
+        {
+          merchant: 'Landlord',
+          frequency: 'MONTHLY',
+          category: 'Rent',
+          typicalAmount: { text: '€1,800.00' },
+          annualEquivalent: { text: '€21,600.00' },
+          occurrences: 3,
+          lastDate: THIS_MONTH.start,
+          isNew: true,
+          priceChange: null,
+          payers: [{ member: 'Recurring Dashboard Member 1', occurrences: 3 }],
+        },
+        { merchant: 'Lidl', annualEquivalent: { text: '€2,880.00' } },
+      ]);
+      expect(JSON.stringify(recurring)).not.toMatch(UUID);
+    });
+
+    it('sorts by name or by next expected date when asked, and rejects anything else', async () => {
+      const fixture = await establishedHousehold('Recurring Sorting');
+      const token = await tokenFor(fixture);
+      await record(fixture, 0, [
+        {
+          amountMinor: 999,
+          merchant: 'Aardvark Cloud',
+          transactionDate: addDays(THIS_MONTH.start, -70),
+        },
+        {
+          amountMinor: 999,
+          merchant: 'Aardvark Cloud',
+          transactionDate: addDays(THIS_MONTH.start, -40),
+        },
+        {
+          amountMinor: 999,
+          merchant: 'Aardvark Cloud',
+          transactionDate: addDays(THIS_MONTH.start, -10),
+        },
+      ]);
+
+      const byName = await view(recurringSchema, '/dashboard/recurring?sort=name', token);
+      const byNext = await view(recurringSchema, '/dashboard/recurring?sort=next', token);
+      const byCost = await view(recurringSchema, '/dashboard/recurring', token);
+      const merchants = (page: typeof byName): string[] =>
+        page.currencies[0]?.commitments.map((commitment) => commitment.merchant) ?? [];
+
+      expect(merchants(byName)).toEqual(['Aardvark Cloud', 'Landlord', 'Lidl']);
+      expect(merchants(byNext)[0]).toBe('Aardvark Cloud');
+      expect(merchants(byCost)).toEqual(['Landlord', 'Lidl', 'Aardvark Cloud']);
+      expect((await get('/dashboard/recurring?sort=amount', token)).status).toBe(400);
+    });
+
+    it('shows an empty state for a household without history and requires a session', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Recurring Empty', 1);
+      const token = await tokenFor(fixture);
+
+      const recurring = await view(recurringSchema, '/dashboard/recurring', token);
+
+      expect(recurring.currencies).toEqual([
+        {
+          currency: 'EUR',
+          monthlyEquivalent: { minor: 0, text: '€0.00' },
+          annualEquivalent: { minor: 0, text: '€0.00' },
+          commitments: [],
+          stopped: [],
+          upcoming: { withinDays: 14, total: { minor: 0, text: '€0.00' }, merchants: [] },
+        },
+      ]);
+      expect((await get('/dashboard/recurring')).status).toBe(401);
+    });
+
+    it('never shows another household its commitments', async () => {
+      const fixture = await establishedHousehold('Recurring Owner');
+      const other = await createHouseholdFixture(testDatabase.database, 'Recurring Visitor', 2);
+      const otherToken = await tokenFor(other, 1);
+
+      const theirs = await view(recurringSchema, '/dashboard/recurring', otherToken);
+      const mine = await view(recurringSchema, '/dashboard/recurring', await tokenFor(fixture));
+
+      expect(theirs.currencies[0]?.commitments).toEqual([]);
+      expect(mine.currencies[0]?.commitments).toHaveLength(2);
     });
   });
 });

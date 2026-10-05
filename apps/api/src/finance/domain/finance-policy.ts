@@ -4,6 +4,8 @@ export interface RecurrenceCadence {
   readonly frequency: RecurrenceFrequency;
   readonly intervalInDays: number;
   readonly toleranceInDays: number;
+  readonly graceInDays: number;
+  readonly occurrencesPerYear: number;
 }
 
 export interface FinancePolicy {
@@ -14,7 +16,10 @@ export interface FinancePolicy {
     readonly lookbackInDays: number;
     readonly minimumOccurrences: number;
     readonly amountToleranceBasisPoints: number;
-    readonly missedCyclesBeforeStale: number;
+    readonly maximumPriceChangeBasisPoints: number;
+    readonly recentChangeWithinDays: number;
+    readonly stoppedVisibleForDays: number;
+    readonly upcomingWithinDays: number;
     readonly cadences: readonly RecurrenceCadence[];
   };
   readonly anomaly: {
@@ -48,15 +53,42 @@ export const DEFAULT_FINANCE_POLICY: FinancePolicy = {
     historyPeriods: 3,
   },
   recurring: {
-    lookbackInDays: 400,
+    lookbackInDays: 1_200,
     minimumOccurrences: 3,
     amountToleranceBasisPoints: 1_000,
-    missedCyclesBeforeStale: 2,
+    maximumPriceChangeBasisPoints: 5_000,
+    recentChangeWithinDays: 90,
+    stoppedVisibleForDays: 120,
+    upcomingWithinDays: 14,
     cadences: [
-      { frequency: 'WEEKLY', intervalInDays: 7, toleranceInDays: 1 },
-      { frequency: 'MONTHLY', intervalInDays: 30, toleranceInDays: 3 },
-      { frequency: 'QUARTERLY', intervalInDays: 91, toleranceInDays: 4 },
-      { frequency: 'YEARLY', intervalInDays: 365, toleranceInDays: 5 },
+      {
+        frequency: 'WEEKLY',
+        intervalInDays: 7,
+        toleranceInDays: 1,
+        graceInDays: 3,
+        occurrencesPerYear: 52,
+      },
+      {
+        frequency: 'MONTHLY',
+        intervalInDays: 30,
+        toleranceInDays: 3,
+        graceInDays: 10,
+        occurrencesPerYear: 12,
+      },
+      {
+        frequency: 'QUARTERLY',
+        intervalInDays: 91,
+        toleranceInDays: 4,
+        graceInDays: 20,
+        occurrencesPerYear: 4,
+      },
+      {
+        frequency: 'YEARLY',
+        intervalInDays: 365,
+        toleranceInDays: 5,
+        graceInDays: 45,
+        occurrencesPerYear: 1,
+      },
     ],
   },
   anomaly: {

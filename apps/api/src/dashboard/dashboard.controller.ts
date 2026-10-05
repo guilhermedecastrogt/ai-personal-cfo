@@ -18,12 +18,14 @@ import { CurrentContext, SessionGuard } from '../auth/session.guard.js';
 import { FutureMonthError } from '../cfo/cfo.service.js';
 import type { RequestContext } from '../households/request-context.js';
 import { TRANSACTION_TYPES } from '../transactions/transaction-vocabulary.js';
+import { RECURRING_SORTS } from './dashboard.contracts.js';
 import type {
   AccountsView,
   BudgetsView,
   GoalsView,
   IncomeView,
   NotificationsView,
+  RecurringView,
   OutlookView,
   OverviewView,
   ReviewView,
@@ -41,6 +43,8 @@ const monthQuerySchema = z.object({
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
     .optional(),
 });
+
+const recurringQuerySchema = z.object({ sort: z.enum(RECURRING_SORTS).default('cost') });
 
 const MAXIMUM_PAGE = 10_000;
 const HTTP_NO_CONTENT = 204;
@@ -132,6 +136,18 @@ export class DashboardController {
     @Query() query: unknown,
   ): Promise<SignalsView> {
     return this.dashboard.signals(context, parseQuery(monthQuerySchema, query).month, new Date());
+  }
+
+  @Get('recurring')
+  recurring(
+    @CurrentContext() context: RequestContext,
+    @Query() query: unknown,
+  ): Promise<RecurringView> {
+    return this.dashboard.recurring(
+      context,
+      parseQuery(recurringQuerySchema, query).sort,
+      new Date(),
+    );
   }
 
   @Get('notifications')

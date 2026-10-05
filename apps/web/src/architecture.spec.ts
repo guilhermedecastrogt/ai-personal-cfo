@@ -57,6 +57,16 @@ describe('web architecture', () => {
     expect(offenders(files, calculation)).toEqual([]);
   });
 
+  it('computes no recurring commitment, cadence or status in the browser', () => {
+    const view = files.find((file) => file.path === 'components/views/recurring-view.tsx');
+
+    expect(view?.text).toContain('entry.monthlyEquivalent');
+    expect(view?.text).toContain('entry.annualEquivalent');
+    expect(
+      offenders(files, /occurrencesPerYear|\* ?(12|52|4)\b|\/ ?12\b|daysBetween|graceIn/),
+    ).toEqual([]);
+  });
+
   it('formats no money and no percentage itself', () => {
     expect(offenders(files, /Intl\.NumberFormat|toLocaleString|style:\s*'currency'/)).toEqual([]);
   });

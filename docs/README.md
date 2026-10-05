@@ -15,6 +15,7 @@ Documents are added as the corresponding part of the system is built.
 | [`conversation.md`](conversation.md)                 | Multi-turn conversations, follow-ups, trusted and untrusted context     | Written                                 |
 | [`web-dashboard.md`](web-dashboard.md)               | Dashboard architecture, API, authentication and views                   | Written                                 |
 | [`proactive-cfo.md`](proactive-cfo.md)               | Proactive notifications: events, policy, state, scheduling and delivery | Written                                 |
+| [`recurring-expenses.md`](recurring-expenses.md)     | Recurring detection, price changes, stopped commitments and totals      | Written                                 |
 | `deployment.md`                                      | Oracle Cloud provisioning and release process                           | Planned                                 |
 | [`adr/`](adr/README.md)                              | Architecture decision records                                           | Written, extended as decisions are made |
 

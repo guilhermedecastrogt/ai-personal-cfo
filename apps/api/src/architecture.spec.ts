@@ -412,6 +412,101 @@ describe('architecture', () => {
     expect(schema?.text).not.toMatch(/jsonb|payload|phone|address/);
   });
 
+  it('keeps recurring detection deterministic and inside the finance domain', () => {
+    const recurring = within('finance/domain/recurring/');
+    const allowed =
+      /^\.\.\/(\.\.\/\.\.\/money\/|finance-policy\.js|ledger\/|period\/|statistics\.js)|^\.\/recurring-/;
+
+    expect(recurring.map((file) => file.path).sort()).toEqual([
+      'finance/domain/recurring/recurring-expense-detector.ts',
+      'finance/domain/recurring/recurring-summary.ts',
+    ]);
+    expect(
+      offenders(recurring, (file) => importsOf(file).some((name) => !allowed.test(name))),
+    ).toEqual([]);
+    expect(
+      offenders(recurring, (file) =>
+        /new Date\(|Date\.now|Math\.random|process\.env|parseFloat|toFixed|async |await /.test(
+          file.text,
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps every recurrence threshold in the finance policy', () => {
+    const detector = files.find(
+      (file) => file.path === 'finance/domain/recurring/recurring-expense-detector.ts',
+    );
+    const policy = files.find((file) => file.path === 'finance/domain/finance-policy.ts');
+
+    expect(detector?.text).not.toMatch(/\b\d{2,}\b/);
+    for (const threshold of [
+      'minimumOccurrences',
+      'amountToleranceBasisPoints',
+      'maximumPriceChangeBasisPoints',
+      'recentChangeWithinDays',
+      'stoppedVisibleForDays',
+      'graceInDays',
+      'occurrencesPerYear',
+    ]) {
+      expect(policy?.text).toContain(threshold);
+    }
+  });
+
+  it('lets only the finance engine detect, total or judge recurring expenses', () => {
+    const outsideFinance = files.filter((file) => !file.path.startsWith('finance/'));
+    const judging =
+      /detectRecurringExpenses|summarizeRecurringExpenses\(|upcomingCommitments\(|occurrencesPerYear|annualEquivalentMinor\s*[-+*/=]|monthlyEquivalentMinor\s*[-+*/]|graceInDays|amountToleranceBasisPoints/;
+
+    expect(
+      offenders(
+        outsideFinance.filter((file) => file.path !== 'cfo/analysis/monthly-review.ts'),
+        (file) => judging.test(file.text),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(within('ai/', 'conversation/', 'proactive/', 'whatsapp/', 'dashboard/'), (file) =>
+        importsOf(file).some((name) => name.includes('recurring-expense-detector')),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(within('ai/'), (file) =>
+        importsOf(file).some((name) => name.includes('recurring')),
+      ),
+    ).toEqual([]);
+  });
+
+  it('answers recurring questions through finance methods scoped to the household', () => {
+    const queries = files.find(
+      (file) => file.path === 'conversation/queries/financial-query.service.ts',
+    );
+    const finance = files.find((file) => file.path === 'finance/application/finance.service.ts');
+    const dashboard = files.find((file) => file.path === 'dashboard/dashboard.service.ts');
+
+    for (const method of ['recurringCommitments', 'upcomingRecurring', 'recurringChanges']) {
+      expect(queries?.text).toContain(`this.finance.${method}(householdId, today)`);
+      expect(finance?.text).toMatch(
+        new RegExp(`async ${method}\\(householdId: string, asOf: IsoDate\\)`),
+      );
+    }
+    expect(dashboard?.text).toContain(
+      'this.finance.recurringCommitments(context.householdId, today)',
+    );
+  });
+
+  it('treats transactions as the source of truth and stores no recurring copies', () => {
+    expect(
+      offenders(files, (file) =>
+        importsOf(file).some((name) => name.includes('recurring-expenses.schema')),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(within('finance/', 'cfo/', 'proactive/', 'conversation/queries/'), (file) =>
+        /\.(insert|update|delete)\((transactions|recurringExpenses)\)/.test(file.text),
+      ),
+    ).toEqual([]);
+  });
+
   it('keeps financial calculation out of the messaging layer', () => {
     const messaging = within('whatsapp/');
     const financialLogic = /finance\/domain|money-math|Minor\b|BasisPoints|formatMoney|parseMoney/;

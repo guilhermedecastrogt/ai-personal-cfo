@@ -112,6 +112,52 @@ const recurringCommitmentSchema = z.object({
   nextExpectedDate: z.string(),
 });
 
+const recurringPayerSchema = z.object({ member: z.string(), occurrences: z.number() });
+
+const recurringDetailSchema = recurringCommitmentSchema.omit({ nextExpectedDate: true }).extend({
+  annualEquivalent: moneySchema,
+  firstDate: z.string(),
+  payers: z.array(recurringPayerSchema),
+});
+
+export const activeRecurringSchema = recurringDetailSchema.extend({
+  nextExpectedDate: z.string(),
+  isNew: z.boolean(),
+  priceChange: z
+    .object({
+      direction: z.enum(['INCREASE', 'DECREASE']),
+      previousAmount: moneySchema,
+      currentAmount: moneySchema,
+      difference: moneySchema,
+      change: ratioSchema.nullable(),
+      effectiveDate: z.string(),
+    })
+    .nullable(),
+});
+
+export const stoppedRecurringSchema = recurringDetailSchema.extend({ missedDate: z.string() });
+
+export const RECURRING_SORTS = ['cost', 'next', 'name'] as const;
+
+export const recurringSchema = z.object({
+  today: z.string(),
+  sort: z.enum(RECURRING_SORTS),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      monthlyEquivalent: moneySchema,
+      annualEquivalent: moneySchema,
+      commitments: z.array(activeRecurringSchema),
+      stopped: z.array(stoppedRecurringSchema),
+      upcoming: z.object({
+        withinDays: z.number(),
+        total: moneySchema,
+        merchants: z.array(z.string()),
+      }),
+    }),
+  ),
+});
+
 export const sessionSchema = z.object({
   member: z.string(),
   household: z.string(),
@@ -336,6 +382,10 @@ export type GoalsView = z.infer<typeof goalsSchema>;
 export type OutlookView = z.infer<typeof outlookViewSchema>;
 export type NotificationsView = z.infer<typeof notificationsSchema>;
 export type NotificationView = z.infer<typeof notificationSchema>;
+export type RecurringView = z.infer<typeof recurringSchema>;
+export type ActiveRecurringView = z.infer<typeof activeRecurringSchema>;
+export type StoppedRecurringView = z.infer<typeof stoppedRecurringSchema>;
+export type RecurringSort = (typeof RECURRING_SORTS)[number];
 export type SignalsView = z.infer<typeof signalsSchema>;
 export type ReviewView = z.infer<typeof reviewSchema>;
 export type TransactionsView = z.infer<typeof transactionsSchema>;

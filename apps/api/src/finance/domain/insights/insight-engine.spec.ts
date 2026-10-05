@@ -178,7 +178,7 @@ describe('evaluateInsights', () => {
     ]);
   });
 
-  it('raises an informational insight for a detected recurring expense', () => {
+  it('raises a newly established recurring expense', () => {
     const recurringExpenses = detectRecurringExpenses({
       entries: ['2026-08-03', '2026-09-03', '2026-10-03'].map((date) =>
         expense(1799, { merchant: 'Streaming', date }),
@@ -188,10 +188,80 @@ describe('evaluateInsights', () => {
       policy: DEFAULT_FINANCE_POLICY.recurring,
     });
 
-    expect(evaluate({ recurringExpenses })[0]).toMatchObject({
-      type: 'RECURRING_EXPENSE',
-      severity: 'INFO',
-      key: 'RECURRING_EXPENSE:streaming:MONTHLY',
+    expect(evaluate({ recurringExpenses })).toMatchObject([
+      {
+        type: 'NEW_RECURRING_EXPENSE',
+        severity: 'MEDIUM',
+        key: 'NEW_RECURRING_EXPENSE:streaming:MONTHLY:2026-08-03',
+      },
+    ]);
+  });
+
+  describe('recurring expenses', () => {
+    const detect = (
+      amounts: readonly (readonly [string, number])[],
+      asOf: string,
+    ): ReturnType<typeof detectRecurringExpenses> =>
+      detectRecurringExpenses({
+        entries: amounts.map(([date, amountMinor]) =>
+          expense(amountMinor, { merchant: 'Streaming', date }),
+        ),
+        currency: 'EUR',
+        asOf,
+        policy: DEFAULT_FINANCE_POLICY.recurring,
+      });
+    const established = [
+      ['2026-03-03', 1599],
+      ['2026-04-03', 1599],
+      ['2026-05-03', 1599],
+      ['2026-06-03', 1599],
+      ['2026-07-03', 1599],
+      ['2026-08-03', 1599],
+    ] as const;
+
+    it('is informational for a long-established commitment', () => {
+      expect(evaluate({ recurringExpenses: detect(established, '2026-08-20') })).toMatchObject([
+        { type: 'RECURRING_EXPENSE', severity: 'INFO', key: 'RECURRING_EXPENSE:streaming:MONTHLY' },
+      ]);
+    });
+
+    it('raises a price increase keyed by the date the new price started', () => {
+      const raised = [...established, ['2026-09-03', 1899]] as const;
+
+      expect(evaluate({ recurringExpenses: detect(raised, '2026-09-05') })).toMatchObject([
+        {
+          type: 'RECURRING_PRICE_INCREASE',
+          severity: 'MEDIUM',
+          key: 'RECURRING_PRICE_INCREASE:streaming:MONTHLY:2026-09-03',
+        },
+        { type: 'RECURRING_EXPENSE', severity: 'INFO' },
+      ]);
+    });
+
+    it('raises nothing extra for a price decrease', () => {
+      const lowered = [...established, ['2026-09-03', 1299]] as const;
+
+      expect(
+        evaluate({ recurringExpenses: detect(lowered, '2026-09-05') }).map((item) => item.type),
+      ).toEqual(['RECURRING_EXPENSE']);
+    });
+
+    it('raises a stopped commitment keyed by its last charge, and nothing else for it', () => {
+      expect(evaluate({ recurringExpenses: detect(established, '2026-10-05') })).toMatchObject([
+        {
+          type: 'RECURRING_EXPENSE_STOPPED',
+          severity: 'MEDIUM',
+          key: 'RECURRING_EXPENSE_STOPPED:streaming:MONTHLY:2026-08-03',
+        },
+      ]);
+    });
+
+    it('keeps every key stable between evaluations', () => {
+      const raised = [...established, ['2026-09-03', 1899]] as const;
+      const keysOn = (asOf: string): string[] =>
+        evaluate({ recurringExpenses: detect(raised, asOf) }).map((item) => item.key);
+
+      expect(keysOn('2026-09-20')).toEqual(keysOn('2026-09-04'));
     });
   });
 

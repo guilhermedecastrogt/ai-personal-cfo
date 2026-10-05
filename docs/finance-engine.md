@@ -171,23 +171,9 @@ Limitations: the forecast knows nothing about planned one-off expenses, treats e
 
 ## Recurring expenses
 
-Detection is conservative. Expenses from the last 400 days are grouped by merchant, compared case-insensitively. A group is reported only if all of the following hold:
+Detection is conservative: at least three charges from the same merchant, in an unbroken run that fits one cadence, at amounts that are either within tolerance of each other or form sustained price levels. Each pattern carries its status, typical amount, any recent price change, who paid, and the evidence behind it. Commitments are summarised per currency with monthly and annual equivalents.
 
-1. It has at least three occurrences.
-2. Every amount is within 10% of the group's median.
-3. Every gap between consecutive occurrences fits one cadence.
-4. The last occurrence is recent: no more than two cycles ago.
-
-| Cadence   | Gap in days |
-| --------- | ----------- |
-| Weekly    | 7 ± 1       |
-| Monthly   | 30 ± 3      |
-| Quarterly | 91 ± 4      |
-| Yearly    | 365 ± 5     |
-
-A supermarket visited weekly for varying amounts fails the second rule. A café visited irregularly fails the third. Expenses without a merchant are not considered.
-
-A pattern carries its evidence: the dates, amounts and gaps it was built from. It describes what was observed. It makes no claim that the expense is a subscription or that it is used ([ADR-004](adr/ADR-004-ai-output-validation.md)).
+The rules, thresholds and limitations are in [recurring-expenses.md](recurring-expenses.md).
 
 ## Anomalies
 
@@ -203,15 +189,18 @@ The median is used instead of the mean so that one earlier outlier does not hide
 
 The insight engine decides whether a result deserves attention. It receives results from the other calculations and returns structured insights, most severe first. A transaction that crosses no threshold produces nothing.
 
-| Type                | Raised when                                                                           | Severity                               |
-| ------------------- | ------------------------------------------------------------------------------------- | -------------------------------------- |
-| `BUDGET_NEAR_LIMIT` | A budget is `NEAR_LIMIT`                                                              | Medium                                 |
-| `BUDGET_EXCEEDED`   | A budget is `EXCEEDED`                                                                | High, or critical at 150% of the limit |
-| `SPENDING_INCREASE` | A category is up at least 25% and 2 000 minor units on the previous equivalent period | Low, or medium at 50%                  |
-| `UNUSUAL_SPENDING`  | An anomaly was detected                                                               | Medium                                 |
-| `RECURRING_EXPENSE` | A recurring pattern was detected                                                      | Info                                   |
-| `GOAL_PROGRESS`     | A goal is completed or overdue                                                        | Info, or medium when overdue           |
-| `CASH_FLOW_WARNING` | Projected spending for the month exceeds expected income                              | High                                   |
+| Type                        | Raised when                                                                           | Severity                               |
+| --------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------- |
+| `BUDGET_NEAR_LIMIT`         | A budget is `NEAR_LIMIT`                                                              | Medium                                 |
+| `BUDGET_EXCEEDED`           | A budget is `EXCEEDED`                                                                | High, or critical at 150% of the limit |
+| `SPENDING_INCREASE`         | A category is up at least 25% and 2 000 minor units on the previous equivalent period | Low, or medium at 50%                  |
+| `UNUSUAL_SPENDING`          | An anomaly was detected                                                               | Medium                                 |
+| `RECURRING_EXPENSE`         | An established recurring pattern exists                                               | Info                                   |
+| `NEW_RECURRING_EXPENSE`     | A recurring pattern was established in the last 90 days                               | Medium                                 |
+| `RECURRING_PRICE_INCREASE`  | A recurring charge moved to a higher price in the last 90 days                        | Medium                                 |
+| `RECURRING_EXPENSE_STOPPED` | A recurring charge is overdue beyond its grace period                                 | Medium                                 |
+| `GOAL_PROGRESS`             | A goal is completed or overdue                                                        | Info, or medium when overdue           |
+| `CASH_FLOW_WARNING`         | Projected spending for the month exceeds expected income                              | High                                   |
 
 Expected income is the larger of this month's income so far and the previous month's income. With no income on record there is no warning.
 

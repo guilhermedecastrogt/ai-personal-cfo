@@ -143,7 +143,7 @@ A message that mentions no date is taken to be about the day it was sent. This i
 | `memberScope`         | `HOUSEHOLD`, `SENDER` or `NAMED_MEMBER`                                                          |
 | `memberName`          | The member named, when the scope is `NAMED_MEMBER`                                               |
 
-Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`, `MONTHLY_REVIEW`, `SPENDING_CHANGE`, `LARGEST_EXPENSES`.
+Intents: `SPENDING_TOTAL`, `SPENDING_BY_CATEGORY`, `SPENDING_BY_MEMBER`, `SPENDING_BY_ACCOUNT`, `INCOME_TOTAL`, `CASH_FLOW`, `SAVINGS`, `BUDGET_STATUS`, `GOAL_PROGRESS`, `SPENDING_TREND`, `RECURRING_EXPENSES`, `RECURRING_UPCOMING`, `RECURRING_CHANGES`, `ACCOUNT_BALANCE`, `FORECAST`, `INSIGHTS`, `MONTHLY_REVIEW`, `SPENDING_CHANGE`, `LARGEST_EXPENSES`.
 
 A question without a period is about the current month. Each intent maps to one method of the finance engine ([finance-engine.md](finance-engine.md)), except `MONTHLY_REVIEW`, which is handled by the CFO layer ([cfo-intelligence.md](cfo-intelligence.md)).
 

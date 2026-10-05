@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import {
   ACCOUNTS,
   NOTIFICATIONS,
+  RECURRING,
   SEPTEMBER,
   SIGNALS,
   TRANSACTIONS,
@@ -10,6 +11,7 @@ import {
 } from '@/testing/fixtures';
 import AccountsPage from './(dashboard)/accounts/page';
 import OverviewPage from './(dashboard)/page';
+import RecurringPage from './(dashboard)/recurring/page';
 import SignalsPage from './(dashboard)/signals/page';
 import TransactionsPage from './(dashboard)/transactions/page';
 
@@ -117,5 +119,23 @@ describe('dashboard pages', () => {
     expect(apiGet).toHaveBeenCalledWith('/dashboard/notifications', undefined);
     expect(screen.getByRole('heading', { name: 'Notifications', level: 2 })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Mark as read' })).toHaveLength(1);
+  });
+
+  it.each([
+    ['name', 'name'],
+    ['next', 'next'],
+    ['amount; drop table', undefined],
+    [undefined, undefined],
+  ])('passes only a known sort order for recurring expenses (%s)', async (requested, passed) => {
+    apiGet.mockResolvedValue(RECURRING);
+
+    render(
+      (await RecurringPage({
+        searchParams: searchParams(requested === undefined ? {} : { sort: requested }),
+      })) as ReactElement,
+    );
+
+    expect(apiGet).toHaveBeenCalledWith('/dashboard/recurring', { sort: passed });
+    expect(screen.getByRole('heading', { name: 'Recurring', level: 1 })).toBeInTheDocument();
   });
 });

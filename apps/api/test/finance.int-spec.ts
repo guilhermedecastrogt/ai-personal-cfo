@@ -577,8 +577,8 @@ describe('finance engine against PostgreSQL', () => {
         'MEDIUM SPENDING_INCREASE',
         'MEDIUM UNUSUAL_SPENDING',
         'MEDIUM UNUSUAL_SPENDING',
-        'INFO RECURRING_EXPENSE',
-        'INFO RECURRING_EXPENSE',
+        'MEDIUM NEW_RECURRING_EXPENSE',
+        'MEDIUM NEW_RECURRING_EXPENSE',
       ]);
       expect(insights.every((insight) => !('message' in insight))).toBe(true);
     });

@@ -165,11 +165,242 @@ describe('detectRecurringExpenses', () => {
     expect(detect(entries)).toEqual([]);
   });
 
-  it('ignores a pattern that stopped more than two cycles ago', () => {
-    const entries = charges('Old Gym', 3500, ['2026-03-01', '2026-04-01', '2026-05-01']);
+  it('needs the same evidence for every cadence', () => {
+    expect(detect(charges('Box', 1200, ['2026-09-28', '2026-10-05']))).toEqual([]);
+    expect(detect(charges('Bill', 9000, ['2026-07-04', '2026-10-03']))).toEqual([]);
+    expect(detect(charges('Licence', 6000, ['2025-10-01', '2026-10-01']))).toEqual([]);
+  });
 
-    expect(detect(entries, '2026-10-05')).toEqual([]);
-    expect(detect(entries, '2026-06-20')).toHaveLength(1);
+  it('ignores an extra charge between cycles, which a subscription would not have', () => {
+    const entries = [
+      ...charges('Shop', 2000, ['2026-07-05', '2026-08-05', '2026-09-05', '2026-10-05']),
+      ...charges('Shop', 2000, ['2026-09-20']),
+    ];
+
+    expect(detect(entries)).toEqual([]);
+  });
+
+  it('starts again from the latest unbroken run after a pause', () => {
+    const entries = charges('Gym', 3500, [
+      '2025-11-01',
+      '2025-12-01',
+      '2026-01-01',
+      '2026-07-01',
+      '2026-08-01',
+      '2026-09-01',
+      '2026-10-01',
+    ]);
+
+    expect(detect(entries)[0]).toMatchObject({
+      occurrences: 4,
+      firstDate: '2026-07-01',
+      establishedOn: '2026-09-01',
+      evidence: { intervalsInDays: [31, 31, 30] },
+    });
+  });
+
+  describe('amounts', () => {
+    it('treats a small variation as the same price, with no price change', () => {
+      const entries = [
+        ...charges('Electricity', 6000, ['2026-07-05']),
+        ...charges('Electricity', 6400, ['2026-08-05']),
+        ...charges('Electricity', 5800, ['2026-09-05']),
+        ...charges('Electricity', 6100, ['2026-10-05']),
+      ];
+
+      expect(detect(entries)[0]).toMatchObject({ typicalAmountMinor: 6000, priceChange: null });
+    });
+
+    it('keeps one commitment across a price increase and reports the change exactly', () => {
+      const entries = [
+        ...charges('Streaming', 1599, ['2026-07-05', '2026-08-05']),
+        ...charges('Streaming', 1899, ['2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)).toHaveLength(1);
+      expect(detect(entries)[0]).toMatchObject({
+        occurrences: 4,
+        typicalAmountMinor: 1899,
+        priceChange: {
+          direction: 'INCREASE',
+          previousAmountMinor: 1599,
+          currentAmountMinor: 1899,
+          differenceMinor: 300,
+          changeBasisPoints: 1876,
+          effectiveDate: '2026-09-05',
+        },
+      });
+    });
+
+    it('recognises a new price from its first charge', () => {
+      const entries = [
+        ...charges('Streaming', 1599, ['2026-08-05', '2026-09-05']),
+        ...charges('Streaming', 1799, ['2026-10-05']),
+      ];
+
+      expect(detect(entries)[0]).toMatchObject({
+        typicalAmountMinor: 1799,
+        priceChange: { previousAmountMinor: 1599, effectiveDate: '2026-10-05' },
+      });
+    });
+
+    it('reports a price decrease with a negative difference', () => {
+      const entries = [
+        ...charges('Phone Plan', 3000, ['2026-06-05', '2026-07-05', '2026-08-05']),
+        ...charges('Phone Plan', 2000, ['2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)[0]?.priceChange).toMatchObject({
+        direction: 'DECREASE',
+        differenceMinor: -1000,
+        changeBasisPoints: -3333,
+      });
+    });
+
+    it('no longer reports a price change once it is old', () => {
+      const entries = [
+        ...charges('Streaming', 1599, ['2026-01-05', '2026-02-05']),
+        ...charges('Streaming', 1899, MONTHLY_DATES),
+      ];
+
+      expect(detect(entries)[0]).toMatchObject({ typicalAmountMinor: 1899, priceChange: null });
+    });
+
+    it('rejects a jump too large to be the same commitment', () => {
+      const entries = [
+        ...charges('Store', 1000, ['2026-07-05', '2026-08-05']),
+        ...charges('Store', 2500, ['2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)).toEqual([]);
+    });
+
+    it('starts a separate commitment after a jump too large, once it has three charges', () => {
+      const entries = [
+        ...charges('Store', 1000, ['2026-05-05', '2026-06-05']),
+        ...charges('Store', 2500, ['2026-07-05', '2026-08-05', '2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)[0]).toMatchObject({
+        typicalAmountMinor: 2500,
+        occurrences: 4,
+        firstDate: '2026-07-05',
+        priceChange: null,
+      });
+    });
+
+    it('recovers three charges after a one-off different amount, without a false price change', () => {
+      const entries = [
+        ...charges('Utility', 3000, ['2026-05-05', '2026-06-05']),
+        ...charges('Utility', 4000, ['2026-07-05']),
+        ...charges('Utility', 3000, ['2026-08-05', '2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)[0]).toMatchObject({
+        occurrences: 3,
+        firstDate: '2026-08-05',
+        typicalAmountMinor: 3000,
+        priceChange: null,
+      });
+    });
+
+    it('rejects a one-off different amount in the middle of a run', () => {
+      const entries = [
+        ...charges('Utility', 3000, ['2026-06-05', '2026-07-05']),
+        ...charges('Utility', 4000, ['2026-08-05']),
+        ...charges('Utility', 3000, ['2026-09-05', '2026-10-05']),
+      ];
+
+      expect(detect(entries)).toEqual([]);
+    });
+  });
+
+  describe('status', () => {
+    const entries = charges('Gym', 3500, ['2026-03-01', '2026-04-01', '2026-05-01']);
+
+    it('is active up to the expected date plus the grace period', () => {
+      expect(detect(entries, '2026-05-31')[0]).toMatchObject({
+        status: 'ACTIVE',
+        nextExpectedDate: '2026-05-31',
+      });
+      expect(detect(entries, '2026-06-10')[0]?.status).toBe('ACTIVE');
+    });
+
+    it('appears to have stopped once the grace period has passed', () => {
+      expect(detect(entries, '2026-06-11')[0]).toMatchObject({
+        status: 'STOPPED',
+        lastDate: '2026-05-01',
+        nextExpectedDate: '2026-05-31',
+      });
+    });
+
+    it('is forgotten some time after it stopped', () => {
+      expect(detect(entries, '2026-10-08')).toHaveLength(1);
+      expect(detect(entries, '2026-10-09')).toEqual([]);
+    });
+
+    it.each([
+      ['Weekly Box', ['2026-09-14', '2026-09-21', '2026-09-28'], '2026-10-08', '2026-10-09'],
+      ['Quarterly Bill', ['2026-01-03', '2026-04-04', '2026-07-04'], '2026-10-23', '2026-10-24'],
+      ['Annual Licence', ['2023-10-01', '2024-10-01', '2025-10-01'], '2026-11-15', '2026-11-16'],
+    ] as const)(
+      'uses a grace period that fits %s',
+      (merchant, dates, lastActiveDay, stoppedDay) => {
+        expect(detect(charges(merchant, 1000, dates), lastActiveDay)[0]?.status).toBe('ACTIVE');
+        expect(detect(charges(merchant, 1000, dates), stoppedDay)[0]?.status).toBe('STOPPED');
+      },
+    );
+  });
+
+  describe('new commitments', () => {
+    it('is new from its third charge and for a limited time', () => {
+      const entries = charges('Cloud Storage', 299, ['2026-06-01', '2026-07-01', '2026-08-01']);
+
+      expect(detect(entries, '2026-08-01')[0]).toMatchObject({
+        isNew: true,
+        establishedOn: '2026-08-01',
+      });
+      expect(detect(entries, '2026-08-20')[0]?.isNew).toBe(true);
+    });
+
+    it('is not new when it has been established for a long time', () => {
+      expect(detect(charges('Streaming', 1799, MONTHLY_DATES))[0]).toMatchObject({
+        isNew: false,
+        establishedOn: '2026-07-03',
+      });
+    });
+  });
+
+  describe('payers', () => {
+    it('counts how often each member paid, most frequent first', () => {
+      const entries = [
+        expense(1799, { merchant: 'Streaming', date: '2026-07-03', memberId: 'member-b' }),
+        expense(1799, { merchant: 'Streaming', date: '2026-08-03', memberId: 'member-c' }),
+        expense(1799, { merchant: 'Streaming', date: '2026-09-03', memberId: 'member-b' }),
+        expense(1799, { merchant: 'Streaming', date: '2026-10-03', memberId: 'member-a' }),
+      ];
+
+      expect(detect(entries)[0]?.payers).toEqual([
+        { memberId: 'member-b', occurrences: 2 },
+        { memberId: 'member-a', occurrences: 1 },
+        { memberId: 'member-c', occurrences: 1 },
+      ]);
+    });
+
+    it('has a single payer in a household of one', () => {
+      expect(detect(charges('Streaming', 1799, MONTHLY_DATES))[0]?.payers).toEqual([
+        { memberId: 'member-a', occurrences: 6 },
+      ]);
+    });
+  });
+
+  it('gives the same result every time for the same ledger', () => {
+    const entries = [
+      ...charges('Streaming', 1599, ['2026-07-05', '2026-08-05']),
+      ...charges('Streaming', 1899, ['2026-09-05', '2026-10-05']),
+    ];
+
+    expect(detect([...entries].reverse())).toEqual(detect(entries));
   });
 
   it('ignores expenses without a merchant, income and future-dated entries', () => {

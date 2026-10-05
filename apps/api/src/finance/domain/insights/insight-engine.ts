@@ -29,7 +29,11 @@ export type Insight =
     })
   | (InsightBase & { readonly type: 'UNUSUAL_SPENDING'; readonly evidence: Anomaly })
   | (InsightBase & {
-      readonly type: 'RECURRING_EXPENSE';
+      readonly type:
+        | 'RECURRING_EXPENSE'
+        | 'NEW_RECURRING_EXPENSE'
+        | 'RECURRING_PRICE_INCREASE'
+        | 'RECURRING_EXPENSE_STOPPED';
       readonly evidence: RecurringExpensePattern;
     })
   | (InsightBase & { readonly type: 'GOAL_PROGRESS'; readonly evidence: GoalProgress })
@@ -54,7 +58,7 @@ export function evaluateInsights(
     ...(inputs.budgets ?? []).flatMap((usage) => budgetInsights(usage, policy)),
     ...(inputs.trends === undefined ? [] : spendingIncreaseInsights(inputs.trends, policy)),
     ...(inputs.anomalies ?? []).map(anomalyInsight),
-    ...(inputs.recurringExpenses ?? []).map(recurringExpenseInsight),
+    ...(inputs.recurringExpenses ?? []).flatMap(recurringExpenseInsights),
     ...(inputs.goals ?? []).flatMap(goalInsights),
     ...(inputs.cashFlowOutlook === undefined ? [] : cashFlowInsights(inputs.cashFlowOutlook)),
   ].sort((left, right) => severityRank(right.severity) - severityRank(left.severity));
@@ -145,13 +149,43 @@ function anomalyInsight(anomaly: Anomaly): Insight {
   };
 }
 
-function recurringExpenseInsight(pattern: RecurringExpensePattern): Insight {
-  return {
-    type: 'RECURRING_EXPENSE',
-    severity: 'INFO',
-    key: `RECURRING_EXPENSE:${pattern.merchantKey}:${pattern.frequency}`,
-    evidence: pattern,
-  };
+function recurringExpenseInsights(pattern: RecurringExpensePattern): Insight[] {
+  const subject = `${pattern.merchantKey}:${pattern.frequency}`;
+  if (pattern.status === 'STOPPED') {
+    return [
+      {
+        type: 'RECURRING_EXPENSE_STOPPED',
+        severity: 'MEDIUM',
+        key: `RECURRING_EXPENSE_STOPPED:${subject}:${pattern.lastDate}`,
+        evidence: pattern,
+      },
+    ];
+  }
+  const detection: Insight = pattern.isNew
+    ? {
+        type: 'NEW_RECURRING_EXPENSE',
+        severity: 'MEDIUM',
+        key: `NEW_RECURRING_EXPENSE:${subject}:${pattern.firstDate}`,
+        evidence: pattern,
+      }
+    : {
+        type: 'RECURRING_EXPENSE',
+        severity: 'INFO',
+        key: `RECURRING_EXPENSE:${subject}`,
+        evidence: pattern,
+      };
+  if (pattern.priceChange?.direction !== 'INCREASE') {
+    return [detection];
+  }
+  return [
+    detection,
+    {
+      type: 'RECURRING_PRICE_INCREASE',
+      severity: 'MEDIUM',
+      key: `RECURRING_PRICE_INCREASE:${subject}:${pattern.priceChange.effectiveDate}`,
+      evidence: pattern,
+    },
+  ];
 }
 
 function goalInsights(progress: GoalProgress): Insight[] {

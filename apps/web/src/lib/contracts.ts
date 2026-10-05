@@ -1,5 +1,6 @@
 export type {
   AccountsView,
+  ActiveRecurringView,
   BudgetView,
   BudgetsView,
   Comparison,
@@ -15,10 +16,13 @@ export type {
   OutlookView,
   OverviewView,
   Ratio,
+  RecurringSort,
+  RecurringView,
   ReviewView,
   SessionView,
   SignalView,
   SignalsView,
   SpendingView,
+  StoppedRecurringView,
   TransactionsView,
 } from '@api/dashboard/dashboard.contracts';

@@ -52,7 +52,7 @@ erDiagram
 | `transactions`            | Expenses, income and transfers                                                 | `household_id`                             |
 | `budgets`                 | A limit for a category, or for all spending when the category is null          | `household_id`                             |
 | `goals`                   | Savings targets                                                                | `household_id`                             |
-| `recurring_expenses`      | Recurring commitments, observed or confirmed                                   | `household_id`                             |
+| `recurring_expenses`      | Reserved for commitments confirmed by hand. Not written: detection is derived  | `household_id`                             |
 | `insights`                | Findings worth the household's attention                                       | `household_id`                             |
 | `monthly_reports`         | One structured report per household, month and currency                        | `household_id`                             |
 | `ai_conversations`        | One conversation per member and channel, with its short-lived structured state | `household_id`                             |

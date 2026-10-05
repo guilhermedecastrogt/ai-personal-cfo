@@ -51,6 +51,14 @@ import {
   detectRecurringExpenses,
   type RecurringExpensePattern,
 } from '../domain/recurring/recurring-expense-detector.js';
+import {
+  recurringChanges,
+  summarizeRecurringExpenses,
+  upcomingCommitments,
+  type RecurringChanges,
+  type RecurringSummary,
+  type UpcomingCommitments,
+} from '../domain/recurring/recurring-summary.js';
 import { calculateSavings, type Savings } from '../domain/savings/savings.js';
 import { analyzeSpendingTrends, type SpendingTrends } from '../domain/trends/spending-trends.js';
 import { LedgerRepository } from '../infrastructure/ledger.repository.js';
@@ -197,6 +205,38 @@ export class FinanceService {
       asOf,
       policy: this.policy.recurring,
     });
+  }
+
+  async recurringCommitments(householdId: string, asOf: IsoDate): Promise<RecurringSummary[]> {
+    const scope = await this.scopeOf(householdId);
+    const accounts = await this.accounts.list(householdId);
+    const currencies = [
+      ...new Set([scope.currency, ...accounts.map((account) => account.currency).sort()]),
+    ];
+    const summaries = await Promise.all(
+      currencies.map(async (currency) =>
+        summarizeRecurringExpenses(
+          await this.recurringExpenses(householdId, asOf, currency),
+          currency,
+        ),
+      ),
+    );
+    return summaries.filter(
+      (summary) =>
+        summary.currency === scope.currency ||
+        summary.commitments.length > 0 ||
+        summary.stopped.length > 0,
+    );
+  }
+
+  async upcomingRecurring(householdId: string, asOf: IsoDate): Promise<UpcomingCommitments[]> {
+    return (await this.recurringCommitments(householdId, asOf)).map((summary) =>
+      upcomingCommitments(summary, asOf, this.policy.recurring.upcomingWithinDays),
+    );
+  }
+
+  async recurringChanges(householdId: string, asOf: IsoDate): Promise<RecurringChanges[]> {
+    return (await this.recurringCommitments(householdId, asOf)).map(recurringChanges);
   }
 
   async monthEndForecast(

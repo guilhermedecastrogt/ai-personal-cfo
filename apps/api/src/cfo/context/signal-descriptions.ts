@@ -82,6 +82,29 @@ function describeInsight(
         detail: `Typically ${text(facts, 'typicalAmount')}. Last charged on ${insight.evidence.lastDate}.`,
         date: insight.evidence.lastDate,
       };
+    case 'NEW_RECURRING_EXPENSE':
+      return {
+        type: insight.type,
+        title: `New recurring expense: ${insight.evidence.merchant}`,
+        detail: `${text(facts, 'typicalAmount')} ${insight.evidence.frequency.toLowerCase()}, charged ${String(insight.evidence.occurrences)} times since ${insight.evidence.firstDate}.`,
+        date: insight.evidence.establishedOn,
+      };
+    case 'RECURRING_PRICE_INCREASE': {
+      const change = (facts.priceChange ?? {}) as Facts;
+      return {
+        type: insight.type,
+        title: `${insight.evidence.merchant} costs more`,
+        detail: `Now ${text(change, 'currentAmount')}, previously ${text(change, 'previousAmount')} (${text(change, 'change')} more), since ${text(change, 'effectiveDate')}.`,
+        date: insight.evidence.priceChange?.effectiveDate ?? null,
+      };
+    }
+    case 'RECURRING_EXPENSE_STOPPED':
+      return {
+        type: insight.type,
+        title: `${insight.evidence.merchant} appears to have stopped`,
+        detail: `Usually ${text(facts, 'typicalAmount')} ${insight.evidence.frequency.toLowerCase()}. Last charged on ${insight.evidence.lastDate}, and nothing since it was expected on ${insight.evidence.nextExpectedDate}.`,
+        date: insight.evidence.lastDate,
+      };
     case 'GOAL_PROGRESS':
       return {
         type: insight.type,

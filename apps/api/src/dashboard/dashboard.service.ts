@@ -11,6 +11,7 @@ import {
 } from '../directory/household-directory.service.js';
 import { FinanceService, HouseholdNotFoundError } from '../finance/application/finance.service.js';
 import type { IsoDate } from '../finance/domain/period/period.js';
+import type { RecurringCommitment } from '../finance/domain/recurring/recurring-summary.js';
 import type { RequestContext } from '../households/request-context.js';
 import { ProactiveCfoService } from '../proactive/proactive-cfo.service.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
@@ -25,6 +26,7 @@ import {
   reviewSchema,
   sessionSchema,
   notificationsSchema,
+  recurringSchema,
   signalsSchema,
   spendingSchema,
   transactionsSchema,
@@ -37,6 +39,8 @@ import {
   type ReviewView,
   type SessionView,
   type NotificationsView,
+  type RecurringSort,
+  type RecurringView,
   type SignalsView,
   type SpendingView,
   type TransactionsView,
@@ -54,6 +58,14 @@ export interface TransactionFilters {
 }
 
 const TRANSACTIONS_PER_PAGE = 50;
+
+type CommitmentOrder = (left: RecurringCommitment, right: RecurringCommitment) => number;
+
+const RECURRING_ORDER: Record<RecurringSort, CommitmentOrder> = {
+  cost: () => 0,
+  next: (left, right) => left.nextExpectedDate.localeCompare(right.nextExpectedDate),
+  name: (left, right) => left.merchant.localeCompare(right.merchant),
+};
 
 interface Analysed {
   readonly month: SelectedMonth;
@@ -267,6 +279,39 @@ export class DashboardService {
         insights: describeInsights(review.insights, analysis.directory),
         anomalies: describeAnomalies(review.anomalies, analysis.directory),
       })),
+    });
+  }
+
+  async recurring(
+    context: RequestContext,
+    sort: RecurringSort,
+    instant: Date,
+  ): Promise<RecurringView> {
+    const today = await this.finance.currentDate(context.householdId, instant);
+    const [directory, summaries, upcoming] = await Promise.all([
+      this.directories.load(context.householdId),
+      this.finance.recurringCommitments(context.householdId, today),
+      this.finance.upcomingRecurring(context.householdId, today),
+    ]);
+    const names = namesOf(directory);
+    return recurringSchema.parse({
+      today,
+      sort,
+      currencies: summaries.map((summary) => {
+        const due = upcoming.find((entry) => entry.currency === summary.currency);
+        return presentResult(
+          {
+            ...summary,
+            commitments: [...summary.commitments].sort(RECURRING_ORDER[sort]),
+            upcoming: {
+              withinDays: due?.withinDays ?? 0,
+              totalMinor: due?.totalMinor ?? 0,
+              merchants: due?.upcoming.map((commitment) => commitment.merchant) ?? [],
+            },
+          },
+          names,
+        );
+      }),
     });
   }
 

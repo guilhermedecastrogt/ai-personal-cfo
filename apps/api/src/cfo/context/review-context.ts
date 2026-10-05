@@ -65,7 +65,9 @@ export function toReviewContext(review: MonthlyReview, directory: NameDirectory)
     forecast: review.forecast,
     recurring: {
       monthlyEquivalentMinor: review.recurring.monthlyEquivalentMinor,
+      annualEquivalentMinor: review.recurring.annualEquivalentMinor,
       commitments: review.recurring.commitments,
+      stopped: review.recurring.stopped,
     },
     unusualSpending: review.anomalies.map(describeAnomaly),
     balances: review.balances,
