@@ -46,6 +46,8 @@ flowchart TD
 
 The `data` network is internal: it has no route to the internet, and only `api`, `migrate` and `postgres` are on it. PostgreSQL publishes no port and cannot be reached from the host's network interfaces, from `web` or from `caddy`.
 
+When the machine already has a reverse proxy on ports 80 and 443, the `caddy` container is left out and that proxy serves the CFO's host name instead, over a shared Docker network. See [deployment.md](deployment.md#sharing-ports-80-and-443-with-another-proxy).
+
 Caddy forwards exactly one path to the API, the WhatsApp webhook. The API's health, sign-in and dashboard routes are reachable only from inside the Docker network, where the web application uses them.
 
 ## Resource budget

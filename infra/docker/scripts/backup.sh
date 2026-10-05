@@ -5,6 +5,7 @@ umask 077
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 export LOG_SCOPE=backup
 require_env_file
+configure_edge
 
 export IMAGE_TAG="${IMAGE_TAG:-$(cat "$STACK_DIR/.deployed-tag" 2>/dev/null || echo unknown)}"
 BACKUP_DIR="${BACKUP_DIR:-$(setting BACKUP_DIR /var/backups/ai-personal-cfo)}"

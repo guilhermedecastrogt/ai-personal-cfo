@@ -1,8 +1,4 @@
-{
-	email {$ACME_EMAIL}
-}
-
-{$CFO_DOMAIN} {
+__CFO_DOMAIN__ {
 	encode zstd gzip
 
 	request_body {

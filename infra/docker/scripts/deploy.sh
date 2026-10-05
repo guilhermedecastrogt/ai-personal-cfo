@@ -6,6 +6,7 @@ export LOG_SCOPE=deploy
 
 [ $# -eq 1 ] || fail "usage: deploy.sh <image-tag>"
 require_env_file
+configure_edge
 
 export IMAGE_TAG="$1"
 STATE_FILE="$STACK_DIR/.deployed-tag"
@@ -17,7 +18,7 @@ STAGE=starting
 on_failure() {
   log "FAILED during stage=$STAGE tag=$IMAGE_TAG"
   compose ps --all || true
-  for service in migrate api web caddy; do
+  for service in migrate api web ${PROXY_SERVICE:+"$PROXY_SERVICE"}; do
     log "last log lines of $service"
     compose logs --no-color --tail 40 "$service" 2>/dev/null || true
   done
@@ -27,14 +28,14 @@ on_failure() {
 }
 trap on_failure ERR
 
-log "begin tag=$IMAGE_TAG previous=${PREVIOUS_TAG:-none}"
+log "begin tag=$IMAGE_TAG previous=${PREVIOUS_TAG:-none} proxy=$EDGE_PROXY"
 
 STAGE=configuration
 compose config --quiet
 
 if [ "${SKIP_PULL:-0}" != "1" ]; then
   STAGE=pull
-  compose pull --quiet migrate api web caddy postgres
+  compose pull --quiet migrate api web postgres ${PROXY_SERVICE:+"$PROXY_SERVICE"}
 fi
 
 STAGE=database
@@ -49,7 +50,14 @@ STAGE=migrations
 compose run --rm --no-deps migrate
 
 STAGE=services
-compose up --detach --remove-orphans --wait --wait-timeout "$WAIT_TIMEOUT" api web caddy
+compose up --detach --remove-orphans --wait --wait-timeout "$WAIT_TIMEOUT" api web ${PROXY_SERVICE:+"$PROXY_SERVICE"}
+
+if [ "$EDGE_PROXY" = "external" ]; then
+  STAGE=proxy
+  docker network inspect "$EDGE_NETWORK_NAME" >/dev/null 2>&1 ||
+    fail "the shared network $EDGE_NETWORK_NAME does not exist"
+  "$STACK_DIR/scripts/external-proxy.sh"
+fi
 
 STAGE=verification
 "$STACK_DIR/scripts/verify.sh"

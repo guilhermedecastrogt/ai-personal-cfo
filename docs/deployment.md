@@ -125,19 +125,51 @@ The image tag is not in `.env`. The deploy script receives it as an argument and
 
 `POSTGRES_PASSWORD` is only applied when the database volume is first created. Changing it later in `.env` does not change the database's password.
 
+## Sharing ports 80 and 443 with another proxy
+
+If the machine already runs a reverse proxy on 80 and 443, the stack's own Caddy cannot start. Set `EDGE_PROXY=external` and the stack runs without Caddy, behind the existing proxy.
+
+| Setting                | Value                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `EDGE_PROXY`           | `external`. The default, `bundled`, runs the stack's own Caddy                         |
+| `EDGE_NETWORK_NAME`    | Name of a Docker network that the existing proxy is attached to. Default `edge`        |
+| `EDGE_PROXY_CONTAINER` | Name of the existing proxy's container                                                 |
+| `EDGE_PROXY_SITES_DIR` | Directory on the host that the existing proxy mounts and imports site definitions from |
+
+What the existing proxy must provide, once, outside this repository:
+
+1. It is Caddy, running in a container, and holds ports 80 and 443.
+2. A Docker network with the configured name exists and the proxy is attached to it.
+3. Its configuration imports every `*.caddy` file from a directory mounted from the host, and that directory is writable by the deploy user.
+
+In this mode the deploy script:
+
+- attaches `api` and `web` to the shared network, where they answer to `cfo-api` and `cfo-web`,
+- writes `cfo.caddy` into the sites directory, from `external-proxy/cfo.caddy.template` with the domain filled in,
+- asks the proxy to validate its whole configuration, and only then to reload it.
+
+If validation or the reload fails, the previous site file is put back, or the new one removed, and the proxy is left as it was. An unchanged site definition causes no reload at all.
+
+The site definition is the same as the bundled one: a 1 MB body limit, the webhook path to the API, everything else to the web application. There is still exactly one proxy in front of the API, so `TRUSTED_PROXY_HOPS=1` stays correct. Certificates for the CFO's host name are obtained and renewed by the existing proxy.
+
+The deploy script reloads a proxy that also serves something else. The reload is graceful and guarded as described, but it is a change to a shared component, so run the first deployment by hand and check the other sites afterwards.
+
+This mode was exercised on a development machine against a stand-in proxy, not against a real one.
+
 ## What the deploy script does
 
 `scripts/deploy.sh <tag>` runs on the VM. Each line it prints starts with a UTC timestamp and the word `deploy`.
 
-| Stage           | Action                                                           | If it fails                                            |
-| --------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
-| `configuration` | Validates the Compose file and `.env`                            | Nothing has changed                                    |
-| `pull`          | Pulls the images for the tag                                     | Nothing has changed                                    |
-| `database`      | Starts PostgreSQL if needed and waits until it is healthy        | Nothing has changed                                    |
-| `backup`        | Takes a backup, when a release was already deployed              | Nothing has changed                                    |
-| `migrations`    | Runs the migrations with the new image                           | The old `api` and `web` keep running on the old schema |
-| `services`      | Replaces `api`, `web` and `caddy`, waits for their health checks | New containers may be unhealthy: see rollback          |
-| `verification`  | Checks health, readiness and an HTTPS request through Caddy      | The new release is running but suspect: see rollback   |
+| Stage           | Action                                                                           | If it fails                                                   |
+| --------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `configuration` | Validates the Compose file and `.env`                                            | Nothing has changed                                           |
+| `pull`          | Pulls the images for the tag                                                     | Nothing has changed                                           |
+| `database`      | Starts PostgreSQL if needed and waits until it is healthy                        | Nothing has changed                                           |
+| `backup`        | Takes a backup, when a release was already deployed                              | Nothing has changed                                           |
+| `migrations`    | Runs the migrations with the new image                                           | The old `api` and `web` keep running on the old schema        |
+| `services`      | Replaces `api`, `web` and `caddy`, waits for their health checks                 | New containers may be unhealthy: see rollback                 |
+| `proxy`         | With an external proxy only: installs the site definition and reloads that proxy | That proxy is left as it was; the CFO is up but not reachable |
+| `verification`  | Checks health, readiness and an HTTPS request through Caddy                      | The new release is running but suspect: see rollback          |
 
 On any failure it prints the stage, the state of every container, the last log lines of each service, and the tag of the previous release, then exits with an error so the workflow fails.
 

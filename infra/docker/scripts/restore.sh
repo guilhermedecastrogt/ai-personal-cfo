@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 export LOG_SCOPE=restore
 require_env_file
+configure_edge
 
 MODE="${1:-}"
 FILE="${2:-}"

@@ -671,7 +671,7 @@ describe('architecture', () => {
       expect(serviceBlock('postgres')).not.toContain('ports:');
       expect(serviceBlock('postgres')).toMatch(/networks:\n {6}- data\n/);
       expect(serviceBlock('postgres')).not.toContain('- edge');
-      expect(serviceBlock('web')).not.toContain('- data');
+      expect(serviceBlock('web')).not.toMatch(/\n {6}(- )?data:?\n/);
       expect(serviceBlock('caddy')).not.toContain('- data');
       expect(compose).toMatch(/\n {2}data:\n {4}internal: true/);
       expect(compose).not.toContain('5432:');
@@ -732,10 +732,17 @@ describe('architecture', () => {
     it('routes only the webhook from the proxy to the API', () => {
       const caddyfile = read('infra/docker/Caddyfile');
 
-      expect(caddyfile.match(/reverse_proxy api:3000/g)).toHaveLength(1);
-      expect(caddyfile).toContain('@webhook path /webhooks/whatsapp');
+      const external = read('infra/docker/external-proxy/cfo.caddy.template');
+
+      for (const definition of [caddyfile, external]) {
+        expect(definition.match(/reverse_proxy cfo-api:3000/g)).toHaveLength(1);
+        expect(definition.match(/reverse_proxy cfo-web:3000/g)).toHaveLength(1);
+        expect(definition).toContain('@webhook path /webhooks/whatsapp');
+        expect(definition).toContain('max_size 1MB');
+        expect(definition).not.toMatch(/postgres|5432|tls internal|auto_https off/);
+      }
       expect(caddyfile).toContain('{$CFO_DOMAIN}');
-      expect(caddyfile).not.toMatch(/postgres|5432|tls internal|auto_https off/);
+      expect(external.startsWith('__CFO_DOMAIN__ {')).toBe(true);
     });
 
     it('never manages the existing virtual machine in Terraform', () => {

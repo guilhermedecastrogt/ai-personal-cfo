@@ -99,8 +99,10 @@ services:
       PROACTIVE_EVALUATION_ENABLED: ${PROACTIVE_EVALUATION_ENABLED:-false}
       PROACTIVE_AI_MESSAGES: ${PROACTIVE_AI_MESSAGES:-false}
     networks:
-      - data
-      - edge
+      data:
+      edge:
+        aliases:
+          - cfo-api
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,9 +128,11 @@ services:
       - /app/apps/web/.next/cache:size=64m,uid=1000,gid=1000
     environment:
       NODE_ENV: production
-      API_URL: http://api:3000
+      API_URL: http://cfo-api:3000
     networks:
-      - edge
+      edge:
+        aliases:
+          - cfo-web
     depends_on:
       api:
         condition: service_healthy
@@ -187,6 +191,8 @@ services:
 
 networks:
   edge:
+    name: ${EDGE_NETWORK_NAME:-ai-personal-cfo_edge}
+    external: ${EDGE_NETWORK_EXTERNAL:-false}
   data:
     internal: true
 

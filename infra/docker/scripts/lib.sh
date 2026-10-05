@@ -16,6 +16,25 @@ require_env_file() {
   [ -f "$ENV_FILE" ] || fail "missing $ENV_FILE (copy .env.example and fill it in)"
 }
 
+EDGE_PROXY="${EDGE_PROXY:-}"
+
+configure_edge() {
+  EDGE_PROXY="${EDGE_PROXY:-$(setting EDGE_PROXY bundled)}"
+  case "$EDGE_PROXY" in
+    bundled)
+      export PROXY_SERVICE=caddy
+      ;;
+    external)
+      export PROXY_SERVICE=
+      export EDGE_NETWORK_NAME="${EDGE_NETWORK_NAME:-$(setting EDGE_NETWORK_NAME edge)}"
+      export EDGE_NETWORK_EXTERNAL=true
+      ;;
+    *)
+      fail "EDGE_PROXY must be 'bundled' or 'external'"
+      ;;
+  esac
+}
+
 compose() {
   docker compose --env-file "$ENV_FILE" --file "$STACK_DIR/compose.yml" "$@"
 }

@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 export LOG_SCOPE=verify
 require_env_file
+configure_edge
 
 export IMAGE_TAG="${IMAGE_TAG:-$(cat "$STACK_DIR/.deployed-tag" 2>/dev/null || echo unknown)}"
 DOMAIN="$(setting CFO_DOMAIN)"
