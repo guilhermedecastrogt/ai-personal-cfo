@@ -138,6 +138,60 @@ describe('architecture', () => {
     expect(queries?.text).not.toMatch(/householdId:\s*(frame|filters|resolution)\./);
   });
 
+  it('serves the dashboard through application services, never repositories', () => {
+    const dashboard = within('dashboard/');
+
+    expect(dashboard.length).toBeGreaterThan(3);
+    expect(
+      offenders(dashboard, (file) =>
+        importsOf(file).some((name) => /\.repository\.js|\.schema\.js|drizzle-orm|^pg$/.test(name)),
+      ),
+    ).toEqual([]);
+  });
+
+  it('does no financial calculation in the dashboard API or the session layer', () => {
+    const arithmetic =
+      /money-math|sumMinor|multiplyThenDivide|divideRounded|Minor\s*[-+*/]\s*\w|\w\s*[-+*/]\s*\w+Minor/;
+
+    expect(offenders(within('dashboard/', 'auth/'), (file) => arithmetic.test(file.text))).toEqual(
+      [],
+    );
+  });
+
+  it('guards every dashboard route and takes the household only from the session', () => {
+    const controller = files.find((file) => file.path === 'dashboard/dashboard.controller.ts');
+    const routes = controller?.text.match(/@Get\(/g) ?? [];
+    const contexts = controller?.text.match(/@CurrentContext\(\) context: RequestContext/g) ?? [];
+
+    expect(controller?.text).toContain('@UseGuards(SessionGuard)');
+    expect(routes.length).toBeGreaterThan(8);
+    expect(contexts).toHaveLength(routes.length);
+    expect(
+      offenders(within('dashboard/'), (file) =>
+        /householdId:\s*(query|filters|parsed)\./.test(file.text),
+      ),
+    ).toEqual([]);
+    expect(controller?.text).not.toMatch(/householdId|household_id/);
+  });
+
+  it('takes the review from the CFO service and figures from the finance service', () => {
+    const service = files.find((file) => file.path === 'dashboard/dashboard.service.ts');
+
+    expect(service?.text).toContain('this.cfo.monthlyReview(');
+    expect(service?.text).toContain('this.cfo.monthlyAnalysis(');
+    expect(service?.text).not.toMatch(/explainMonthlyReview|AI_PROVIDER|buildMonthlyReview\(/);
+  });
+
+  it('stores sessions and access codes only as hashes', () => {
+    const service = files.find((file) => file.path === 'auth/auth.service.ts');
+    const schema = files.find((file) => file.path === 'auth/auth.schema.ts');
+
+    expect(service?.text).toContain("createHash('sha256')");
+    expect(schema?.text).toMatch(/code_hash/);
+    expect(schema?.text).toMatch(/token_hash/);
+    expect(schema?.text).not.toMatch(/'token'|'code'|'password'/);
+  });
+
   it('gives the AI layer no access to repositories, services or the finance engine', () => {
     const reachesData = /\.repository\.js|\.service\.js|\/finance\/|\/cfo\/|\/conversation\//;
 

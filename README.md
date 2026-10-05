@@ -70,9 +70,10 @@ cp apps/api/.env.example apps/api/.env
 npm run db:migrate --workspace apps/api
 npm run db:seed --workspace apps/api
 npm run start:dev --workspace apps/api
+npm run dev --workspace apps/web
 ```
 
-The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the [development guide](docs/development.md) for the full set of commands and conventions.
+The API listens on port 3000 and the dashboard on port 3001. To sign in to the dashboard, issue an access code for a member as described in the [dashboard guide](docs/web-dashboard.md). See the [development guide](docs/development.md) for the full set of commands and conventions.
 
 ## Roadmap
 
@@ -87,7 +88,7 @@ The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the
 - [x] WhatsApp integration with webhook idempotency
 - [x] Insight engine and monthly financial review
 - [x] Multi-turn conversations with follow-up questions
-- [ ] Dashboard
+- [x] Dashboard
 - [ ] Monthly reports
 - [ ] Deployment infrastructure
 - [ ] Security hardening

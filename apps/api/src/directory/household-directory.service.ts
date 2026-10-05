@@ -11,6 +11,12 @@ export interface NamedEntry {
   readonly name: string;
 }
 
+export interface HouseholdProfile {
+  readonly name: string;
+  readonly currency: string;
+  readonly timezone: string;
+}
+
 export interface HouseholdDirectory {
   readonly members: readonly NamedEntry[];
   readonly accounts: readonly Account[];
@@ -35,6 +41,13 @@ export class HouseholdDirectoryService {
       this.goals.list(householdId),
     ]);
     return { members, accounts, categories, goals };
+  }
+
+  async profile(householdId: string): Promise<HouseholdProfile | undefined> {
+    const household = await this.households.findHousehold(householdId);
+    return household === undefined
+      ? undefined
+      : { name: household.name, currency: household.currency, timezone: household.timezone };
   }
 
   async defaultAccount(householdId: string, memberId: string): Promise<Account | undefined> {

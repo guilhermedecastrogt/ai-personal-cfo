@@ -229,7 +229,7 @@ describe('buildMonthlyReview', () => {
     }
 
     it('reports each budget with its usage and status', () => {
-      expect(withBudget(24600).budgets).toEqual([
+      expect(withBudget(24600).budgets).toMatchObject([
         {
           budgetId: 'budget-restaurants',
           categoryId: 'restaurants',

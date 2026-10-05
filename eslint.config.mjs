@@ -4,14 +4,14 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/', '**/coverage/', '**/.next/', '**/node_modules/'] },
+  { ignores: ['**/dist/', '**/coverage/', '**/.next/', '**/node_modules/', '**/next-env.d.ts'] },
   js.configs.recommended,
   {
     files: ['**/*.{js,mjs}'],
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       parserOptions: { projectService: true },

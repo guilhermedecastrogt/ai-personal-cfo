@@ -98,6 +98,8 @@ flowchart TD
 | `whatsapp`     | The webhook, idempotent event claiming, sender resolution, and the provider adapter for Kapso                          |
 | `conversation` | Multi-turn orchestration of a message: conversation state, follow-ups, transaction extraction, questions and the reply |
 | `directory`    | Names of a household's members, accounts, categories and goals for the layers above                                    |
+| `auth`         | Access codes and sessions for the dashboard, resolving a session to a household and member                             |
+| `dashboard`    | The read-only API behind the web dashboard, returning views built from the services above                              |
 | `media`        | Obtaining an image through a provider-independent source, validating it and holding it temporarily                     |
 | `insights`     | Rules that decide whether something deserves the household's attention                                                 |
 | `cfo`          | The deterministic monthly review, its context for the model, and the checked narrative                                 |

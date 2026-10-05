@@ -58,6 +58,8 @@ erDiagram
 | `ai_conversations`        | One conversation per member and channel, with its short-lived structured state | `household_id`                            |
 | `ai_messages`             | Text of a conversation's messages                                              | Through `conversation_id`                 |
 | `webhook_events`          | Provider event identifiers already seen                                        | None. Holds no financial or personal data |
+| `member_access_codes`     | The hash of each member's dashboard access code                                | `household_id`                            |
+| `dashboard_sessions`      | Hashed session tokens with their expiry                                        | `household_id`                            |
 
 Every table has a UUID primary key and `created_at`. Mutable tables have `updated_at`.
 

@@ -98,6 +98,7 @@ export function snapshotOf(options: SnapshotOptions = {}): FinancialSnapshot {
     budgets: [],
     goals: [],
     forecast: null,
+    outlook: null,
     recurringExpenses: [],
     anomalies: [],
     insights: [],

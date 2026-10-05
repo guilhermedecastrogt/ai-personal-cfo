@@ -1,7 +1,10 @@
 import type { Anomaly } from '../../finance/domain/anomaly/anomaly-detector.js';
 import type { CurrencyBalances } from '../../finance/domain/balances/account-balances.js';
 import type { BudgetStatus } from '../../finance/domain/budget/budget-usage.js';
+import type { CashFlowOutlook } from '../../finance/domain/cash-flow/cash-flow.js';
 import type { FinancePolicy } from '../../finance/domain/finance-policy.js';
+import type { MemberAmount } from '../../finance/domain/flow/flow-breakdown.js';
+import type { Insight } from '../../finance/domain/insights/insight-engine.js';
 import type { ForecastMethod } from '../../finance/domain/forecast/spending-forecast.js';
 import type { GoalProgress } from '../../finance/domain/goals/goal-progress.js';
 import type { DateRange, IsoDate } from '../../finance/domain/period/period.js';
@@ -60,6 +63,8 @@ export interface ReviewBudget {
   readonly status: BudgetStatus;
   readonly projectedTotalMinor: number;
   readonly isProjectedOverLimit: boolean;
+  readonly alertThresholdPercent: number;
+  readonly byMember: readonly MemberAmount[];
 }
 
 export interface MonthlyReview {
@@ -96,6 +101,8 @@ export interface MonthlyReview {
     readonly daysRemaining: number;
     readonly method: ForecastMethod;
   } | null;
+  readonly outlook: CashFlowOutlook | null;
+  readonly insights: readonly Insight[];
   readonly recurring: RecurringSummary;
   readonly anomalies: readonly Anomaly[];
   readonly balances: CurrencyBalances | null;
@@ -139,6 +146,8 @@ export function buildMonthlyReview(
             daysRemaining: snapshot.forecast.daysRemaining,
             method: snapshot.forecast.method,
           },
+    outlook: snapshot.outlook,
+    insights: snapshot.insights,
     recurring: summarizeRecurringExpenses(snapshot.recurringExpenses, snapshot.currency),
     anomalies: snapshot.anomalies,
     balances: snapshot.balances,
@@ -218,6 +227,8 @@ function reviewBudget(usage: FinancialSnapshot['budgets'][number]): ReviewBudget
     projectedTotalMinor: usage.forecast.projectedTotalMinor,
     isProjectedOverLimit:
       usage.status !== 'EXCEEDED' && usage.forecast.projectedTotalMinor > usage.limitMinor,
+    alertThresholdPercent: usage.alertThresholdPercent,
+    byMember: usage.byMember,
   };
 }
 

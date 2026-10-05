@@ -13,6 +13,7 @@ Documents are added as the corresponding part of the system is built.
 | [`whatsapp-integration.md`](whatsapp-integration.md) | Webhook flow, Kapso adapter, idempotency and identity resolution        | Written                                 |
 | [`cfo-intelligence.md`](cfo-intelligence.md)         | Monthly review, findings, model context and the numeric-truth check     | Written                                 |
 | [`conversation.md`](conversation.md)                 | Multi-turn conversations, follow-ups, trusted and untrusted context     | Written                                 |
+| [`web-dashboard.md`](web-dashboard.md)               | Dashboard architecture, API, authentication and views                   | Written                                 |
 | `deployment.md`                                      | Oracle Cloud provisioning and release process                           | Planned                                 |
 | [`adr/`](adr/README.md)                              | Architecture decision records                                           | Written, extended as decisions are made |
 

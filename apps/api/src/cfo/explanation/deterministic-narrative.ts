@@ -105,6 +105,21 @@ function suggestionsOf(review: Facts): string[] {
   return [...new Set(suggestions)];
 }
 
+export interface FindingStatement {
+  readonly kind: 'STRENGTH' | 'CONCERN';
+  readonly code: string;
+  readonly statement: string;
+}
+
+export function describeFindings(review: ReplyFacts): FindingStatement[] {
+  return findingsOf(review).flatMap((finding) => {
+    const code = field(finding, 'code');
+    const statement = STATEMENTS[code]?.(finding);
+    const kind = finding.kind === 'STRENGTH' ? 'STRENGTH' : 'CONCERN';
+    return statement === undefined ? [] : [{ kind, code, statement }];
+  });
+}
+
 export function renderDeterministicNarrative(reviews: readonly ReplyFacts[]): ReviewNarrative {
   const recommendations = reviews.flatMap(suggestionsOf);
   return {

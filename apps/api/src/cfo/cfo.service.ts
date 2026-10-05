@@ -8,7 +8,9 @@ import type { DateRange, IsoDate } from '../finance/domain/period/period.js';
 import { GoalsRepository } from '../goals/goals.repository.js';
 import { HouseholdsRepository } from '../households/households.repository.js';
 import type { RequestContext } from '../households/request-context.js';
+import type { ReplyFacts } from '../ai/ai-provider.js';
 import { FinancialSnapshotBuilder } from './analysis/financial-snapshot.builder.js';
+import type { FinancialSnapshot } from './analysis/financial-snapshot.js';
 import { buildMonthlyReview, type MonthlyReview } from './analysis/monthly-review.js';
 import type { NameDirectory } from './context/result-description.js';
 import { toReviewContext } from './context/review-context.js';
@@ -18,6 +20,18 @@ export interface MonthlyReviewRequest {
   readonly month: DateRange;
   readonly today: IsoDate;
   readonly userMessage?: string;
+}
+
+export interface CurrencyAnalysis {
+  readonly snapshot: FinancialSnapshot;
+  readonly review: MonthlyReview;
+  readonly context: ReplyFacts;
+}
+
+export interface MonthlyAnalysis {
+  readonly month: DateRange;
+  readonly analyses: readonly CurrencyAnalysis[];
+  readonly directory: NameDirectory;
 }
 
 export interface MonthlyReviewResult {
@@ -56,6 +70,24 @@ export class CfoService {
     context: RequestContext,
     request: MonthlyReviewRequest,
   ): Promise<MonthlyReviewResult> {
+    const analysis = await this.monthlyAnalysis(context, request);
+    const explained = await this.explainer.explain({
+      userMessage: request.userMessage ?? null,
+      senderName: context.memberName,
+      reviews: analysis.analyses.map((currency) => currency.context),
+    });
+    return {
+      month: request.month,
+      reviews: analysis.analyses.map((currency) => currency.review),
+      narrative: explained.narrative,
+      narrativeSource: explained.source,
+    };
+  }
+
+  async monthlyAnalysis(
+    context: RequestContext,
+    request: Pick<MonthlyReviewRequest, 'month' | 'today'>,
+  ): Promise<MonthlyAnalysis> {
     const { householdId } = context;
     if (request.month.start > request.today) {
       throw new FutureMonthError();
@@ -76,39 +108,31 @@ export class CfoService {
     const currencies = [
       ...new Set([household.currency, ...accounts.map((account) => account.currency).sort()]),
     ];
-    const candidates = await Promise.all(
-      currencies.map(async (currency) =>
-        buildMonthlyReview(
-          await this.snapshots.build({
-            householdId,
-            currency,
-            month: request.month,
-            today: request.today,
-            topLevelCategoryIds,
-          }),
-          this.policy,
-        ),
-      ),
-    );
-    const reviews = candidates.filter(
-      (review) => review.currency === household.currency || hasContent(review),
-    );
     const directory: NameDirectory = {
       members: namesById(members),
       categories: namesById(categories),
       accounts: namesById(accounts),
       goals: namesById(goals),
     };
-    const explained = await this.explainer.explain({
-      userMessage: request.userMessage ?? null,
-      senderName: context.memberName,
-      reviews: reviews.map((review) => toReviewContext(review, directory)),
-    });
+    const candidates = await Promise.all(
+      currencies.map(async (currency) => {
+        const snapshot = await this.snapshots.build({
+          householdId,
+          currency,
+          month: request.month,
+          today: request.today,
+          topLevelCategoryIds,
+        });
+        const review = buildMonthlyReview(snapshot, this.policy);
+        return { snapshot, review, context: toReviewContext(review, directory) };
+      }),
+    );
     return {
       month: request.month,
-      reviews,
-      narrative: explained.narrative,
-      narrativeSource: explained.source,
+      directory,
+      analyses: candidates.filter(
+        ({ review }) => review.currency === household.currency || hasContent(review),
+      ),
     };
   }
 }

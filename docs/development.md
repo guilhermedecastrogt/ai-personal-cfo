@@ -47,6 +47,8 @@ Run from the repository root. Each delegates to every workspace that defines the
 | `npm run test:integration` | Tests against a real PostgreSQL. Needs `DATABASE_URL` |
 | `npm run build`            | Compile every workspace                               |
 
+The dashboard has its own environment file, `apps/web/.env.example`, with one variable: `API_URL`, the address of the API as seen from the web server.
+
 Each integration test file creates its own database from the migrations and drops it afterwards, so the tests never touch development data. To run them against the local PostgreSQL:
 
 ```sh

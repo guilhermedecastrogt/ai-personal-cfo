@@ -36,6 +36,13 @@
       "when": 1791191053813,
       "tag": "0004_conversation_state",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791192211393,
+      "tag": "0005_dashboard_sessions",
+      "breakpoints": true
     }
   ]
 }

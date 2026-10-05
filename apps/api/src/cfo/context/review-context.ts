@@ -40,7 +40,18 @@ export function toReviewContext(review: MonthlyReview, directory: NameDirectory)
     spendingByMember: review.byMember.length > 1 ? review.byMember : [],
     categoryIncreases: review.categoryIncreases,
     categoryDecreases: review.categoryDecreases,
-    budgets: review.budgets.map((budget) => withBudgetScope({ ...budget })),
+    budgets: review.budgets.map((budget) =>
+      withBudgetScope({
+        categoryId: budget.categoryId,
+        limitMinor: budget.limitMinor,
+        spentMinor: budget.spentMinor,
+        remainingMinor: budget.remainingMinor,
+        usageBasisPoints: budget.usageBasisPoints,
+        status: budget.status,
+        projectedTotalMinor: budget.projectedTotalMinor,
+        isProjectedOverLimit: budget.isProjectedOverLimit,
+      }),
+    ),
     goals: review.goals.map((goal) => ({
       goalId: goal.goalId,
       targetMinor: goal.targetMinor,

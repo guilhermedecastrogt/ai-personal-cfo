@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AccountsModule } from './accounts/accounts.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { BudgetsModule } from './budgets/budgets.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { ConversationModule } from './conversation/conversation.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { FinanceModule } from './finance/finance.module.js';
 import { GoalsModule } from './goals/goals.module.js';
@@ -28,6 +30,8 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module.js';
     ConversationModule,
     KapsoModule,
     WhatsAppModule,
+    AuthModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

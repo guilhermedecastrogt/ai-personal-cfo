@@ -7,6 +7,22 @@ export interface NameDirectory {
   readonly goals: ReadonlyMap<string, string>;
 }
 
+export interface AmountView {
+  readonly minor: number;
+  readonly text: string;
+}
+
+export interface RatioView {
+  readonly basisPoints: number;
+  readonly text: string;
+}
+
+interface Presentation {
+  readonly directory: NameDirectory;
+  money(amountMinor: number, currency: string): unknown;
+  ratio(basisPoints: number): unknown;
+}
+
 const UNKNOWN_NAME = 'Unknown';
 const UNCATEGORISED = 'Uncategorised';
 const JOINT_OWNER = 'Joint';
@@ -20,19 +36,32 @@ const OMITTED_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 export function describeResult(value: unknown, directory: NameDirectory): unknown {
-  return describeValue(value, directory, undefined);
+  return describeValue(
+    value,
+    { directory, money: formatMoney, ratio: formatBasisPoints },
+    undefined,
+  );
+}
+
+export function presentResult(value: unknown, directory: NameDirectory): unknown {
+  const presentation: Presentation = {
+    directory,
+    money: (minor, currency): AmountView => ({ minor, text: formatMoney(minor, currency) }),
+    ratio: (basisPoints): RatioView => ({ basisPoints, text: formatBasisPoints(basisPoints) }),
+  };
+  return describeValue(value, presentation, undefined);
 }
 
 function describeValue(
   value: unknown,
-  directory: NameDirectory,
+  presentation: Presentation,
   currency: string | undefined,
 ): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => describeValue(item, directory, currency));
+    return value.map((item) => describeValue(item, presentation, currency));
   }
   if (typeof value === 'object' && value !== null) {
-    return describeObject(value as Record<string, unknown>, directory, currency);
+    return describeObject(value as Record<string, unknown>, presentation, currency);
   }
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
@@ -42,14 +71,14 @@ function describeValue(
 
 function describeObject(
   source: Record<string, unknown>,
-  directory: NameDirectory,
+  presentation: Presentation,
   inheritedCurrency: string | undefined,
 ): Record<string, unknown> {
   const currency = typeof source.currency === 'string' ? source.currency : inheritedCurrency;
   const described: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
     if (!OMITTED_KEYS.has(key)) {
-      const [label, content] = describeField(key, value, directory, currency);
+      const [label, content] = describeField(key, value, presentation, currency);
       described[label] = content;
     }
   }
@@ -59,9 +88,10 @@ function describeObject(
 function describeField(
   key: string,
   value: unknown,
-  directory: NameDirectory,
+  presentation: Presentation,
   currency: string | undefined,
 ): [string, unknown] {
+  const { directory } = presentation;
   const nameOf = (names: ReadonlyMap<string, string>, fallback: string): unknown =>
     typeof value === 'string' ? (names.get(value) ?? UNKNOWN_NAME) : fallback;
   switch (key) {
@@ -74,7 +104,10 @@ function describeField(
     case 'accountId':
       return ['account', nameOf(directory.accounts, UNKNOWN_NAME)];
     case 'transferAccountId':
-      return ['transferAccount', nameOf(directory.accounts, UNKNOWN_NAME)];
+      return [
+        'transferAccount',
+        typeof value === 'string' ? nameOf(directory.accounts, UNKNOWN_NAME) : null,
+      ];
     case 'goalId':
       return ['goal', nameOf(directory.goals, UNKNOWN_NAME)];
     case 'memberIds':
@@ -86,20 +119,20 @@ function describeField(
       ];
   }
   if (key.endsWith(MINOR_SUFFIX) && currency !== undefined) {
-    return [key.slice(0, -MINOR_SUFFIX.length), formatAmounts(value, currency)];
+    return [key.slice(0, -MINOR_SUFFIX.length), formatAmounts(value, currency, presentation)];
   }
   if (key.endsWith(BASIS_POINTS_SUFFIX)) {
     return [
       key.slice(0, -BASIS_POINTS_SUFFIX.length),
-      typeof value === 'number' ? formatBasisPoints(value) : null,
+      typeof value === 'number' ? presentation.ratio(value) : null,
     ];
   }
-  return [key, describeValue(value, directory, currency)];
+  return [key, describeValue(value, presentation, currency)];
 }
 
-function formatAmounts(value: unknown, currency: string): unknown {
+function formatAmounts(value: unknown, currency: string, presentation: Presentation): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => formatAmounts(item, currency));
+    return value.map((item) => formatAmounts(item, currency, presentation));
   }
-  return typeof value === 'number' ? formatMoney(value, currency) : null;
+  return typeof value === 'number' ? presentation.money(value, currency) : null;
 }

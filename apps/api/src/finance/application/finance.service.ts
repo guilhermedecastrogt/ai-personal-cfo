@@ -20,6 +20,7 @@ import {
   calculateCashFlow,
   projectCashFlow,
   type CashFlow,
+  type CashFlowOutlook,
 } from '../domain/cash-flow/cash-flow.js';
 import { CategoryTree } from '../domain/categories/category-tree.js';
 import { DEFAULT_FINANCE_POLICY } from '../domain/finance-policy.js';
@@ -279,34 +280,39 @@ export class FinanceService {
     return { accounts: balances, totals: summarizeBalances(balances, scope.memberIds) };
   }
 
-  async insights(householdId: string, asOf: IsoDate, currency?: string): Promise<Insight[]> {
+  async cashFlowOutlook(
+    householdId: string,
+    asOf: IsoDate,
+    currency?: string,
+  ): Promise<CashFlowOutlook> {
     const scope = await this.scopeOf(householdId, currency);
     const month = monthContaining(asOf);
-    const [budgets, trends, anomalies, recurringExpenses, goals, forecast, income, previousIncome] =
+    const [forecast, income, previousIncome] = await Promise.all([
+      this.monthEndForecast(householdId, asOf, scope.currency),
+      this.income(householdId, month, scope.currency),
+      this.income(householdId, previousEquivalentRange(month), scope.currency),
+    ]);
+    return projectCashFlow(
+      scope.currency,
+      month,
+      Math.max(income.totalMinor, previousIncome.totalMinor),
+      forecast.projectedTotalMinor,
+    );
+  }
+
+  async insights(householdId: string, asOf: IsoDate, currency?: string): Promise<Insight[]> {
+    const scope = await this.scopeOf(householdId, currency);
+    const [budgets, trends, anomalies, recurringExpenses, goals, cashFlowOutlook] =
       await Promise.all([
         this.budgets(householdId, asOf),
         this.spendingTrends(householdId, monthToDate(asOf), scope.currency),
         this.anomalies(householdId, asOf, scope.currency),
         this.recurringExpenses(householdId, asOf, scope.currency),
         this.goals(householdId, asOf),
-        this.monthEndForecast(householdId, asOf, scope.currency),
-        this.income(householdId, month, scope.currency),
-        this.income(householdId, previousEquivalentRange(month), scope.currency),
+        this.cashFlowOutlook(householdId, asOf, scope.currency),
       ]);
     return evaluateInsights(
-      {
-        budgets,
-        trends,
-        anomalies,
-        recurringExpenses,
-        goals,
-        cashFlowOutlook: projectCashFlow(
-          scope.currency,
-          month,
-          Math.max(income.totalMinor, previousIncome.totalMinor),
-          forecast.projectedTotalMinor,
-        ),
-      },
+      { budgets, trends, anomalies, recurringExpenses, goals, cashFlowOutlook },
       this.policy.insights,
     );
   }

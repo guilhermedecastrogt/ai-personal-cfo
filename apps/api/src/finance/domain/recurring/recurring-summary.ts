@@ -1,5 +1,6 @@
 import { assertSameCurrency, multiplyThenDivide, sumMinor } from '../../../money/money-math.js';
 import type { RecurrenceFrequency } from '../finance-policy.js';
+import type { IsoDate } from '../period/period.js';
 import type { RecurringExpensePattern } from './recurring-expense-detector.js';
 
 export interface RecurringCommitment {
@@ -8,6 +9,9 @@ export interface RecurringCommitment {
   readonly categoryId: string | null;
   readonly typicalAmountMinor: number;
   readonly monthlyEquivalentMinor: number;
+  readonly occurrences: number;
+  readonly lastDate: IsoDate;
+  readonly nextExpectedDate: IsoDate;
 }
 
 export interface RecurringSummary {
@@ -37,6 +41,9 @@ export function summarizeRecurringExpenses(
         frequency: pattern.frequency,
         categoryId: pattern.categoryId,
         typicalAmountMinor: pattern.typicalAmountMinor,
+        occurrences: pattern.occurrences,
+        lastDate: pattern.lastDate,
+        nextExpectedDate: pattern.nextExpectedDate,
         monthlyEquivalentMinor: multiplyThenDivide(
           pattern.typicalAmountMinor,
           OCCURRENCES_PER_YEAR[pattern.frequency],

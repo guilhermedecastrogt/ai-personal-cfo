@@ -7,7 +7,12 @@ import {
   findTransactionRuleViolations,
   type TransactionRuleViolation,
 } from './transaction-rules.js';
-import { TransactionsRepository, type Transaction } from './transactions.repository.js';
+import {
+  TransactionsRepository,
+  type Transaction,
+  type TransactionPage,
+  type TransactionSearch,
+} from './transactions.repository.js';
 
 export type TransactionRejectionReason =
   | TransactionRuleViolation
@@ -17,7 +22,7 @@ export type TransactionRejectionReason =
   | 'UNKNOWN_TRANSFER_ACCOUNT'
   | 'UNKNOWN_CATEGORY';
 
-export type { Transaction };
+export type { Transaction, TransactionPage, TransactionSearch };
 
 export class TransactionRejectedError extends Error {
   constructor(readonly reasons: readonly TransactionRejectionReason[]) {
@@ -76,6 +81,14 @@ export class TransactionsService {
     sourceMessageId: string,
   ): Promise<Transaction | undefined> {
     return this.transactions.findBySourceMessage(householdId, sourceMessageId);
+  }
+
+  async search(householdId: string, search: TransactionSearch): Promise<TransactionPage> {
+    return this.transactions.search(householdId, search);
+  }
+
+  async earliestDate(householdId: string): Promise<string | undefined> {
+    return this.transactions.earliestDate(householdId);
   }
 
   private async findOptionalAccount(

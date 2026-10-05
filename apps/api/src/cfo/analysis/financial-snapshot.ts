@@ -1,6 +1,7 @@
 import type { CashFlowSummary, PeriodFlow } from '../../finance/application/finance.service.js';
 import type { Anomaly } from '../../finance/domain/anomaly/anomaly-detector.js';
 import type { CurrencyBalances } from '../../finance/domain/balances/account-balances.js';
+import type { CashFlowOutlook } from '../../finance/domain/cash-flow/cash-flow.js';
 import type { BudgetUsage } from '../../finance/domain/budget/budget-usage.js';
 import type { SpendingForecast } from '../../finance/domain/forecast/spending-forecast.js';
 import type { GoalProgress } from '../../finance/domain/goals/goal-progress.js';
@@ -29,6 +30,7 @@ export interface FinancialSnapshot {
   readonly budgets: readonly BudgetUsage[];
   readonly goals: readonly GoalProgress[];
   readonly forecast: SpendingForecast | null;
+  readonly outlook: CashFlowOutlook | null;
   readonly recurringExpenses: readonly RecurringExpensePattern[];
   readonly anomalies: readonly Anomaly[];
   readonly insights: readonly Insight[];

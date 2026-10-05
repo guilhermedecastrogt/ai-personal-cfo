@@ -41,6 +41,7 @@ export class FinancialSnapshotBuilder {
       anomalies,
       insights,
       balances,
+      outlook,
     ] = await Promise.all([
       this.finance.cashFlow(householdId, period, currency),
       this.finance.spending(householdId, period, currency),
@@ -56,6 +57,7 @@ export class FinancialSnapshotBuilder {
       this.finance.anomalies(householdId, asOf, currency),
       this.finance.insights(householdId, asOf, currency),
       this.finance.accountBalances(householdId),
+      this.finance.cashFlowOutlook(householdId, asOf, currency),
     ]);
     return {
       currency,
@@ -75,6 +77,7 @@ export class FinancialSnapshotBuilder {
       budgets: budgets.filter((budget) => budget.currency === currency),
       goals: goals.filter((goal) => goal.currency === currency),
       forecast: isComplete ? null : forecast,
+      outlook: isComplete ? null : outlook,
       recurringExpenses,
       anomalies,
       insights: insights.filter((insight) => currencyOf(insight) === currency),
