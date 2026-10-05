@@ -3,3 +3,4 @@ dist/
 coverage/
 .next/
 package-lock.json
+apps/api/drizzle/

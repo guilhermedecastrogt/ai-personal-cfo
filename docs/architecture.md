@@ -239,11 +239,11 @@ Conventions that hold across the schema:
 - Members are rows related to a household, one to many. No table has positional or per-member columns, and no constraint limits how many members a household has.
 - An account's `owner_member_id` references any member of the household, or is null for a joint account.
 - UUID primary keys, `created_at` everywhere and `updated_at` on mutable rows.
-- Money is stored as an integer amount in minor units next to an ISO 4217 currency code. Amounts in different currencies are never summed or converted.
-- A transfer is one movement between two accounts of the household. It is excluded from income and expense figures by its type, so moving money between accounts never changes spending or net worth.
+- Money is stored as an integer amount in minor units next to an ISO 4217 currency code. Amounts in different currencies are never summed or converted, and a transaction is always in the currency of its account ([ADR-012](adr/ADR-012-money-as-integer-minor-units.md)).
+- A transfer is one row with a source and a destination account of the household ([ADR-013](adr/ADR-013-transfers-as-single-transaction.md)). It is excluded from income and expense figures by its type, so moving money between accounts never changes spending or net worth.
 - Constraints carry the invariants the application relies on: positive amounts, valid enumerations, members belonging to the household they are used in, and unique provider event identifiers.
 
-Supporting tables for conversations, messages and webhook events sit outside the financial model. The column-level schema is documented in `database.md` when the schema is implemented. The reasoning for the household model is in ADRs [006](adr/ADR-006-household-and-members.md), [009](adr/ADR-009-transaction-attribution.md), [010](adr/ADR-010-household-budgets-and-goals.md) and [011](adr/ADR-011-multi-household-multi-member.md).
+Supporting tables for conversations, messages and webhook events sit outside the financial model. The schema is documented in [database.md](database.md). The reasoning for the household model is in ADRs [006](adr/ADR-006-household-and-members.md), [009](adr/ADR-009-transaction-attribution.md), [010](adr/ADR-010-household-budgets-and-goals.md) and [011](adr/ADR-011-multi-household-multi-member.md).
 
 ## Finance engine
 

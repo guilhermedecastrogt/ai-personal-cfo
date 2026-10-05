@@ -15,3 +15,6 @@ Each record captures one significant decision: the context that forced it, what 
 | [009](ADR-009-transaction-attribution.md)            | Transaction attribution and expense scope                         | Accepted |
 | [010](ADR-010-household-budgets-and-goals.md)        | Budgets and goals belong to the household                         | Accepted |
 | [011](ADR-011-multi-household-multi-member.md)       | Any number of households, any number of members                   | Accepted |
+| [012](ADR-012-money-as-integer-minor-units.md)       | Money as integer minor units bound to a currency                  | Accepted |
+| [013](ADR-013-transfers-as-single-transaction.md)    | A transfer is one transaction between two accounts                | Accepted |
+| [014](ADR-014-global-category-list.md)               | Categories are a global controlled list created by migration      | Accepted |

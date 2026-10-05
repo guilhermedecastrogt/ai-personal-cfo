@@ -67,6 +67,8 @@ Requires Node.js 22 and Docker.
 npm install
 docker compose -f docker-compose.dev.yml up -d --wait
 cp apps/api/.env.example apps/api/.env
+npm run db:migrate --workspace apps/api
+npm run db:seed --workspace apps/api
 npm run start:dev --workspace apps/api
 ```
 
@@ -78,7 +80,7 @@ The API listens on port 3000 and exposes `GET /health` and `GET /ready`. See the
 - [x] Household, identity and AI provider decisions
 - [x] Architecture documentation and decision records
 - [x] Backend bootstrap with health and readiness checks
-- [ ] Database schema and core domain
+- [x] Database schema and core domain
 - [ ] Finance engine
 - [ ] AI transaction extraction from text
 - [ ] AI transaction extraction from images

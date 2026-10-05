@@ -11,6 +11,8 @@
 npm install
 docker compose -f docker-compose.dev.yml up -d --wait
 cp apps/api/.env.example apps/api/.env
+npm run db:migrate --workspace apps/api
+npm run db:seed --workspace apps/api
 npm run start:dev --workspace apps/api
 ```
 
@@ -45,7 +47,7 @@ Run from the repository root. Each delegates to every workspace that defines the
 | `npm run test:integration` | Tests against a real PostgreSQL. Needs `DATABASE_URL` |
 | `npm run build`            | Compile every workspace                               |
 
-To run the integration tests against the local database:
+Each integration test file creates its own database from the migrations and drops it afterwards, so the tests never touch development data. To run them against the local PostgreSQL:
 
 ```sh
 DATABASE_URL=postgres://cfo:cfo@localhost:5432/cfo npm run test:integration
@@ -100,4 +102,4 @@ Tests use hand-written stubs passed through dependency injection. Test names sta
 - **Validation at boundaries.** Anything entering from outside the type system, such as environment variables, request bodies, webhooks and model output, is parsed with a Zod schema before use.
 - **Conventional Commits**, one meaningful step per commit.
 
-Database schema and migrations are introduced together with the first tables.
+Schema changes, migrations and seeding are described in [database.md](database.md).
