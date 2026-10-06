@@ -28,6 +28,7 @@ export interface InterpretationRequest {
   readonly memberNames: readonly string[];
   readonly accountNames: readonly string[];
   readonly categories: readonly CategoryOption[];
+  readonly goalNames: readonly string[];
 }
 
 export interface ImageExtractionRequest {

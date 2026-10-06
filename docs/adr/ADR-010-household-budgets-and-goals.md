@@ -1,6 +1,6 @@
 # ADR-010: Budgets and goals belong to the household
 
-- Status: Accepted
+- Status: Accepted. Goal contributions refined by [ADR-032](ADR-032-goal-contributions.md)
 - Date: 2026-10-05
 
 ## Context

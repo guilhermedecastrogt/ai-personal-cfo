@@ -190,6 +190,7 @@ The web application runs on port 3001 and reads the API's address from `API_URL`
 
 ## Limitations
 
+- Deleting a transaction that counts toward a goal takes its contribution back, and a goal that has contributions cannot change currency ([ADR-032](adr/ADR-032-goal-contributions.md)).
 - Transactions are recorded only through WhatsApp, and accounts cannot be created or edited from the dashboard.
 - A deleted record cannot be restored from the dashboard; only a database backup brings it back.
 - Access codes are issued by an operator with a script. There is no self-service sign-up, code rotation screen or sign-in rate limiting yet.

@@ -8,6 +8,7 @@ Decide what the latest message is:
 - TRANSACTION: the sender reports money spent, received or moved between accounts, or supplies what was missing from the pending transaction. Fill "transactions" and set "question" to null.
 - QUESTION: the sender asks about the household's finances. Fill "question" and set "transactions" to an empty list.
 - CORRECTION: the sender wants to change or delete something already recorded, for example "isso foi dia 1", "foram 45", "coloca em restaurantes", "na verdade foi a Bia", "apaga esse" or "delete the Lidl one". Fill "correction" and set "question" to null and "transactions" to an empty list. Never turn a correction into a new transaction.
+- GOAL_CONTRIBUTION: the sender wants an amount to count toward one of the listed goals, for example "contabilize esse valor na meta Viagem Malta", "coloquei 200 na reserva" or "soma 50 na meta do carro". Fill "contribution" and set "question" and "correction" to null and "transactions" to an empty list.
 - UNCLEAR: the message refers to something you cannot identify from the message and the conversation state, for example "there" or "that one" with nothing it could point to. Set "question" to null and "transactions" to an empty list. Do not guess.
 - OTHER: anything else. Set "question" to null and "transactions" to an empty list.
 
@@ -26,6 +27,11 @@ Rules for a correction:
 - "changes" holds only the new values the sender states, with the same rules as a transaction: amount as decimal text, category exactly as listed, account and member as written, date as a reference. Leave every other field null, the date UNSPECIFIED and "memberReference" SENDER.
 - When the last outcome is CORRECTION_PENDING, the sender is answering which transaction they meant. Combine their earlier message, which said what to change, with the latest one, which says which transaction it is.
 - You never know which transactions exist and never invent one. The application finds the transaction.
+
+Rules for a goal contribution:
+- "goal" is the goal as the sender named it, preferably exactly as listed.
+- "fromRecorded" is true when the amount is a transaction already recorded ("esse valor", "esse gasto", "o da loveholidays"), and "target" then describes it with the same rules as a correction. Otherwise false, with "target" all null and its date UNSPECIFIED.
+- "amount", "currency", "member" and "date" are what the sender states for a new amount, with the same rules as a transaction. Leave them null and the date UNSPECIFIED when "fromRecorded" is true.
 
 Rules for transactions:
 - "transactions" has one entry per distinct transaction the sender reports, in the order written, at most five. "dia 3 gastei 10,65 no lanche e 117,72 no mercado" is two entries. Never merge two amounts into one entry or split one amount into two.
@@ -89,5 +95,6 @@ export function buildInterpretationInstructions(request: InterpretationRequest):
     `Household members:\n${listNames(request.memberNames)}`,
     `Accounts:\n${listNames(request.accountNames)}`,
     `Categories:\n${listCategories(request.categories)}`,
+    `Goals:\n${listNames(request.goalNames)}`,
   ].join('\n\n');
 }

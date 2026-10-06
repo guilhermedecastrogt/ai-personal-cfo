@@ -18,6 +18,7 @@ const TRANSACTION_FIELD_ERRORS: Readonly<Record<TransactionRejectionReason, Fiel
   DESTINATION_WITHOUT_TRANSFER: { field: 'type', code: 'NOT_ALLOWED' },
   CATEGORY_KIND_MISMATCH: { field: 'category', code: 'KIND_MISMATCH' },
   TYPE_CHANGE_NOT_ALLOWED: { field: 'type', code: 'NOT_ALLOWED' },
+  GOAL_CURRENCY_MISMATCH: { field: 'account', code: 'CURRENCY_MISMATCH' },
 };
 
 const BUDGET_FIELD_ERRORS: Readonly<Record<BudgetRejectionReason, FieldError>> = {
@@ -30,6 +31,7 @@ const BUDGET_FIELD_ERRORS: Readonly<Record<BudgetRejectionReason, FieldError>> =
 
 const GOAL_FIELD_ERRORS: Readonly<Record<GoalRejectionReason, FieldError>> = {
   UNSUPPORTED_CURRENCY: { field: 'currency', code: 'UNKNOWN' },
+  CURRENCY_LOCKED: { field: 'currency', code: 'NOT_ALLOWED' },
 };
 
 export function transactionFieldErrors(

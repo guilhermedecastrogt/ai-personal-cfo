@@ -26,6 +26,15 @@ interface Wording {
   readonly stale: string;
   readonly unchanged: (line: string) => string;
   readonly notCorrected: (needs: string) => string;
+  readonly contributed: (added: string, goal: string) => string;
+  readonly progress: (saved: string, target: string, share: string) => string;
+  readonly goalReached: string;
+  readonly whichGoal: (options: string) => string;
+  readonly noGoals: string;
+  readonly goalCurrency: (goal: string, goalCurrency: string, currency: string) => string;
+  readonly alreadyContributed: (goal: string) => string;
+  readonly contributionAmount: string;
+  readonly contributionMember: string;
 }
 
 const WORDING: Readonly<Record<Locale, Wording>> = {
@@ -55,6 +64,16 @@ const WORDING: Readonly<Record<Locale, Wording>> = {
     stale: 'That transaction has just changed. Check it and tell me again what to correct.',
     unchanged: (line) => `Nothing changed, it was already recorded this way: ${line}.`,
     notCorrected: (needs) => `Nothing was changed: I need ${needs}.`,
+    contributed: (added, goal) => `Added ${added} to the goal ${goal}.`,
+    progress: (saved, target, share) => `Progress: ${saved} of ${target} (${share}).`,
+    goalReached: 'Goal reached.',
+    whichGoal: (options) => `Which goal? ${options}.`,
+    noGoals: 'There are no goals yet. Create one in the dashboard, under Goals.',
+    goalCurrency: (goal, goalCurrency, currency) =>
+      `The goal ${goal} is in ${goalCurrency} and this amount is in ${currency}, so I did not add it.`,
+    alreadyContributed: (goal) => `That transaction already counts toward the goal ${goal}.`,
+    contributionAmount: 'Tell me the amount to add to the goal.',
+    contributionMember: 'Tell me who it came from, by name.',
   },
   'pt-BR': {
     recorded: 'Registrado',
@@ -83,6 +102,16 @@ const WORDING: Readonly<Record<Locale, Wording>> = {
     stale: 'Esse lançamento acabou de mudar. Confira e me diga de novo o que corrigir.',
     unchanged: (line) => `Nada mudou, o lançamento já estava assim: ${line}.`,
     notCorrected: (needs) => `Não alterei nada, porque preciso saber ${needs}.`,
+    contributed: (added, goal) => `Somei ${added} à meta ${goal}.`,
+    progress: (saved, target, share) => `Progresso: ${saved} de ${target} (${share}).`,
+    goalReached: 'Meta atingida.',
+    whichGoal: (options) => `Qual meta? ${options}.`,
+    noGoals: 'Ainda não há metas. Crie uma no painel, em Metas.',
+    goalCurrency: (goal, goalCurrency, currency) =>
+      `A meta ${goal} é em ${goalCurrency} e este valor é em ${currency}, então não somei.`,
+    alreadyContributed: (goal) => `Esse lançamento já conta na meta ${goal}.`,
+    contributionAmount: 'Me diga o valor para somar à meta.',
+    contributionMember: 'Me diga de quem veio, pelo nome.',
   },
 };
 
@@ -217,6 +246,54 @@ export function unchangedReply(summary: TransactionSummary, locale: Locale, toda
 
 export function notCorrectedReply(needs: readonly string[], locale: Locale): string {
   return WORDING[locale].notCorrected(joinNeeds(needs, locale));
+}
+
+export interface ContributionReply {
+  readonly goal: string;
+  readonly added: string;
+  readonly progress: {
+    readonly saved: string;
+    readonly target: string;
+    readonly share: string;
+    readonly completed: boolean;
+  } | null;
+}
+
+export function contributedReply(contribution: ContributionReply, locale: Locale): string {
+  const words = WORDING[locale];
+  const { progress } = contribution;
+  return [
+    words.contributed(contribution.added, contribution.goal),
+    ...(progress === null ? [] : [words.progress(progress.saved, progress.target, progress.share)]),
+    ...(progress?.completed === true ? [words.goalReached] : []),
+  ].join(' ');
+}
+
+export function whichGoalReply(options: readonly string[], locale: Locale): string {
+  return options.length === 0
+    ? WORDING[locale].noGoals
+    : WORDING[locale].whichGoal(joinNeeds(options, locale));
+}
+
+export function goalCurrencyReply(
+  goal: string,
+  goalCurrency: string,
+  currency: string,
+  locale: Locale,
+): string {
+  return WORDING[locale].goalCurrency(goal, goalCurrency, currency);
+}
+
+export function alreadyContributedReply(goal: string, locale: Locale): string {
+  return WORDING[locale].alreadyContributed(goal);
+}
+
+export function contributionAmountReply(locale: Locale): string {
+  return WORDING[locale].contributionAmount;
+}
+
+export function contributionMemberReply(locale: Locale): string {
+  return WORDING[locale].contributionMember;
 }
 
 function capitalize(text: string): string {

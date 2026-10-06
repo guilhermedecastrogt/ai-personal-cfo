@@ -96,13 +96,14 @@ The API key is read once at startup, never logged, and never included in an erro
 
 One call classifies the message and extracts its content.
 
-| Kind          | Meaning                                                  | Carries                                                  |
-| ------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| `TRANSACTION` | Money spent, received or moved                           | One to five transaction candidates, in the order written |
-| `QUESTION`    | A question about the household's finances                | A financial question                                     |
-| `CORRECTION`  | A request to change or delete something already recorded | Nothing. It is declined                                  |
-| `UNCLEAR`     | A reference the model cannot identify                    | Nothing. The member is asked                             |
-| `OTHER`       | Anything else                                            | Nothing                                                  |
+| Kind                | Meaning                                                  | Carries                                                                                                 |
+| ------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `TRANSACTION`       | Money spent, received or moved                           | One to five transaction candidates, in the order written                                                |
+| `QUESTION`          | A question about the household's finances                | A financial question                                                                                    |
+| `CORRECTION`        | A request to change or delete something already recorded | Which transaction, in the member's words, and the new values                                            |
+| `GOAL_CONTRIBUTION` | An amount that should count toward a goal                | The goal as named, and either a recorded transaction described in the member's words or a stated amount |
+| `UNCLEAR`           | A reference the model cannot identify                    | Nothing. The member is asked                                                                            |
+| `OTHER`             | Anything else                                            | Nothing                                                                                                 |
 
 ### Several transactions in one message
 
@@ -272,7 +273,7 @@ The assistant does not deduplicate messages. Handling the same message twice rec
 
 ## Privacy and logging
 
-Sent to OpenAI: the member's message, up to six recent turns of the same conversation, the names of the household's members, accounts and categories, and, for a reply, the facts being phrased. Requests ask OpenAI not to store them.
+Sent to OpenAI: the member's message, up to six recent turns of the same conversation, the names of the household's members, accounts, categories and goals, and, for a reply, the facts being phrased. Requests ask OpenAI not to store them.
 
 Logged: the provider, the operation, the outcome or error category, and the duration. Message text, facts, prompts, responses and the API key are never logged.
 

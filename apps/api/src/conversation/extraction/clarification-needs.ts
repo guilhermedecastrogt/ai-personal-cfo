@@ -45,6 +45,10 @@ const CONFIRMATION: Wording = {
   'pt-BR': 'a confirmação de que foi isso mesmo',
 };
 const DETAILS: Wording = { en: 'the details again', 'pt-BR': 'os detalhes de novo' };
+const GOAL_CURRENCY: Wording = {
+  en: 'an account in the same currency as the goal this transaction counts toward',
+  'pt-BR': 'uma conta na mesma moeda da meta em que este lançamento conta',
+};
 const OWNER: Wording = { en: 'who it belongs to', 'pt-BR': 'de quem é' };
 
 const NEEDS: Readonly<Record<ClarificationReason, Wording>> = {
@@ -73,6 +77,7 @@ const NEEDS: Readonly<Record<ClarificationReason, Wording>> = {
   LOW_CONFIDENCE: CONFIRMATION,
   INVALID_INPUT: DETAILS,
   UNKNOWN_MEMBER: OWNER,
+  GOAL_CURRENCY_MISMATCH: GOAL_CURRENCY,
 };
 
 const KINDS: Readonly<Record<Locale, Readonly<Record<TransactionType, string>>>> = {

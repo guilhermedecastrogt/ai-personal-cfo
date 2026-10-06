@@ -1,11 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, between, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
+import type { DatabaseExecutor } from '../database/database-executor.js';
 import { requireRow } from '../database/require-row.js';
 import type { NewTransaction } from './new-transaction.schema.js';
 import { transactions } from './transactions.schema.js';
 
 export type Transaction = typeof transactions.$inferSelect;
+
+function noHook(): Promise<void> {
+  return Promise.resolve();
+}
 
 export interface TransactionFilter {
   readonly memberId?: string;
@@ -109,27 +114,40 @@ export class TransactionsRepository {
     transactionId: string,
     version: string,
     changes: TransactionChanges,
+    afterUpdate: (executor: DatabaseExecutor, updated: Transaction) => Promise<void> = noHook,
   ): Promise<Transaction | undefined> {
-    const [transaction] = await this.database
-      .update(transactions)
-      .set(changes)
-      .where(
-        and(
-          eq(transactions.householdId, householdId),
-          eq(transactions.id, transactionId),
-          sql`date_trunc('milliseconds', ${transactions.updatedAt}) = ${version}::timestamptz`,
-        ),
-      )
-      .returning();
-    return transaction;
+    return this.database.transaction(async (executor) => {
+      const [transaction] = await executor
+        .update(transactions)
+        .set(changes)
+        .where(
+          and(
+            eq(transactions.householdId, householdId),
+            eq(transactions.id, transactionId),
+            sql`date_trunc('milliseconds', ${transactions.updatedAt}) = ${version}::timestamptz`,
+          ),
+        )
+        .returning();
+      if (transaction !== undefined) {
+        await afterUpdate(executor, transaction);
+      }
+      return transaction;
+    });
   }
 
-  async delete(householdId: string, transactionId: string): Promise<boolean> {
-    const deleted = await this.database
-      .delete(transactions)
-      .where(and(eq(transactions.householdId, householdId), eq(transactions.id, transactionId)))
-      .returning({ id: transactions.id });
-    return deleted.length > 0;
+  async delete(
+    householdId: string,
+    transactionId: string,
+    beforeDelete: (executor: DatabaseExecutor) => Promise<void> = noHook,
+  ): Promise<boolean> {
+    return this.database.transaction(async (executor) => {
+      await beforeDelete(executor);
+      const deleted = await executor
+        .delete(transactions)
+        .where(and(eq(transactions.householdId, householdId), eq(transactions.id, transactionId)))
+        .returning({ id: transactions.id });
+      return deleted.length > 0;
+    });
   }
 
   async findBySourceMessage(

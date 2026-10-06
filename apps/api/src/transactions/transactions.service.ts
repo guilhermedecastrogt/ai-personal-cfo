@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AccountsRepository } from '../accounts/accounts.repository.js';
 import { CategoriesRepository } from '../categories/categories.repository.js';
+import { GoalContributionsRepository } from '../goals/goal-contributions.repository.js';
 import { HouseholdsRepository } from '../households/households.repository.js';
 import {
   newTransactionSchema,
@@ -26,7 +27,8 @@ export type TransactionRejectionReason =
   | 'UNKNOWN_ACCOUNT'
   | 'UNKNOWN_TRANSFER_ACCOUNT'
   | 'UNKNOWN_CATEGORY'
-  | 'TYPE_CHANGE_NOT_ALLOWED';
+  | 'TYPE_CHANGE_NOT_ALLOWED'
+  | 'GOAL_CURRENCY_MISMATCH';
 
 export interface TransactionEdit {
   readonly type: TransactionType;
@@ -63,6 +65,7 @@ export class TransactionsService {
     private readonly households: HouseholdsRepository,
     private readonly accounts: AccountsRepository,
     private readonly categories: CategoriesRepository,
+    private readonly contributions: GoalContributionsRepository,
   ) {}
 
   async record(householdId: string, input: NewTransactionInput): Promise<Transaction> {
@@ -127,18 +130,29 @@ export class TransactionsService {
       transactionDate: edit.transactionDate,
       source: existing.source,
     });
-    const updated = await this.transactions.update(householdId, transactionId, version, {
-      memberId: transaction.memberId,
-      accountId: transaction.accountId,
-      type: transaction.type,
-      amountMinor: transaction.amountMinor,
-      currency: transaction.currency,
-      merchant: transaction.merchant ?? null,
-      description: transaction.description ?? null,
-      categoryId: transaction.categoryId ?? null,
-      expenseScope: transaction.expenseScope,
-      transactionDate: transaction.transactionDate,
-    });
+    const contribution = await this.contributions.linkedTo(householdId, transactionId);
+    if (contribution !== undefined && contribution.currency !== transaction.currency) {
+      throw new TransactionRejectedError(['GOAL_CURRENCY_MISMATCH']);
+    }
+    const updated = await this.transactions.update(
+      householdId,
+      transactionId,
+      version,
+      {
+        memberId: transaction.memberId,
+        accountId: transaction.accountId,
+        type: transaction.type,
+        amountMinor: transaction.amountMinor,
+        currency: transaction.currency,
+        merchant: transaction.merchant ?? null,
+        description: transaction.description ?? null,
+        categoryId: transaction.categoryId ?? null,
+        expenseScope: transaction.expenseScope,
+        transactionDate: transaction.transactionDate,
+      },
+      (executor, row) =>
+        this.contributions.followTransactionAmount(executor, householdId, row.id, row.amountMinor),
+    );
     if (updated !== undefined) {
       return { status: 'UPDATED', transaction: updated };
     }
@@ -148,7 +162,9 @@ export class TransactionsService {
   }
 
   async remove(householdId: string, transactionId: string): Promise<boolean> {
-    return this.transactions.delete(householdId, transactionId);
+    return this.transactions.delete(householdId, transactionId, (executor) =>
+      this.contributions.revertForTransaction(executor, householdId, transactionId),
+    );
   }
 
   private async validate(householdId: string, input: NewTransactionInput): Promise<NewTransaction> {

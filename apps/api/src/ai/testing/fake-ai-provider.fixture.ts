@@ -67,6 +67,7 @@ export function transactionsInterpretation(
     completesPendingTransaction: false,
     transactions: candidates.map((overrides) => transactionCandidate(overrides)),
     correction: null,
+    contribution: null,
   };
 }
 
@@ -79,6 +80,7 @@ export function questionInterpretation(overrides: Partial<FinancialQuestion> = {
     kind: 'QUESTION',
     transactions: [],
     correction: null,
+    contribution: null,
     completesPendingTransaction: false,
     question: {
       intent: 'SPENDING_TOTAL',
@@ -109,6 +111,7 @@ export function completionOf(
     kind: 'TRANSACTION',
     question: null,
     correction: null,
+    contribution: null,
     completesPendingTransaction: true,
     transactions: [
       {
@@ -138,6 +141,7 @@ function bareInterpretation(kind: 'OTHER' | 'CORRECTION' | 'UNCLEAR'): unknown {
     transactions: [],
     question: null,
     correction: null,
+    contribution: null,
     completesPendingTransaction: false,
   };
 }
@@ -152,6 +156,7 @@ export function correctionInterpretation(
     transactions: [],
     question: null,
     completesPendingTransaction: false,
+    contribution: null,
     correction: {
       action,
       target: {
@@ -277,4 +282,40 @@ export class FakeAIProvider implements AIProvider {
     this.replyRequests.push(request);
     return Promise.resolve(this.replyScript(request));
   }
+}
+
+export function contributionInterpretation(
+  goal: string,
+  overrides: Partial<{
+    fromRecorded: boolean;
+    target: Partial<CorrectionTarget>;
+    amount: string | null;
+    currency: string | null;
+    member: string | null;
+    date: DateReference;
+  }> = {},
+): unknown {
+  return {
+    kind: 'GOAL_CONTRIBUTION',
+    transactions: [],
+    question: null,
+    correction: null,
+    completesPendingTransaction: false,
+    contribution: {
+      goal,
+      fromRecorded: overrides.fromRecorded ?? false,
+      target: {
+        ordinal: null,
+        merchant: null,
+        amount: null,
+        member: null,
+        date: UNSPECIFIED_DATE,
+        ...overrides.target,
+      },
+      amount: overrides.amount ?? null,
+      currency: overrides.currency ?? null,
+      member: overrides.member ?? null,
+      date: overrides.date ?? UNSPECIFIED_DATE,
+    },
+  };
 }

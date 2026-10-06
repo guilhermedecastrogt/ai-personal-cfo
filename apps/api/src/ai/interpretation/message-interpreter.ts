@@ -39,6 +39,10 @@ export class MessageInterpreter {
       const { correction } = parsed.data;
       return correction === null ? { kind: 'UNCLEAR' } : { kind, correction };
     }
+    if (kind === 'GOAL_CONTRIBUTION') {
+      const { contribution } = parsed.data;
+      return contribution === null ? { kind: 'UNCLEAR' } : { kind, contribution };
+    }
     if (kind === 'OTHER' || kind === 'UNCLEAR') {
       return { kind };
     }

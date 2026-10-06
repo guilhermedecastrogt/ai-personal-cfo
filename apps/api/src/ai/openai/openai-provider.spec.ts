@@ -37,6 +37,7 @@ const INTERPRETATION_REQUEST = {
     { name: 'Food', kind: 'EXPENSE' as const, parent: null },
     { name: 'Groceries', kind: 'EXPENSE' as const, parent: 'Food' },
   ],
+  goalNames: ['Summer Trip'],
 };
 
 const REPLY_REQUEST = {

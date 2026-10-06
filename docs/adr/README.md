@@ -35,3 +35,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [029](ADR-029-dashboard-writes.md)                            | The dashboard edits and deletes transactions, and manages budgets and goals                    | Accepted |
 | [030](ADR-030-deterministic-confirmations.md)                 | Recorded transactions are confirmed without the model                                          | Accepted |
 | [031](ADR-031-corrections-in-the-chat.md)                     | Corrections and deletions are applied from the chat                                            | Accepted |
+| [032](ADR-032-goal-contributions.md)                          | Goals receive contributions linked to transactions                                             | Accepted |

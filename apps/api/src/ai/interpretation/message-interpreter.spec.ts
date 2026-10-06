@@ -5,6 +5,7 @@ import {
   FakeAIProvider,
   UNCLEAR_INTERPRETATION,
   completionOf,
+  contributionInterpretation,
   correctionInterpretation,
   OTHER_INTERPRETATION,
   questionInterpretation,
@@ -20,6 +21,7 @@ const REQUEST = {
   memberNames: ['Member A'],
   accountNames: ['Joint Account'],
   categories: [],
+  goalNames: [],
 };
 
 async function interpret(output: unknown): Promise<unknown> {
@@ -62,6 +64,7 @@ describe('MessageInterpreter', () => {
         transactions: [],
         question: null,
         correction: null,
+        contribution: null,
         completesPendingTransaction: false,
       }),
     ).toEqual({ kind: 'UNCLEAR' });
@@ -98,6 +101,15 @@ describe('MessageInterpreter', () => {
         target: { merchant: 'Lidl', ordinal: null },
         changes: { amount: '28', merchant: null },
       },
+    });
+  });
+
+  it('returns a goal contribution', async () => {
+    expect(
+      await interpret(contributionInterpretation('Viagem Malta', { fromRecorded: true })),
+    ).toMatchObject({
+      kind: 'GOAL_CONTRIBUTION',
+      contribution: { goal: 'Viagem Malta', fromRecorded: true },
     });
   });
 

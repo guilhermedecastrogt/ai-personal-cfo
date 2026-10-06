@@ -10,6 +10,7 @@ import {
   pgTable,
   real,
   text,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { accounts } from '../accounts/accounts.schema.js';
@@ -101,5 +102,6 @@ export const transactions = pgTable(
     ),
     index('transactions_account_id_index').on(table.accountId),
     index('transactions_source_message_id_index').on(table.sourceMessageId),
+    unique('transactions_household_id_id_unique').on(table.householdId, table.id),
   ],
 );

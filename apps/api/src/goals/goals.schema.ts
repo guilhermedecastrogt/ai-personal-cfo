@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { bigint, char, check, date, index, pgEnum, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  char,
+  check,
+  date,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { auditTimestamps, identifier } from '../database/columns.js';
 import { households } from '../households/households.schema.js';
 import { GOAL_TYPES } from './goal-vocabulary.js';
@@ -26,6 +37,7 @@ export const goals = pgTable(
   },
   (table) => [
     index('goals_household_id_index').on(table.householdId),
+    unique('goals_household_id_id_currency_unique').on(table.householdId, table.id, table.currency),
     check('goals_name_not_blank', sql`length(trim(${table.name})) > 0`),
     check('goals_target_amount_positive', sql`${table.targetAmountMinor} > 0`),
     check('goals_current_amount_not_negative', sql`${table.currentAmountMinor} >= 0`),

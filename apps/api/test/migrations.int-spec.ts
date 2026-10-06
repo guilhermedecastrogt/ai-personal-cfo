@@ -11,6 +11,7 @@ const EXPECTED_TABLES = [
   'categories',
   'dashboard_sessions',
   'evaluation_leases',
+  'goal_contributions',
   'goals',
   'households',
   'insights',

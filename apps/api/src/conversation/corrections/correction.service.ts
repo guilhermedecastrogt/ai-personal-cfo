@@ -96,6 +96,16 @@ export class CorrectionService {
       : { status: 'NOT_FOUND' };
   }
 
+  async findRecorded(
+    context: RequestContext,
+    conversationId: string,
+    target: CorrectionTarget,
+    today: IsoDate,
+  ): Promise<TargetResolution> {
+    const directory = await this.directories.load(context.householdId);
+    return this.resolve(context, conversationId, target, directory, today);
+  }
+
   private async resolve(
     context: RequestContext,
     conversationId: string,

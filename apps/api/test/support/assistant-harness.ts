@@ -13,6 +13,8 @@ import { CfoService } from '../../src/cfo/cfo.service.js';
 import { ReviewExplainer } from '../../src/cfo/explanation/review-explainer.js';
 import type { AppConfig } from '../../src/config/app-config.js';
 import { CorrectionService } from '../../src/conversation/corrections/correction.service.js';
+import { GoalContributionService } from '../../src/conversation/goals/goal-contribution.service.js';
+import { GoalsService } from '../../src/goals/goals.service.js';
 import { ConversationsRepository } from '../../src/conversation/conversations.repository.js';
 import { TransactionExtractionService } from '../../src/conversation/extraction/transaction-extraction.service.js';
 import { FinancialAssistant } from '../../src/conversation/financial-assistant.service.js';
@@ -22,6 +24,7 @@ import type { Database } from '../../src/database/database.js';
 import { HouseholdDirectoryService } from '../../src/directory/household-directory.service.js';
 import { FinanceService } from '../../src/finance/application/finance.service.js';
 import { LedgerRepository } from '../../src/finance/infrastructure/ledger.repository.js';
+import { GoalContributionsRepository } from '../../src/goals/goal-contributions.repository.js';
 import { GoalsRepository } from '../../src/goals/goals.repository.js';
 import { HouseholdsRepository } from '../../src/households/households.repository.js';
 import { DEFAULT_MEDIA_POLICY, type MediaPolicy } from '../../src/media/media-policy.js';
@@ -90,11 +93,13 @@ export async function createAssistantHarness(
   const budgets = new BudgetsRepository(database);
   const goals = new GoalsRepository(database);
   const transactions = new TransactionsRepository(database);
+  const contributions = new GoalContributionsRepository(database);
   const transactionsService = new TransactionsService(
     transactions,
     households,
     accounts,
     categories,
+    contributions,
   );
   const finance = new FinanceService(
     new LedgerRepository(database),
@@ -108,6 +113,7 @@ export async function createAssistantHarness(
   const conversations = new ConversationsRepository(database);
   const mediaSource = new FakeMediaSource();
   const directory = new HouseholdDirectoryService(households, accounts, categories, goals);
+  const corrections = new CorrectionService(transactionsService, conversations, directory);
   const extraction = new TransactionExtractionService(transactionsService, directory, TEST_CONFIG);
   const cfo = new CfoService(
     new FinancialSnapshotBuilder(finance),
@@ -133,7 +139,13 @@ export async function createAssistantHarness(
     finance,
     conversations,
     directory,
-    new CorrectionService(transactionsService, conversations, directory),
+    corrections,
+    new GoalContributionService(
+      new GoalsService(goals, households, accounts, contributions),
+      corrections,
+      directory,
+      finance,
+    ),
   );
   return {
     assistant,

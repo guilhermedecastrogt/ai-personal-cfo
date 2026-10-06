@@ -146,7 +146,7 @@ describe('budget and goal forms', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('Summer Trip');
     expect(screen.getByLabelText('Tipo')).toHaveValue('TRAVEL');
     expect(screen.getByLabelText('Objetivo')).toHaveValue('1000.00');
-    expect(screen.getByLabelText(/Guardado até agora/)).toHaveValue('620.00');
+    expect(screen.getByLabelText(/Progresso até agora/)).toHaveValue('620.00');
     expect(screen.getByLabelText(/Data alvo/)).toHaveValue('2027-06-30');
   });
 });

@@ -210,6 +210,12 @@ Corrections, like confirmations, are written by the application without the mode
 
 A correction that the model reads as a new expense would still be recorded as a second transaction. The confirmation always states what was recorded, so the member can see it.
 
+### Goal contributions
+
+"Contabilize esse valor na meta Viagem Malta", "coloquei 200 na reserva": the model names the goal and either describes a transaction already recorded, in the member's words, or states an amount. The application finds the goal by name among the household's active goals and, for a recorded transaction, finds it as for a correction. It adds the contribution and replies with the goal's progress, without the model: `Somei € 392,94 à meta Viagem Malta. Progresso: € 392,94 de € 1.000,00 (39,29%).`
+
+A transaction counts toward a goal at most once. An amount in another currency than the goal's is not added. A goal name that fits none or several is asked about, listing the goals.
+
 ## Images
 
 An image is handled by the image flow ([vision-extraction.md](vision-extraction.md)) and receives no conversation context. The image request contains the image, its caption and the names of accounts and categories, as before. An image neither reads nor disturbs the previous question, so a follow-up after an image still works.

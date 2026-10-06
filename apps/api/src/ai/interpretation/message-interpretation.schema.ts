@@ -111,18 +111,30 @@ export const correctionSchema = z.object({
   changes: transactionCandidateSchema,
 });
 
+export const goalContributionSchema = z.object({
+  goal: z.string(),
+  fromRecorded: z.boolean(),
+  target: correctionTargetSchema,
+  amount: z.string().nullable(),
+  currency: z.string().nullable(),
+  member: z.string().nullable(),
+  date: dateReferenceSchema,
+});
+
 export const messageInterpretationWireSchema = z.object({
-  kind: z.enum(['TRANSACTION', 'QUESTION', 'CORRECTION', 'UNCLEAR', 'OTHER']),
+  kind: z.enum(['TRANSACTION', 'QUESTION', 'CORRECTION', 'GOAL_CONTRIBUTION', 'UNCLEAR', 'OTHER']),
   transactions: z.array(transactionCandidateSchema).max(MAXIMUM_TRANSACTIONS_PER_MESSAGE),
   completesPendingTransaction: z.boolean(),
   question: financialQuestionSchema.nullable(),
   correction: correctionSchema.nullable(),
+  contribution: goalContributionSchema.nullable(),
 });
 
 export type DateReference = z.infer<typeof dateReferenceSchema>;
 export type TransactionCandidate = z.infer<typeof transactionCandidateSchema>;
 export type CorrectionTarget = z.infer<typeof correctionTargetSchema>;
 export type Correction = z.infer<typeof correctionSchema>;
+export type GoalContributionRequest = z.infer<typeof goalContributionSchema>;
 export type PeriodReference = z.infer<typeof periodReferenceSchema>;
 export type FinancialQuestion = z.infer<typeof financialQuestionSchema>;
 export type FinancialIntent = (typeof FINANCIAL_INTENTS)[number];
@@ -138,6 +150,7 @@ export type MessageInterpretation =
     }
   | { readonly kind: 'QUESTION'; readonly question: FinancialQuestion }
   | { readonly kind: 'CORRECTION'; readonly correction: Correction }
+  | { readonly kind: 'GOAL_CONTRIBUTION'; readonly contribution: GoalContributionRequest }
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' };
 

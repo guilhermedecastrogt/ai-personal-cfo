@@ -244,7 +244,7 @@ describe('budgets and goals', () => {
     const goals = panel('Household goals');
 
     expect(goals).toHaveTextContent('Summer Trip In progress€620.00 of €1,000.00 (62%)');
-    expect(goals).toHaveTextContent('€380.00 to go by 2027-06-30, which needs €45.68 a month.');
+    expect(goals).toHaveTextContent('€380.00 remaining by 2027-06-30, which needs €45.68 a month.');
   });
 
   it('says when no goals are set', () => {

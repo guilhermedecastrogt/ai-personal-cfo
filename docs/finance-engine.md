@@ -134,6 +134,8 @@ Usage is attributed to members from the transactions. Limits and alerts apply to
 
 ## Goals
 
+The current amount of a goal is a stored total. It is set by hand in the dashboard and increased by contributions, each of which can be linked to the transaction it came from ([ADR-032](adr/ADR-032-goal-contributions.md)). Deleting a linked transaction takes its contribution back, and changing its amount adjusts the contribution.
+
 ```
 remaining = max(target − current, 0)
 progress = current ÷ target

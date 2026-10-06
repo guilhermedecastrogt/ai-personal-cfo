@@ -64,6 +64,13 @@
       "when": 1791217398430,
       "tag": "0008_member_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791247798450,
+      "tag": "0009_goal_contributions",
+      "breakpoints": true
     }
   ]
 }

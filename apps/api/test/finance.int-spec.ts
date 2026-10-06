@@ -11,6 +11,7 @@ import {
 } from '../src/finance/application/finance.service.js';
 import { calendarMonth, monthToDate } from '../src/finance/domain/period/period.js';
 import { LedgerRepository } from '../src/finance/infrastructure/ledger.repository.js';
+import { GoalContributionsRepository } from '../src/goals/goal-contributions.repository.js';
 import { GoalsRepository } from '../src/goals/goals.repository.js';
 import { goals } from '../src/goals/goals.schema.js';
 import { HouseholdsRepository } from '../src/households/households.repository.js';
@@ -90,6 +91,7 @@ describe('finance engine against PostgreSQL', () => {
       households,
       accounts,
       categoriesRepository,
+      new GoalContributionsRepository(database),
     );
     finance = new FinanceService(
       new LedgerRepository(database),

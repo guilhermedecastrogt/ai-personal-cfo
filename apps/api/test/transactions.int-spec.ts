@@ -3,6 +3,7 @@ import { AccountsRepository } from '../src/accounts/accounts.repository.js';
 import { CategoriesRepository } from '../src/categories/categories.repository.js';
 import { categories } from '../src/categories/categories.schema.js';
 import { requireRow } from '../src/database/require-row.js';
+import { GoalContributionsRepository } from '../src/goals/goal-contributions.repository.js';
 import { HouseholdsRepository } from '../src/households/households.repository.js';
 import type { NewTransactionInput } from '../src/transactions/new-transaction.schema.js';
 import { TransactionsRepository } from '../src/transactions/transactions.repository.js';
@@ -77,6 +78,7 @@ describe('transactions', () => {
       new HouseholdsRepository(testDatabase.database),
       accounts,
       new CategoriesRepository(testDatabase.database),
+      new GoalContributionsRepository(testDatabase.database),
     );
     restaurantsId = await categoryId('Restaurants');
     salaryId = await categoryId('Salary');

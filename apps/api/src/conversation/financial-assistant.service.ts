@@ -52,10 +52,20 @@ import {
 import { resolvePeriodReference } from './queries/period-reference.js';
 import { readConfirmation, type Confirmation } from './confirmation.js';
 import { CorrectionService, type CorrectionOutcome } from './corrections/correction.service.js';
+import {
+  GoalContributionService,
+  type ContributionResult,
+} from './goals/goal-contribution.service.js';
 import { describeNeeds, describeStoredNeeds } from './extraction/clarification-needs.js';
 import {
   acknowledgementReply,
+  alreadyContributedReply,
   alreadyRecordedReply,
+  contributedReply,
+  contributionAmountReply,
+  contributionMemberReply,
+  goalCurrencyReply,
+  whichGoalReply,
   confirmDeletionReply,
   correctedReply,
   deletedReply,
@@ -107,6 +117,7 @@ export type AssistantOutcome =
   | { readonly kind: 'IMAGE'; readonly image: ImageOutcome }
   | { readonly kind: 'REVIEW'; readonly review: MonthlyReviewResult }
   | { readonly kind: 'CORRECTION'; readonly result: CorrectionOutcome }
+  | { readonly kind: 'GOAL_CONTRIBUTION'; readonly result: ContributionResult }
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' }
   | { readonly kind: 'WELCOME'; readonly facts: ReplyFacts }
@@ -154,6 +165,7 @@ export class FinancialAssistant {
     private readonly conversations: ConversationsRepository,
     private readonly directories: HouseholdDirectoryService,
     private readonly corrections: CorrectionService,
+    private readonly contributions: GoalContributionService,
   ) {}
 
   async handle(
@@ -252,6 +264,9 @@ export class FinancialAssistant {
       summarizeTransaction(transaction, directory, context.memberId);
     if (plan.kind === 'CORRECTION') {
       return correctionReply(plan.result, summaryOf, locale, today);
+    }
+    if (plan.kind === 'GOAL_CONTRIBUTION') {
+      return contributionReply(plan.result, summaryOf, locale, today);
     }
     const summaries = plan.transactions.map(summaryOf);
     const [first] = summaries;
@@ -431,6 +446,21 @@ export class FinancialAssistant {
           today,
         );
         return { outcome: { kind: 'CORRECTION', result }, state: afterCorrection(state, result) };
+      }
+      case 'GOAL_CONTRIBUTION': {
+        const result = await this.contributions.contribute(
+          context,
+          conversationId,
+          interpretation.contribution,
+          today,
+        );
+        return {
+          outcome: { kind: 'GOAL_CONTRIBUTION', result },
+          state:
+            result.status === 'CONTRIBUTED'
+              ? { ...state, lastOutcome: 'GOAL_CONTRIBUTED', pendingDeletion: null }
+              : undefined,
+        };
       }
     }
   }
@@ -615,6 +645,7 @@ export class FinancialAssistant {
       memberNames: directory.members.map((member) => member.name),
       accountNames: directory.accounts.map((account) => account.name),
       categories: toCategoryOptions(directory.categories),
+      goalNames: directory.goals.map((goal) => goal.name),
     };
   }
 }
@@ -710,6 +741,33 @@ function correctionReply(
   }
 }
 
+function contributionReply(
+  result: ContributionResult,
+  summaryOf: (transaction: Transaction) => TransactionSummary,
+  locale: Locale,
+  today: IsoDate,
+): string {
+  switch (result.status) {
+    case 'CONTRIBUTED':
+      return contributedReply(result, locale);
+    case 'GOAL_UNKNOWN':
+    case 'GOAL_AMBIGUOUS':
+      return whichGoalReply(result.options, locale);
+    case 'TARGET_NOT_FOUND':
+      return notFoundReply(locale);
+    case 'TARGET_AMBIGUOUS':
+      return whichOneReply(result.transactions.map(summaryOf), locale, today);
+    case 'CURRENCY_MISMATCH':
+      return goalCurrencyReply(result.goal, result.goalCurrency, result.currency, locale);
+    case 'ALREADY_CONTRIBUTED':
+      return alreadyContributedReply(result.goal, locale);
+    case 'INVALID_AMOUNT':
+      return contributionAmountReply(locale);
+    case 'UNKNOWN_MEMBER':
+      return contributionMemberReply(locale);
+  }
+}
+
 function toPending(item: PendingTransaction, outcome: ExtractionOutcome): PendingTransaction {
   return outcome.status === 'NEEDS_CLARIFICATION'
     ? { ...item, candidate: outcome.candidate, reasons: [...outcome.reasons] }
@@ -738,7 +796,8 @@ type ReplyPlanned =
       readonly transactions: readonly Transaction[];
       readonly facts: ReplyFacts;
     }
-  | { readonly kind: 'CORRECTION'; readonly result: CorrectionOutcome };
+  | { readonly kind: 'CORRECTION'; readonly result: CorrectionOutcome }
+  | { readonly kind: 'GOAL_CONTRIBUTION'; readonly result: ContributionResult };
 
 function compose(situation: ReplySituation, facts: ReplyFacts): ReplyPlanned {
   return { kind: 'COMPOSE', situation, facts };
@@ -757,6 +816,8 @@ function planReply(outcome: RepliedOutcome): ReplyPlanned {
       return planImageReply(outcome.image);
     case 'CORRECTION':
       return { kind: 'CORRECTION', result: outcome.result };
+    case 'GOAL_CONTRIBUTION':
+      return { kind: 'GOAL_CONTRIBUTION', result: outcome.result };
     case 'UNCLEAR':
       return compose('CLARIFICATION_NEEDED', { reasons: ['AMBIGUOUS_REFERENCE'] });
     case 'OTHER':
@@ -811,6 +872,8 @@ function summarize(outcome: AssistantOutcome): string {
       return `image:${outcome.image.status}`;
     case 'CORRECTION':
       return `correction:${outcome.result.status}`;
+    case 'GOAL_CONTRIBUTION':
+      return `goal-contribution:${outcome.result.status}`;
     case 'REVIEW':
       return `review:${outcome.review.narrativeSource}`;
     case 'AI_UNAVAILABLE':

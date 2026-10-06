@@ -17,6 +17,7 @@ const REQUEST = {
     { name: 'Restaurants', kind: 'EXPENSE' as const, parent: 'Food' },
     { name: 'Salary', kind: 'INCOME' as const, parent: null },
   ],
+  goalNames: ['Summer Trip'],
 };
 
 describe('OpenAI, live', () => {
