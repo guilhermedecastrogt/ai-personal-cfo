@@ -6,16 +6,26 @@ interface JsonSchemaNode {
   readonly required?: readonly string[];
   readonly additionalProperties?: unknown;
   readonly anyOf?: readonly JsonSchemaNode[];
+  readonly items?: JsonSchemaNode;
+  readonly maxItems?: number;
 }
 
 function objectNodes(node: JsonSchemaNode): JsonSchemaNode[] {
-  const children = [...Object.values(node.properties ?? {}), ...(node.anyOf ?? [])];
+  const children = [
+    ...Object.values(node.properties ?? {}),
+    ...(node.anyOf ?? []),
+    ...(node.items === undefined ? [] : [node.items]),
+  ];
   const nested = children.flatMap(objectNodes);
   return node.type === 'object' ? [node, ...nested] : nested;
 }
 
 describe('message interpretation JSON schema', () => {
   const schema = messageInterpretationJsonSchema() as JsonSchemaNode;
+
+  it('accepts at most five transactions in one message', () => {
+    expect(schema.properties?.transactions?.maxItems).toBe(5);
+  });
 
   it('is an object at the root without a dialect declaration', () => {
     expect(schema.type).toBe('object');
@@ -41,9 +51,7 @@ describe('message interpretation JSON schema', () => {
   });
 
   it('carries the amount as text so the model performs no conversion', () => {
-    const transaction = schema.properties?.transaction?.anyOf?.find(
-      (node) => node.type === 'object',
-    );
+    const transaction = schema.properties?.transactions?.items;
 
     expect(transaction?.properties?.amount?.type).toEqual(['string', 'null']);
     expect(Object.keys(transaction?.properties ?? {})).not.toContain('amountMinor');

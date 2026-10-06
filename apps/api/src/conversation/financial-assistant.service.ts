@@ -24,13 +24,19 @@ import { monthContaining, type IsoDate } from '../finance/domain/period/period.j
 import type { RequestContext } from '../households/request-context.js';
 import { toCategoryOptions } from './category-options.js';
 import { CONVERSATION_POLICY } from './conversation-policy.js';
-import type { ConversationState, QuestionFrame } from './conversation-state.js';
+import {
+  MAXIMUM_QUEUED_TRANSACTIONS,
+  type ConversationState,
+  type PendingTransaction,
+  type QuestionFrame,
+} from './conversation-state.js';
 import { ConversationsRepository, type OpenConversation } from './conversations.repository.js';
 import { answerPendingTransaction } from './extraction/pending-answer.js';
 import { completePendingCandidate } from './extraction/pending-transaction.js';
 import {
   TransactionExtractionService,
   type ExtractionOutcome,
+  type PreparedTransaction,
 } from './extraction/transaction-extraction.service.js';
 import { resolveFollowUp } from './follow-up/question-resolution.js';
 import {
@@ -81,7 +87,12 @@ export interface IncomingMessage {
 }
 
 export type AssistantOutcome =
-  | { readonly kind: 'TRANSACTION'; readonly extraction: ExtractionOutcome }
+  | {
+      readonly kind: 'TRANSACTION';
+      readonly extraction: ExtractionOutcome;
+      readonly recorded: readonly Transaction[];
+      readonly queued: number;
+    }
   | { readonly kind: 'QUESTION'; readonly query: QueryOutcome }
   | { readonly kind: 'IMAGE'; readonly image: ImageOutcome }
   | { readonly kind: 'REVIEW'; readonly review: MonthlyReviewResult }
@@ -225,22 +236,35 @@ export class FinancialAssistant {
     const locale = context.locale ?? DEFAULT_LOCALE;
     const plan = planReply(outcome);
     if (plan.kind === 'COMPOSE') {
-      return this.replies.compose({
-        situation: plan.situation,
-        facts: plan.facts,
-        userMessage,
-        senderName: context.memberName,
-        locale,
-      });
+      return this.compose(context, plan.situation, plan.facts, userMessage);
     }
     const directory = await this.directories.load(context.householdId);
     const summaries = plan.transactions.map((transaction) =>
       summarizeTransaction(transaction, directory, context.memberId),
     );
     const [first] = summaries;
+    if (plan.kind === 'RECORDED_AND_ASK') {
+      const question = await this.compose(context, 'CLARIFICATION_NEEDED', plan.facts, userMessage);
+      return `${recordedReply(summaries, locale, today)}\n\n${question}`;
+    }
     return plan.alreadyRecorded && first !== undefined
       ? alreadyRecordedReply(first, locale, today)
       : recordedReply(summaries, locale, today);
+  }
+
+  private compose(
+    context: RequestContext,
+    situation: ReplySituation,
+    facts: ReplyFacts,
+    userMessage: string,
+  ): Promise<string> {
+    return this.replies.compose({
+      situation,
+      facts,
+      userMessage,
+      senderName: context.memberName,
+      locale: context.locale ?? DEFAULT_LOCALE,
+    });
   }
 
   private async answerWithoutInterpreter(
@@ -268,7 +292,7 @@ export class FinancialAssistant {
     if (confirmation === 'NO') {
       return {
         response: { reply: discardedReply(locale), outcome: acknowledged },
-        state: { ...state, lastOutcome: 'NONE', pendingTransaction: null },
+        state: { ...state, lastOutcome: 'NONE', pendingTransaction: null, queuedTransactions: [] },
       };
     }
     if (!pending.reasons.every((reason) => reason === 'LOW_CONFIDENCE')) {
@@ -287,7 +311,7 @@ export class FinancialAssistant {
       state,
       {
         kind: 'TRANSACTION',
-        transaction: { ...pending.candidate, confidence: 1 },
+        transactions: [{ ...pending.candidate, confidence: 1 }],
         completesPending: true,
       },
     );
@@ -362,7 +386,7 @@ export class FinancialAssistant {
           ? { outcome: { kind: interpretation.kind }, state: undefined }
           : this.recordTransaction(context, message, today, state, {
               kind: 'TRANSACTION',
-              transaction: answered,
+              transactions: [answered],
               completesPending: true,
             });
       }
@@ -397,36 +421,81 @@ export class FinancialAssistant {
     interpretation: Extract<MessageInterpretation, { kind: 'TRANSACTION' }>,
   ): Promise<Action> {
     const pending = interpretation.completesPending ? state.pendingTransaction : null;
-    const candidate: TransactionCandidate =
-      pending === null
-        ? interpretation.transaction
-        : completePendingCandidate(pending.candidate, interpretation.transaction);
-    const medium = pending?.medium ?? 'TEXT';
-    const sourceMessageId =
-      pending === null ? message.sourceMessageId : (pending.sourceMessageId ?? undefined);
-    const extraction = await this.extraction.extract({
-      context,
+    const [first, ...rest] = interpretation.transactions;
+    const fresh = (candidate: TransactionCandidate): PendingTransaction => ({
       candidate,
-      today,
-      medium,
-      ...(sourceMessageId === undefined ? {} : { sourceMessageId }),
+      reasons: [],
+      medium: 'TEXT',
+      sourceMessageId: message.sourceMessageId ?? null,
     });
+    const work: PendingTransaction[] = [
+      pending === null
+        ? fresh(first)
+        : { ...pending, candidate: completePendingCandidate(pending.candidate, first) },
+      ...rest.map(fresh),
+    ];
+    const carried = pending === null ? [] : [...state.queuedTransactions];
+    const recorded: Extract<ExtractionOutcome, { status: 'RECORDED' }>[] = [];
+    let waiting: { item: PendingTransaction; outcome: ExtractionOutcome }[] = [];
+    while (work.length > 0) {
+      const prepared = await Promise.all(
+        work.map(async (item) => ({ item, outcome: await this.prepare(context, item, today) })),
+      );
+      const ready = prepared.flatMap(({ outcome }) =>
+        outcome.status === 'READY' ? [outcome] : [],
+      );
+      recorded.push(...(await this.extraction.record(context.householdId, ready, new Date())));
+      waiting = prepared.flatMap(({ item, outcome }) =>
+        outcome.status === 'NEEDS_CLARIFICATION' ? [{ item, outcome }] : [],
+      );
+      work.length = 0;
+      const next = carried.shift();
+      if (waiting.length === 0 && next !== undefined) {
+        work.push(next);
+      }
+    }
+    const queue: PendingTransaction[] = [
+      ...waiting.slice(1).map(({ item, outcome }) => toPending(item, outcome)),
+      ...carried,
+    ].slice(0, MAXIMUM_QUEUED_TRANSACTIONS);
+    const [asked] = waiting;
+    const extraction = asked?.outcome ?? recorded.at(-1);
+    if (extraction === undefined) {
+      throw new Error('A transaction turn ended with nothing recorded or asked');
+    }
+    const transactions = recorded.map((outcome) => outcome.transaction);
     return {
-      outcome: { kind: 'TRANSACTION', extraction },
+      outcome: { kind: 'TRANSACTION', extraction, recorded: transactions, queued: queue.length },
       state:
-        extraction.status === 'RECORDED'
-          ? { ...state, lastOutcome: 'TRANSACTION_RECORDED', pendingTransaction: null }
+        asked === undefined
+          ? {
+              ...state,
+              lastOutcome:
+                transactions.length > 1 ? 'TRANSACTIONS_RECORDED' : 'TRANSACTION_RECORDED',
+              pendingTransaction: null,
+              queuedTransactions: [],
+            }
           : {
               ...state,
               lastOutcome: 'TRANSACTION_PENDING',
-              pendingTransaction: {
-                candidate: extraction.candidate,
-                reasons: [...extraction.reasons],
-                medium,
-                sourceMessageId: sourceMessageId ?? null,
-              },
+              pendingTransaction: toPending(asked.item, asked.outcome),
+              queuedTransactions: queue,
             },
     };
+  }
+
+  private async prepare(
+    context: RequestContext,
+    item: PendingTransaction,
+    today: IsoDate,
+  ): Promise<PreparedTransaction> {
+    return this.extraction.prepare({
+      context,
+      candidate: item.candidate,
+      today,
+      medium: item.medium,
+      ...(item.sourceMessageId === null ? {} : { sourceMessageId: item.sourceMessageId }),
+    });
   }
 
   private async answerQuestion(
@@ -454,6 +523,7 @@ export class FinancialAssistant {
         lastOutcome: query.status === 'ANSWERED' ? 'QUESTION_ANSWERED' : 'QUESTION_PENDING',
         question: query.frame ?? state.question,
         pendingTransaction: null,
+        queuedTransactions: [],
       },
     };
   }
@@ -485,6 +555,7 @@ export class FinancialAssistant {
           memberName: null,
         },
         pendingTransaction: null,
+        queuedTransactions: [],
       },
     };
   }
@@ -530,7 +601,12 @@ function afterImage(
   sourceMessageId: string | null,
 ): ConversationState | undefined {
   if (image.status === 'RECORDED' || image.status === 'ALREADY_RECORDED') {
-    return { ...state, lastOutcome: 'TRANSACTION_RECORDED', pendingTransaction: null };
+    return {
+      ...state,
+      lastOutcome: 'TRANSACTION_RECORDED',
+      pendingTransaction: null,
+      queuedTransactions: [],
+    };
   }
   if (image.status === 'NEEDS_CLARIFICATION' && image.candidate !== null) {
     return {
@@ -542,9 +618,16 @@ function afterImage(
         medium: 'IMAGE',
         sourceMessageId,
       },
+      queuedTransactions: [],
     };
   }
   return undefined;
+}
+
+function toPending(item: PendingTransaction, outcome: ExtractionOutcome): PendingTransaction {
+  return outcome.status === 'NEEDS_CLARIFICATION'
+    ? { ...item, candidate: outcome.candidate, reasons: [...outcome.reasons] }
+    : item;
 }
 
 function clarifyQuestion(
@@ -563,6 +646,11 @@ type ReplyPlanned =
       readonly kind: 'RECORDED';
       readonly transactions: readonly Transaction[];
       readonly alreadyRecorded: boolean;
+    }
+  | {
+      readonly kind: 'RECORDED_AND_ASK';
+      readonly transactions: readonly Transaction[];
+      readonly facts: ReplyFacts;
     };
 
 function compose(situation: ReplySituation, facts: ReplyFacts): ReplyPlanned {
@@ -572,13 +660,7 @@ function compose(situation: ReplySituation, facts: ReplyFacts): ReplyPlanned {
 function planReply(outcome: RepliedOutcome): ReplyPlanned {
   switch (outcome.kind) {
     case 'TRANSACTION':
-      return outcome.extraction.status === 'RECORDED'
-        ? {
-            kind: 'RECORDED',
-            transactions: [outcome.extraction.transaction],
-            alreadyRecorded: false,
-          }
-        : compose('CLARIFICATION_NEEDED', outcome.extraction.facts);
+      return planTransactionReply(outcome);
     case 'QUESTION':
       return compose(
         outcome.query.status === 'ANSWERED' ? 'QUESTION_ANSWERED' : 'CLARIFICATION_NEEDED',
@@ -595,6 +677,19 @@ function planReply(outcome: RepliedOutcome): ReplyPlanned {
     case 'WELCOME':
       return compose('WELCOME', outcome.facts);
   }
+}
+
+function planTransactionReply(
+  outcome: Extract<AssistantOutcome, { kind: 'TRANSACTION' }>,
+): ReplyPlanned {
+  const { extraction, recorded, queued } = outcome;
+  if (extraction.status === 'RECORDED') {
+    return { kind: 'RECORDED', transactions: recorded, alreadyRecorded: false };
+  }
+  const facts = queued === 0 ? extraction.facts : { ...extraction.facts, stillToAsk: queued };
+  return recorded.length === 0
+    ? compose('CLARIFICATION_NEEDED', facts)
+    : { kind: 'RECORDED_AND_ASK', transactions: recorded, facts };
 }
 
 function planImageReply(image: ImageOutcome): ReplyPlanned {
@@ -620,7 +715,9 @@ function unavailable(error: AIProviderError, context: RequestContext): Assistant
 function summarize(outcome: AssistantOutcome): string {
   switch (outcome.kind) {
     case 'TRANSACTION':
-      return `transaction:${outcome.extraction.status}`;
+      return `transaction:recorded=${String(outcome.recorded.length)},pending=${String(
+        (outcome.extraction.status === 'NEEDS_CLARIFICATION' ? 1 : 0) + outcome.queued,
+      )}`;
     case 'QUESTION':
       return `question:${outcome.query.status}`;
     case 'IMAGE':

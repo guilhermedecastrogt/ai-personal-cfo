@@ -9,6 +9,7 @@ import {
 export const CONVERSATION_OUTCOMES = [
   'NONE',
   'TRANSACTION_RECORDED',
+  'TRANSACTIONS_RECORDED',
   'TRANSACTION_PENDING',
   'QUESTION_ANSWERED',
   'QUESTION_PENDING',
@@ -24,6 +25,8 @@ export const questionFrameSchema = z.object({
   memberName: z.string().nullable(),
 });
 
+export const MAXIMUM_QUEUED_TRANSACTIONS = 4;
+
 export const pendingTransactionSchema = z.object({
   candidate: transactionCandidateSchema.extend({
     member: z.string().nullable().default(null),
@@ -38,6 +41,10 @@ export const conversationStateSchema = z.object({
   lastOutcome: z.enum(CONVERSATION_OUTCOMES),
   question: questionFrameSchema.nullable(),
   pendingTransaction: pendingTransactionSchema.nullable(),
+  queuedTransactions: z
+    .array(pendingTransactionSchema)
+    .max(MAXIMUM_QUEUED_TRANSACTIONS)
+    .default([]),
 });
 
 export type QuestionFrame = z.infer<typeof questionFrameSchema>;
@@ -48,6 +55,7 @@ export const EMPTY_CONVERSATION_STATE: ConversationState = {
   lastOutcome: 'NONE',
   question: null,
   pendingTransaction: null,
+  queuedTransactions: [],
 };
 
 const MILLISECONDS_PER_MINUTE = 60_000;

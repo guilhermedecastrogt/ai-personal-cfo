@@ -8,6 +8,7 @@ import {
   OTHER_INTERPRETATION,
   questionInterpretation,
   transactionInterpretation,
+  transactionsInterpretation,
 } from '../testing/fake-ai-provider.fixture.js';
 import { MessageInterpreter } from './message-interpreter.js';
 
@@ -38,8 +39,36 @@ describe('MessageInterpreter', () => {
   it('returns a transaction candidate', async () => {
     expect(await interpret(transactionInterpretation())).toMatchObject({
       kind: 'TRANSACTION',
-      transaction: { type: 'EXPENSE', amount: '23', merchant: 'Lidl' },
+      transactions: [{ type: 'EXPENSE', amount: '23', merchant: 'Lidl' }],
     });
+  });
+
+  it('returns every transaction of a message in the order written', async () => {
+    expect(
+      await interpret(
+        transactionsInterpretation({ merchant: 'Café', amount: '10.65' }, { merchant: 'Lidl' }),
+      ),
+    ).toMatchObject({
+      kind: 'TRANSACTION',
+      transactions: [{ merchant: 'Café' }, { merchant: 'Lidl' }],
+    });
+  });
+
+  it('reads a transaction kind without any transaction as unclear', async () => {
+    expect(
+      await interpret({
+        kind: 'TRANSACTION',
+        transactions: [],
+        question: null,
+        completesPendingTransaction: false,
+      }),
+    ).toEqual({ kind: 'UNCLEAR' });
+  });
+
+  it('refuses more transactions than one message may carry', async () => {
+    const six = transactionsInterpretation({}, {}, {}, {}, {}, {});
+
+    expect(await failureOf(six)).toBe('INVALID_RESPONSE');
   });
 
   it('returns a question', async () => {
@@ -64,7 +93,7 @@ describe('MessageInterpreter', () => {
     expect(await interpret(completionOf({ category: 'Groceries' }))).toMatchObject({
       kind: 'TRANSACTION',
       completesPending: true,
-      transaction: { category: 'Groceries', amount: null },
+      transactions: [{ category: 'Groceries', amount: null }],
     });
     expect(await interpret(transactionInterpretation())).toMatchObject({ completesPending: false });
   });

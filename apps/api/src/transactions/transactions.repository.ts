@@ -53,6 +53,28 @@ export class TransactionsRepository {
     );
   }
 
+  async createMany(
+    householdId: string,
+    batch: readonly NewTransaction[],
+    instant: Date,
+  ): Promise<Transaction[]> {
+    if (batch.length === 0) {
+      return [];
+    }
+    const rows = await this.database
+      .insert(transactions)
+      .values(
+        batch.map((transaction, position) => ({
+          ...transaction,
+          householdId,
+          createdAt: new Date(instant.getTime() + position),
+          updatedAt: new Date(instant.getTime() + position),
+        })),
+      )
+      .returning();
+    return rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  }
+
   async findById(householdId: string, transactionId: string): Promise<Transaction | undefined> {
     const [transaction] = await this.database
       .select()

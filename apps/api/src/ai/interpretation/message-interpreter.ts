@@ -21,9 +21,16 @@ export class MessageInterpreter {
     if (!parsed.success) {
       throw new AIProviderError('INVALID_RESPONSE');
     }
-    const { kind, transaction, question } = parsed.data;
-    if (kind === 'TRANSACTION' && transaction !== null) {
-      return { kind, transaction, completesPending: parsed.data.completesPendingTransaction };
+    const { kind, transactions, question } = parsed.data;
+    if (kind === 'TRANSACTION') {
+      const [first, ...rest] = transactions;
+      return first === undefined
+        ? { kind: 'UNCLEAR' }
+        : {
+            kind,
+            transactions: [first, ...rest],
+            completesPending: parsed.data.completesPendingTransaction,
+          };
     }
     if (kind === 'QUESTION' && question !== null) {
       return { kind, question };

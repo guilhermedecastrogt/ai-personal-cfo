@@ -4,6 +4,7 @@ import { AI_UNAVAILABLE_REPLY } from '../src/ai/reply/fallback-reply.js';
 import {
   completionOf,
   CORRECTION_INTERPRETATION,
+  transactionsInterpretation,
   OTHER_INTERPRETATION,
   imageReading,
   questionInterpretation,
@@ -66,7 +67,7 @@ describe('conversational assistant', () => {
     harness.provider.willInterpretAs(interpretation);
     return harness.assistant.handle(
       contextOf(fixture, options.member ?? 0),
-      { text },
+      { text, sourceMessageId: `wamid.conversation-${String(clock)}` },
       options.at ?? new Date(START.getTime() + clock * 1000),
     );
   }
@@ -1155,7 +1156,7 @@ describe('conversational assistant', () => {
       clock += 1;
       return harness.assistant.handle(
         contextOf(fixture),
-        { text },
+        { text, sourceMessageId: `wamid.conversation-${String(clock)}` },
         new Date(START.getTime() + clock * 1000),
       );
     }
@@ -1239,6 +1240,110 @@ describe('conversational assistant', () => {
       expect(await recorded(fixture)).toEqual([
         expect.objectContaining({ memberId: partner.id, accountId: partnerAccountId }),
       ]);
+    });
+
+    it('records every complete transaction of one message in one reply', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Two At Once', 1);
+      const replies = harness.provider.replyRequests.length;
+
+      const response = await say(
+        fixture,
+        'dia 3 gastei 10,65 no café e 117,72 no lidl',
+        transactionsInterpretation(
+          { amount: '10.65', merchant: 'Café Central', category: 'Coffee' },
+          { amount: '117.72', merchant: 'Lidl', category: 'Groceries' },
+        ),
+      );
+      const rows = await recorded(fixture);
+
+      expect(response.reply).toBe(
+        [
+          'Recorded 2 transactions:',
+          '€10.65 at Café Central (Coffee), account Joint Account, on 2026-10-20.',
+          '€117.72 at Lidl (Groceries), account Joint Account, on 2026-10-20.',
+        ].join('\n'),
+      );
+      expect(harness.provider.replyRequests).toHaveLength(replies);
+      expect(rows.map((row) => row.amountMinor).sort((a, b) => a - b)).toEqual([1065, 11772]);
+      expect(new Set(rows.map((row) => row.sourceMessageId)).size).toBe(1);
+    });
+
+    it('records what is complete and asks only about what is missing', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'One Of Two', 1);
+      harness.provider.willReply('Em qual categoria ficam os € 30,00?');
+
+      const first = await say(
+        fixture,
+        'gastei 23 no lidl e 30 num lugar',
+        transactionsInterpretation({}, { amount: '30', merchant: null, category: null }),
+      );
+      const firstRows = await recorded(fixture);
+      const second = await say(fixture, 'Restaurantes', completionOf({ category: 'Restaurants' }));
+      const rows = await recorded(fixture);
+
+      expect(first.reply).toBe(
+        'Recorded: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-20.\n\nEm qual categoria ficam os € 30,00?',
+      );
+      expect(firstRows).toHaveLength(1);
+      expect(second.reply).toMatch(
+        /^Recorded: €30\.00 in|^Recorded: €30\.00 at|^Recorded: €30\.00 /,
+      );
+      expect(rows).toHaveLength(2);
+      expect(new Set(rows.map((row) => row.sourceMessageId)).size).toBe(1);
+      harness.provider.willReply((request) => `[${request.situation}]`);
+    });
+
+    it('asks about incomplete transactions one at a time', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Queue', 1);
+
+      await say(
+        fixture,
+        'gastei 30 e 40',
+        transactionsInterpretation(
+          { amount: '30', merchant: null, category: null },
+          { amount: '40', merchant: null, category: null },
+        ),
+      );
+      const firstAsk = lastFacts();
+      const afterFirst = await say(
+        fixture,
+        'Restaurantes',
+        completionOf({ category: 'Restaurants' }),
+      );
+      const secondAsk = lastFacts();
+      const afterSecond = await say(fixture, 'Mercado', completionOf({ category: 'Groceries' }));
+
+      expect(firstAsk).toMatchObject({ understood: { amount: '€30.00' }, stillToAsk: 1 });
+      expect(afterFirst.outcome).toMatchObject({ recorded: [expect.anything()], queued: 0 });
+      expect(secondAsk).toMatchObject({ understood: { amount: '€40.00' } });
+      expect(secondAsk).not.toHaveProperty('stillToAsk');
+      expect(afterSecond.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
+      expect((await recorded(fixture)).map((row) => row.amountMinor).sort((a, b) => a - b)).toEqual(
+        [3000, 4000],
+      );
+    });
+
+    it('records a batch all at once or not at all', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Atomic', 1);
+      const service = harness.transactionsService;
+      const valid = await service.check(fixture.household.id, {
+        memberId: memberAt(fixture, 0).id,
+        accountId: fixture.jointAccount.id,
+        type: 'EXPENSE',
+        amountMinor: 2300,
+        currency: 'EUR',
+        transactionDate: '2026-10-20',
+        source: 'WHATSAPP_TEXT',
+      });
+
+      await expect(
+        service.recordBatch(
+          fixture.household.id,
+          [valid, { ...valid, accountId: '00000000-0000-4000-8000-000000000000' }],
+          new Date(),
+        ),
+      ).rejects.toThrow();
+      expect(await recorded(fixture)).toEqual([]);
     });
 
     it('does not complete anything when nothing is pending', async () => {

@@ -45,7 +45,7 @@ export type TransactionEditOutcome =
   | { readonly status: 'NOT_FOUND' }
   | { readonly status: 'STALE' };
 
-export type { Transaction, TransactionPage, TransactionSearch };
+export type { NewTransaction, Transaction, TransactionPage, TransactionSearch };
 
 export class TransactionRejectedError extends Error {
   constructor(readonly reasons: readonly TransactionRejectionReason[]) {
@@ -65,6 +65,18 @@ export class TransactionsService {
 
   async record(householdId: string, input: NewTransactionInput): Promise<Transaction> {
     return this.transactions.create(householdId, await this.validate(householdId, input));
+  }
+
+  async check(householdId: string, input: NewTransactionInput): Promise<NewTransaction> {
+    return this.validate(householdId, input);
+  }
+
+  async recordBatch(
+    householdId: string,
+    batch: readonly NewTransaction[],
+    instant: Date,
+  ): Promise<Transaction[]> {
+    return this.transactions.createMany(householdId, batch, instant);
   }
 
   async find(householdId: string, transactionId: string): Promise<Transaction | undefined> {

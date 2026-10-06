@@ -36,34 +36,46 @@ export const UNSPECIFIED_PERIOD: PeriodReference = {
   month: null,
 };
 
-export function transactionInterpretation(overrides: Partial<TransactionCandidate> = {}): unknown {
+export function transactionCandidate(
+  overrides: Partial<TransactionCandidate> = {},
+): TransactionCandidate {
+  return {
+    type: 'EXPENSE',
+    amount: '23',
+    currency: 'EUR',
+    merchant: 'Lidl',
+    description: null,
+    category: 'Groceries',
+    account: null,
+    transferAccount: null,
+    member: null,
+    memberReference: 'SENDER',
+    paymentMethod: null,
+    date: UNSPECIFIED_DATE,
+    confidence: 0.98,
+    ...overrides,
+  };
+}
+
+export function transactionsInterpretation(
+  ...candidates: readonly Partial<TransactionCandidate>[]
+): unknown {
   return {
     kind: 'TRANSACTION',
     question: null,
     completesPendingTransaction: false,
-    transaction: {
-      type: 'EXPENSE',
-      amount: '23',
-      currency: 'EUR',
-      merchant: 'Lidl',
-      description: null,
-      category: 'Groceries',
-      account: null,
-      transferAccount: null,
-      member: null,
-      memberReference: 'SENDER',
-      paymentMethod: null,
-      date: UNSPECIFIED_DATE,
-      confidence: 0.98,
-      ...overrides,
-    },
+    transactions: candidates.map((overrides) => transactionCandidate(overrides)),
   };
+}
+
+export function transactionInterpretation(overrides: Partial<TransactionCandidate> = {}): unknown {
+  return transactionsInterpretation(overrides);
 }
 
 export function questionInterpretation(overrides: Partial<FinancialQuestion> = {}): unknown {
   return {
     kind: 'QUESTION',
-    transaction: null,
+    transactions: [],
     completesPendingTransaction: false,
     question: {
       intent: 'SPENDING_TOTAL',
@@ -82,36 +94,42 @@ export function imageReading(overrides: Partial<TransactionCandidate> = {}): unk
   return {
     kind: 'SINGLE_TRANSACTION',
     transactionCount: null,
-    transaction: (transactionInterpretation(overrides) as { transaction: unknown }).transaction,
+    transaction: transactionCandidate(overrides),
   };
 }
 
-export function completionOf(overrides: Partial<TransactionCandidate> = {}): unknown {
+export function completionOf(
+  overrides: Partial<TransactionCandidate> = {},
+  ...further: readonly Partial<TransactionCandidate>[]
+): unknown {
   return {
     kind: 'TRANSACTION',
     question: null,
     completesPendingTransaction: true,
-    transaction: {
-      type: null,
-      amount: null,
-      currency: null,
-      merchant: null,
-      description: null,
-      category: null,
-      account: null,
-      transferAccount: null,
-      member: null,
-      memberReference: 'SENDER',
-      paymentMethod: null,
-      date: UNSPECIFIED_DATE,
-      confidence: 0.95,
-      ...overrides,
-    },
+    transactions: [
+      {
+        type: null,
+        amount: null,
+        currency: null,
+        merchant: null,
+        description: null,
+        category: null,
+        account: null,
+        transferAccount: null,
+        member: null,
+        memberReference: 'SENDER',
+        paymentMethod: null,
+        date: UNSPECIFIED_DATE,
+        confidence: 0.95,
+        ...overrides,
+      },
+      ...further.map((candidate) => transactionCandidate(candidate)),
+    ],
   };
 }
 
 function bareInterpretation(kind: 'OTHER' | 'CORRECTION' | 'UNCLEAR'): unknown {
-  return { kind, transaction: null, question: null, completesPendingTransaction: false };
+  return { kind, transactions: [], question: null, completesPendingTransaction: false };
 }
 
 export const OTHER_INTERPRETATION = bareInterpretation('OTHER');

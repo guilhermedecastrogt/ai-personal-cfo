@@ -96,13 +96,17 @@ The API key is read once at startup, never logged, and never included in an erro
 
 One call classifies the message and extracts its content.
 
-| Kind          | Meaning                                                  | Carries                      |
-| ------------- | -------------------------------------------------------- | ---------------------------- |
-| `TRANSACTION` | Money spent, received or moved                           | A transaction candidate      |
-| `QUESTION`    | A question about the household's finances                | A financial question         |
-| `CORRECTION`  | A request to change or delete something already recorded | Nothing. It is declined      |
-| `UNCLEAR`     | A reference the model cannot identify                    | Nothing. The member is asked |
-| `OTHER`       | Anything else                                            | Nothing                      |
+| Kind          | Meaning                                                  | Carries                                                  |
+| ------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| `TRANSACTION` | Money spent, received or moved                           | One to five transaction candidates, in the order written |
+| `QUESTION`    | A question about the household's finances                | A financial question                                     |
+| `CORRECTION`  | A request to change or delete something already recorded | Nothing. It is declined                                  |
+| `UNCLEAR`     | A reference the model cannot identify                    | Nothing. The member is asked                             |
+| `OTHER`       | Anything else                                            | Nothing                                                  |
+
+### Several transactions in one message
+
+"dia 3 gastei 10,65 no café e 117,72 no mercado" is two candidates. Each is resolved and validated on its own, without writing anything. Every complete one is then recorded in a single database statement, so they are recorded together or not at all. An incomplete one is kept as the pending transaction and asked about; further incomplete ones wait in a queue of at most four and are asked about one at a time. The reply confirms what was recorded and, in a separate message, asks about the first pending one.
 
 ### Transaction candidate
 

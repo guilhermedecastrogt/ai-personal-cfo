@@ -15,6 +15,7 @@ const STATE = {
     memberName: null,
   },
   pendingTransaction: null,
+  queuedTransactions: [],
 };
 
 function read(stored: unknown, minutesLater: number, storedAt: Date | null = STORED_AT): unknown {
@@ -30,6 +31,13 @@ describe('readConversationState', () => {
   it('returns the stored state while it is fresh', () => {
     expect(read(STATE, 5)).toEqual(STATE);
     expect(read(STATE, 30)).toEqual(STATE);
+  });
+
+  it('reads a state saved before transactions could be queued', () => {
+    const { queuedTransactions, ...older } = STATE;
+
+    expect(queuedTransactions).toEqual([]);
+    expect(read(older, 5)).toEqual(STATE);
   });
 
   it('forgets the state once it is older than its lifetime', () => {

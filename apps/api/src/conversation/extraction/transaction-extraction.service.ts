@@ -11,6 +11,7 @@ import type { TransactionSource } from '../../transactions/transaction-vocabular
 import {
   TransactionRejectedError,
   TransactionsService,
+  type NewTransaction,
   type Transaction,
   type TransactionRejectionReason,
 } from '../../transactions/transactions.service.js';
@@ -38,6 +39,14 @@ export type ExtractionOutcome =
       readonly candidate: TransactionCandidate;
       readonly facts: ReplyFacts;
     };
+
+export type PreparedTransaction =
+  | {
+      readonly status: 'READY';
+      readonly transaction: NewTransaction;
+      readonly facts: ReplyFacts;
+    }
+  | Extract<ExtractionOutcome, { status: 'NEEDS_CLARIFICATION' }>;
 
 export interface ExtractionRequest {
   readonly context: RequestContext;
@@ -70,7 +79,7 @@ export class TransactionExtractionService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  async extract(request: ExtractionRequest): Promise<ExtractionOutcome> {
+  async prepare(request: ExtractionRequest): Promise<PreparedTransaction> {
     const { context, candidate, today } = request;
     const locale = context.locale ?? DEFAULT_LOCALE;
     const { accounts, categories, members } = await this.directory.load(context.householdId);
@@ -93,7 +102,7 @@ export class TransactionExtractionService {
       confidenceThreshold: this.config.aiConfidenceThreshold,
     });
     const forMember = ownerId === context.memberId ? null : (owner?.name ?? null);
-    const clarify = (reasons: readonly ClarificationReason[]): ExtractionOutcome =>
+    const clarify = (reasons: readonly ClarificationReason[]): PreparedTransaction =>
       clarification(reasons, candidate, draft.understood, forMember, {
         accounts,
         categories,
@@ -109,7 +118,7 @@ export class TransactionExtractionService {
       return clarify(draft.problems);
     }
     try {
-      const transaction = await this.transactions.record(context.householdId, {
+      const transaction = await this.transactions.check(context.householdId, {
         ...draft.fields,
         memberId: ownerId,
         source: sourceOf(context, request.medium),
@@ -118,7 +127,7 @@ export class TransactionExtractionService {
           : { sourceMessageId: request.sourceMessageId }),
       });
       return {
-        status: 'RECORDED',
+        status: 'READY',
         transaction,
         facts: describe(draft.understood, forMember, locale),
       };
@@ -128,6 +137,35 @@ export class TransactionExtractionService {
       }
       throw error;
     }
+  }
+
+  async record(
+    householdId: string,
+    prepared: readonly Extract<PreparedTransaction, { status: 'READY' }>[],
+    instant: Date,
+  ): Promise<Extract<ExtractionOutcome, { status: 'RECORDED' }>[]> {
+    const rows = await this.transactions.recordBatch(
+      householdId,
+      prepared.map((ready) => ready.transaction),
+      instant,
+    );
+    return rows.map((transaction, position) => ({
+      status: 'RECORDED',
+      transaction,
+      facts: prepared[position]?.facts ?? {},
+    }));
+  }
+
+  async extract(request: ExtractionRequest): Promise<ExtractionOutcome> {
+    const prepared = await this.prepare(request);
+    if (prepared.status !== 'READY') {
+      return prepared;
+    }
+    const [recorded] = await this.record(request.context.householdId, [prepared], new Date());
+    if (recorded === undefined) {
+      throw new Error('The transaction was not recorded');
+    }
+    return recorded;
   }
 }
 
@@ -151,7 +189,7 @@ function clarification(
   understood: Understood,
   forMember: string | null,
   { accounts, categories, members, locale }: ClarificationOptions,
-): ExtractionOutcome {
+): Extract<ExtractionOutcome, { status: 'NEEDS_CLARIFICATION' }> {
   const needsCategory = reasons.some((reason) => CATEGORY_REASONS.includes(reason));
   const needsAccount = reasons.some((reason) => ACCOUNT_REASONS.includes(reason));
   const needsMember = reasons.includes('UNKNOWN_MEMBER');

@@ -73,6 +73,7 @@ export interface AssistantHarness {
   readonly budgets: BudgetsRepository;
   readonly goals: GoalsRepository;
   readonly transactions: TransactionsRepository;
+  readonly transactionsService: TransactionsService;
   temporaryFiles(): Promise<string[]>;
   dispose(): Promise<void>;
 }
@@ -133,6 +134,7 @@ export async function createAssistantHarness(
   );
   return {
     assistant,
+    transactionsService,
     cfo,
     households,
     provider,

@@ -166,6 +166,10 @@ The amount comes from the stored candidate, which came from the member's own mes
 
 A completing message with nothing pending is treated as a new, incomplete transaction and leads to a question.
 
+### Several transactions in one message
+
+A message can report up to five transactions. The complete ones are recorded together, in one database statement, and confirmed in one reply. The first incomplete one becomes the pending transaction, and any others wait in a queue of up to four. Each answer completes the pending one, and the next in the queue is asked about in the same reply. A "não" drops the pending transaction and the queue. A new transaction message that is not an answer also drops them, as a single pending transaction always was.
+
 ### Whose transaction it is
 
 The model says how the message refers to the person: the sender ("gastei"), a named member ("a Bia gastou") or a third-person verb with no subject ("gastou 20 no uber"). A third-person message takes a member only from the sender's message immediately before it, when that one named exactly one member. Otherwise the application asks who it was, listing the members, and a reply with just the name completes it. A person is never carried over from older messages.

@@ -51,6 +51,8 @@ export const dateReferenceSchema = z.object({
   isoDate: z.string().nullable(),
 });
 
+export const MAXIMUM_TRANSACTIONS_PER_MESSAGE = 5;
+
 export const MEMBER_REFERENCES = ['SENDER', 'NAMED', 'THIRD_PERSON_UNSTATED'] as const;
 
 export const transactionCandidateSchema = z.object({
@@ -97,7 +99,7 @@ export const financialQuestionSchema = z.object({
 
 export const messageInterpretationWireSchema = z.object({
   kind: z.enum(['TRANSACTION', 'QUESTION', 'CORRECTION', 'UNCLEAR', 'OTHER']),
-  transaction: transactionCandidateSchema.nullable(),
+  transactions: z.array(transactionCandidateSchema).max(MAXIMUM_TRANSACTIONS_PER_MESSAGE),
   completesPendingTransaction: z.boolean(),
   question: financialQuestionSchema.nullable(),
 });
@@ -114,7 +116,7 @@ export type QuestionSlot = (typeof QUESTION_SLOTS)[number];
 export type MessageInterpretation =
   | {
       readonly kind: 'TRANSACTION';
-      readonly transaction: TransactionCandidate;
+      readonly transactions: readonly [TransactionCandidate, ...TransactionCandidate[]];
       readonly completesPending: boolean;
     }
   | { readonly kind: 'QUESTION'; readonly question: FinancialQuestion }
