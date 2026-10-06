@@ -13,11 +13,12 @@ import {
   Rows,
   Share,
 } from '../ui';
+import { CompositionRing } from '../charts';
 
 type CategoryRow = Spending['currencies'][number]['byCategory'][number];
 type MemberRow = Spending['currencies'][number]['byMember'][number];
 
-function Categories({
+export function Categories({
   rows,
   t,
 }: {
@@ -143,6 +144,16 @@ export function SpendingView({
                 comparison={entry.comparison}
                 risingIsGood={false}
               />
+              {entry.composition.length === 0 ? null : (
+                <Panel title={t.charts.compositionTitle} note={t.charts.compositionNote}>
+                  <CompositionRing
+                    slices={entry.composition}
+                    total={entry.total}
+                    totalLabel={t.charts.spending}
+                    t={t}
+                  />
+                </Panel>
+              )}
               <div className="grid gap-6 lg:grid-cols-2">
                 <Panel title={t.flow.byCategory}>
                   <Categories rows={entry.byCategory} t={t} />

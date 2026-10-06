@@ -246,7 +246,8 @@ export function PageHeading({
   children,
 }: {
   readonly title: string;
-  readonly month?: { readonly label: string; readonly isComplete: boolean; readonly asOf: string };
+  readonly month?:
+    { readonly label: string; readonly isComplete: boolean; readonly asOf: string } | undefined;
   readonly t: Dictionary;
   readonly children?: ReactNode;
 }): ReactNode {

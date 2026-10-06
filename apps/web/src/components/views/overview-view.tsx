@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { OverviewView as Overview } from '@/lib/contracts';
+import type { EvolutionView, OverviewView as Overview } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
   Change,
@@ -14,6 +14,7 @@ import {
   Rows,
   Share,
 } from '../ui';
+import { EvolutionChart } from '../charts';
 import { BudgetList } from './budget-list';
 
 type Entry = Overview['currencies'][number];
@@ -99,13 +100,63 @@ function Findings({ entry, t }: { readonly entry: Entry; readonly t: Dictionary 
   );
 }
 
+function EvolutionPanel({
+  evolution,
+  currency,
+  monthKey,
+  t,
+}: {
+  readonly evolution: EvolutionView;
+  readonly currency: string;
+  readonly monthKey: string;
+  readonly t: Dictionary;
+}): ReactNode {
+  const series = evolution.currencies.find((entry) => entry.currency === currency);
+  if (series === undefined) {
+    return null;
+  }
+  const choices = [
+    { months: 6, label: t.charts.sixMonths },
+    { months: 12, label: t.charts.twelveMonths },
+  ];
+  return (
+    <Panel
+      title={t.charts.evolutionTitle(evolution.months)}
+      note={t.charts.evolutionNote}
+      action={
+        <span className="flex rounded-full border border-line p-0.5 text-xs">
+          {choices.map((choice) => (
+            <Link
+              key={choice.months}
+              href={`/?month=${monthKey}&months=${String(choice.months)}`}
+              scroll={false}
+              aria-current={choice.months === evolution.months ? 'true' : undefined}
+              className={`rounded-full px-3 py-1 ${
+                choice.months === evolution.months
+                  ? 'bg-accent font-medium text-accent-ink'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              {choice.label}
+            </Link>
+          ))}
+        </span>
+      }
+    >
+      <EvolutionChart months={series.months} t={t} />
+    </Panel>
+  );
+}
+
 function CurrencyOverview({
   entry,
   data,
+  evolution,
   t,
 }: {
   readonly entry: Entry;
   readonly data: Overview;
+  readonly evolution: EvolutionView;
   readonly t: Dictionary;
 }): ReactNode {
   if (!entry.hasTransactions && entry.budgets.length === 0) {
@@ -114,6 +165,12 @@ function CurrencyOverview({
   return (
     <>
       <LedgerLine entry={entry} data={data} t={t} />
+      <EvolutionPanel
+        evolution={evolution}
+        currency={entry.currency}
+        monthKey={data.month.key}
+        t={t}
+      />
       <Panel title={t.overview.compared}>
         {entry.comparison === null ? (
           <Empty>{t.common.noEarlierPeriod}</Empty>
@@ -241,16 +298,18 @@ function CurrencyOverview({
 
 export function OverviewView({
   data,
+  evolution,
   t,
 }: {
   readonly data: Overview;
+  readonly evolution: EvolutionView;
   readonly t: Dictionary;
 }): ReactNode {
   return (
     <>
       <PageHeading title={t.overview.title} month={data.month} t={t} />
       <CurrencySections entries={data.currencies} t={t}>
-        {(entry) => <CurrencyOverview entry={entry} data={data} t={t} />}
+        {(entry) => <CurrencyOverview entry={entry} data={data} evolution={evolution} t={t} />}
       </CurrencySections>
     </>
   );

@@ -6,6 +6,7 @@ import {
   BUDGETS,
   EMPTY_OVERVIEW,
   EUR_OVERVIEW,
+  EVOLUTION,
   GOALS,
   INCOME,
   OUTLOOK,
@@ -41,7 +42,7 @@ function panel(title: string): HTMLElement {
 
 describe('overview', () => {
   it('opens with the month in one line, using the figures it was given', () => {
-    render(<OverviewView t={EN} data={overview()} />);
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
     const line = screen.getByRole('region', { name: 'Month in one line' });
 
     expect(line).toHaveTextContent('October 2026 so far');
@@ -55,6 +56,7 @@ describe('overview', () => {
   it('shows a completed month without "so far" and says there is nothing to project', () => {
     render(
       <OverviewView
+        evolution={EVOLUTION}
         t={EN}
         data={overview([{ ...EUR_OVERVIEW, forecast: null, balances: null }], SEPTEMBER)}
       />,
@@ -70,7 +72,7 @@ describe('overview', () => {
   });
 
   it('compares with the previous period', () => {
-    render(<OverviewView t={EN} data={overview()} />);
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
     const comparison = panel('Compared with the previous period');
 
     expect(comparison).toHaveTextContent('Spending▲ up from €2,130.00 (4.23%)');
@@ -79,7 +81,13 @@ describe('overview', () => {
   });
 
   it('says so when there is no earlier period, instead of showing a change', () => {
-    render(<OverviewView t={EN} data={overview([{ ...EUR_OVERVIEW, comparison: null }])} />);
+    render(
+      <OverviewView
+        evolution={EVOLUTION}
+        t={EN}
+        data={overview([{ ...EUR_OVERVIEW, comparison: null }])}
+      />,
+    );
 
     expect(panel('Compared with the previous period')).toHaveTextContent(
       'There is no earlier period to compare with yet.',
@@ -87,7 +95,7 @@ describe('overview', () => {
   });
 
   it('shows findings, budgets, the projection and balances', () => {
-    render(<OverviewView t={EN} data={overview()} />);
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
 
     expect(panel('What stands out')).toHaveTextContent('Income exceeded spending by €780.00.');
     expect(panel('What stands out')).toHaveTextContent(
@@ -101,7 +109,7 @@ describe('overview', () => {
   });
 
   it('links to the review of the same month', () => {
-    render(<OverviewView t={EN} data={overview()} />);
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
 
     expect(
       screen.getByRole('link', { name: 'Read the full review for October 2026' }),
@@ -109,7 +117,9 @@ describe('overview', () => {
   });
 
   it('keeps each currency in its own section and never shows a combined total', () => {
-    render(<OverviewView t={EN} data={overview([EUR_OVERVIEW, BRL_OVERVIEW])} />);
+    render(
+      <OverviewView evolution={EVOLUTION} t={EN} data={overview([EUR_OVERVIEW, BRL_OVERVIEW])} />,
+    );
     const euros = screen.getByRole('region', { name: 'Figures in EUR' });
     const reais = screen.getByRole('region', { name: 'Figures in BRL' });
 
@@ -123,7 +133,7 @@ describe('overview', () => {
   });
 
   it('describes an empty household without any figure', () => {
-    render(<OverviewView t={EN} data={overview([EMPTY_OVERVIEW])} />);
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview([EMPTY_OVERVIEW])} />);
 
     expect(screen.getByText(/No transactions are recorded for October 2026/)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('€');
@@ -549,7 +559,10 @@ describe('transactions', () => {
       `/transactions/transaction-key-bistro?back=${back}`,
     ]);
     expect(screen.getAllByRole('link', { name: 'Edit Transfer' })).toHaveLength(2);
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Apply']);
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Search',
+      'Apply',
+    ]);
   });
 
   it('says when nothing matches', () => {
@@ -562,6 +575,101 @@ describe('transactions', () => {
     );
 
     expect(screen.getByText('No transactions match for October 2026.')).toBeInTheDocument();
+  });
+});
+
+describe('charts', () => {
+  it('draws income and spending month by month, with a readable table behind the bars', () => {
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
+    const chart = panel('The last 6 months');
+    const rows = within(chart).getAllByRole('row');
+
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent('September 2026€3,000.00€3,200.00€-200.00');
+    expect(rows[2]).toHaveTextContent('October 2026€3,000.00€2,220.00€780.00');
+    expect(chart.querySelector('.bar')).toHaveStyle({ height: '93.75%' });
+    expect(within(chart).getByRole('link', { name: '12 months' })).toHaveAttribute(
+      'href',
+      '/?month=2026-10&months=12',
+    );
+    expect(within(chart).getByRole('link', { name: '6 months' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
+  it('leaves the chart out for a currency the evolution does not have', () => {
+    render(<OverviewView evolution={{ months: 6, currencies: [] }} t={EN} data={overview()} />);
+
+    expect(screen.queryByRole('heading', { name: 'The last 6 months' })).not.toBeInTheDocument();
+  });
+
+  it('rings spending by category from the shares and offsets it was given', () => {
+    render(<SpendingView t={EN} data={SPENDING} />);
+    const ring = panel('Where it went');
+    const slices = ring.querySelectorAll('circle[data-slice]');
+
+    expect(ring).toHaveTextContent('Housing81.08%€1,800.00');
+    expect(ring).toHaveTextContent('Food18.92%€420.00');
+    expect(slices[1]).toHaveAttribute('stroke-dasharray', '1892 10000');
+    expect(slices[1]).toHaveAttribute('stroke-dashoffset', '-8108');
+  });
+
+  it('marks how far through the period a budget is and says whether spending keeps pace', () => {
+    render(<BudgetsView t={EN} data={BUDGETS} />);
+
+    expect(
+      screen.getByText('Spending faster than the month', { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('· 64.52% of the period has passed')).toBeInTheDocument();
+    expect(document.querySelector('[title="64.52% of the period has passed"]')).toHaveStyle({
+      left: '64.52%',
+    });
+  });
+});
+
+describe('transaction search', () => {
+  it('keeps the text, the period and the order, and exports exactly what is shown', () => {
+    render(
+      <TransactionsView
+        t={EN}
+        data={{
+          ...TRANSACTIONS,
+          range: { start: '2026-09-01', end: '2026-10-31' },
+          sort: 'amount_desc',
+        }}
+        query={{ q: 'bistro', from: '2026-09-01', to: '2026-10-31', sort: 'amount_desc' }}
+      />,
+    );
+
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('bistro');
+    expect(screen.getByLabelText('From')).toHaveValue('2026-09-01');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-10-31');
+    expect(screen.getByLabelText('Order')).toHaveValue('amount_desc');
+    expect(screen.getByText('From 2026-09-01 to 2026-10-31')).toBeInTheDocument();
+    expect(screen.queryByText('October 2026, up to 2026-10-20')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Export CSV' })).toHaveAttribute(
+      'href',
+      '/transactions/export?month=2026-10&q=bistro&from=2026-09-01&to=2026-10-31&sort=amount_desc',
+    );
+    expect(screen.getByRole('link', { name: 'Clear' })).toHaveAttribute(
+      'href',
+      '/transactions?month=2026-10',
+    );
+  });
+
+  it('says when a search finds nothing and when a period could not be used', () => {
+    render(
+      <TransactionsView
+        t={EN}
+        data={{ ...TRANSACTIONS, transactions: [], total: 0, pageCount: 1 }}
+        query={{ q: 'nowhere' }}
+        invalidRange
+      />,
+    );
+
+    expect(screen.getByText('No transaction matches this search.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('it must start before it ends');
   });
 });
 
@@ -588,7 +696,7 @@ describe('accounts', () => {
 
 describe('in Brazilian Portuguese', () => {
   it('writes the month in one line and the panels in Portuguese', () => {
-    render(<OverviewView t={PT_BR} data={overview()} />);
+    render(<OverviewView evolution={EVOLUTION} t={PT_BR} data={overview()} />);
     const line = screen.getByRole('region', { name: 'O mês em uma linha' });
 
     expect(line).toHaveTextContent('€3,000.00 entraram, €2,220.00 saíram, €780.00 ficaram.');

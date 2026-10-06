@@ -1,13 +1,17 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type {
+  TransactionSort,
   AccountsView as Accounts,
   ReviewView as Review,
   TransactionsView as Transactions,
 } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
+import type { TransactionQuery } from '@/lib/transaction-query';
 import { Icon } from '../icons';
 import { Badge, Empty, Figure, PageHeading, Panel, Row, Rows } from '../ui';
+
+const SORTS: readonly TransactionSort[] = ['date_desc', 'date_asc', 'amount_desc', 'amount_asc'];
 
 function Points({
   title,
@@ -73,23 +77,55 @@ export function ReviewView({
   );
 }
 
-export interface TransactionQuery {
-  readonly type?: string | undefined;
-  readonly category?: string | undefined;
-  readonly account?: string | undefined;
-  readonly member?: string | undefined;
-}
+export type { TransactionQuery };
 
 type TransactionRow = Transactions['transactions'][number];
 
-function pageLink(data: Transactions, query: TransactionQuery, page: number): string {
-  const parameters = new URLSearchParams({ month: data.month.key, page: String(page) });
+function queryString(
+  data: Transactions,
+  query: TransactionQuery,
+  page: number | undefined,
+): string {
+  const parameters = new URLSearchParams({ month: data.month.key });
+  if (page !== undefined) {
+    parameters.set('page', String(page));
+  }
   for (const [name, value] of Object.entries(query)) {
     if (typeof value === 'string' && value !== '') {
       parameters.set(name, value);
     }
   }
-  return `/transactions?${parameters.toString()}`;
+  return parameters.toString();
+}
+
+function pageLink(data: Transactions, query: TransactionQuery, page: number): string {
+  return `/transactions?${queryString(data, query, page)}`;
+}
+
+function exportLink(data: Transactions, query: TransactionQuery): string {
+  return `/transactions/export?${queryString(data, query, undefined)}`;
+}
+
+function DateField({
+  name,
+  label,
+  value,
+}: {
+  readonly name: string;
+  readonly label: string;
+  readonly value: string | undefined;
+}): ReactNode {
+  return (
+    <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+      <span className="eyebrow text-muted">{label}</span>
+      <input
+        type="date"
+        name={name}
+        defaultValue={value ?? ''}
+        className="h-10 w-full rounded-xl border border-line bg-surface px-3"
+      />
+    </label>
+  );
 }
 
 function editLink(transaction: TransactionRow, listPath: string): string {
@@ -265,73 +301,151 @@ function TransactionTable({
 export function TransactionsView({
   data,
   query,
+  invalidRange = false,
   t,
 }: {
   readonly data: Transactions;
   readonly query: TransactionQuery;
+  readonly invalidRange?: boolean;
   readonly t: Dictionary;
 }): ReactNode {
-  const filtered = Object.values(query).some((value) => value !== undefined && value !== '');
+  const filtered =
+    [query.type, query.category, query.account, query.member, query.from, query.to].some(
+      (value) => value !== undefined && value !== '',
+    ) ||
+    (query.sort !== undefined && query.sort !== 'date_desc');
+  const searching = filtered || (query.q !== undefined && query.q !== '');
   return (
     <>
-      <PageHeading title={t.transactions.title} month={data.month} t={t} />
-      <details
-        open={filtered}
-        className="group mb-6 rounded-2xl border border-line bg-surface shadow-panel md:open:pb-0"
+      <PageHeading
+        title={t.transactions.title}
+        month={data.range === null ? data.month : undefined}
+        t={t}
       >
-        <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 text-sm font-medium">
-          {t.transactions.filters}
-          <span aria-hidden="true" className="text-muted transition group-open:rotate-180">
-            ▾
-          </span>
-        </summary>
-        <form
-          method="get"
-          action="/transactions"
-          className="grid grid-cols-2 gap-3 border-t border-line px-5 pb-5 pt-4 md:grid-cols-5 md:items-end"
-        >
-          <input type="hidden" name="month" value={data.month.key} />
-          <Filter
-            name="type"
-            label={t.transactions.type}
-            selected={query.type}
-            options={data.filters.types.map((type) => ({
-              key: type,
-              name: t.transactions.types[type as TransactionRow['type']],
-            }))}
-            t={t}
-          />
-          <Filter
-            name="category"
-            label={t.transactions.category}
-            selected={query.category}
-            options={data.filters.categories}
-            t={t}
-          />
-          <Filter
-            name="account"
-            label={t.transactions.account}
-            selected={query.account}
-            options={data.filters.accounts}
-            t={t}
-          />
-          <Filter
-            name="member"
-            label={t.transactions.member}
-            selected={query.member}
-            options={data.filters.members}
-            t={t}
-          />
+        {data.range === null ? null : (
+          <p className="mt-3 text-muted">
+            {t.search.range(t.date(data.range.start), t.date(data.range.end))}
+          </p>
+        )}
+      </PageHeading>
+      <form
+        method="get"
+        action="/transactions"
+        role="search"
+        className="mb-4 rounded-2xl border border-line bg-surface shadow-panel"
+      >
+        <input type="hidden" name="month" value={data.month.key} />
+        <div className="flex items-center gap-2 py-2 pl-4 pr-2">
+          <Icon name="search" className="h-[18px] w-[18px] shrink-0 text-muted" />
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">{t.search.label}</span>
+            <input
+              type="search"
+              name="q"
+              defaultValue={query.q ?? ''}
+              maxLength={100}
+              placeholder={t.search.placeholder}
+              className="h-10 w-full bg-transparent text-[0.9375rem] placeholder:text-muted"
+            />
+          </label>
           <button
             type="submit"
-            className="col-span-2 h-10 rounded-xl bg-accent px-4 font-medium text-accent-ink md:col-span-1"
+            className="h-9 shrink-0 rounded-xl bg-accent px-4 text-sm font-medium text-accent-ink"
           >
-            {t.transactions.apply}
+            {t.search.label}
           </button>
-        </form>
-      </details>
+        </div>
+        <details open={filtered} className="group border-t border-line">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-sm font-medium">
+            {t.transactions.filters}
+            <span aria-hidden="true" className="text-muted transition group-open:rotate-180">
+              ▾
+            </span>
+          </summary>
+          <div className="grid grid-cols-2 gap-3 border-t border-line px-5 pb-5 pt-4 md:grid-cols-4 md:items-end">
+            <Filter
+              name="type"
+              label={t.transactions.type}
+              selected={query.type}
+              options={data.filters.types.map((type) => ({
+                key: type,
+                name: t.transactions.types[type as TransactionRow['type']],
+              }))}
+              t={t}
+            />
+            <Filter
+              name="category"
+              label={t.transactions.category}
+              selected={query.category}
+              options={data.filters.categories}
+              t={t}
+            />
+            <Filter
+              name="account"
+              label={t.transactions.account}
+              selected={query.account}
+              options={data.filters.accounts}
+              t={t}
+            />
+            <Filter
+              name="member"
+              label={t.transactions.member}
+              selected={query.member}
+              options={data.filters.members}
+              t={t}
+            />
+            <DateField name="from" label={t.search.from} value={data.range?.start} />
+            <DateField name="to" label={t.search.to} value={data.range?.end} />
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+              <span className="eyebrow text-muted">{t.search.sort}</span>
+              <select
+                name="sort"
+                defaultValue={data.sort}
+                className="h-10 w-full rounded-xl border border-line bg-surface px-3"
+              >
+                {SORTS.map((sort) => (
+                  <option key={sort} value={sort}>
+                    {t.search.sorts[sort]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="flex gap-2">
+              <button
+                type="submit"
+                className="h-10 flex-1 rounded-xl bg-accent px-4 font-medium text-accent-ink"
+              >
+                {t.transactions.apply}
+              </button>
+              {searching ? (
+                <Link
+                  href={`/transactions?month=${data.month.key}`}
+                  className="grid h-10 place-items-center rounded-xl border border-line px-4 text-sm hover:bg-raised"
+                >
+                  {t.search.clear}
+                </Link>
+              ) : null}
+            </span>
+          </div>
+        </details>
+      </form>
+      {invalidRange ? (
+        <p role="alert" className="mb-4 rounded-xl bg-caution-soft px-4 py-3 text-sm text-caution">
+          {t.search.invalidRange}
+        </p>
+      ) : null}
+      <div className="mb-4 flex justify-end">
+        <a
+          href={exportLink(data, query)}
+          download
+          className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm text-ink-soft hover:bg-raised hover:text-ink"
+        >
+          <Icon name="download" className="h-4 w-4" />
+          {t.search.export}
+        </a>
+      </div>
       {data.transactions.length === 0 ? (
-        <Empty>{t.transactions.none(data.month.label)}</Empty>
+        <Empty>{searching ? t.search.noMatches : t.transactions.none(data.month.label)}</Empty>
       ) : (
         <>
           <TransactionCards

@@ -2,15 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useRef, useTransition, type ReactNode } from 'react';
+import {
+  useRef,
+  useState,
+  useTransition,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import type { SessionView } from '@/lib/contracts';
 import { dictionaryFor, type Dictionary } from '@/lib/i18n/dictionary';
 import { Icon, type IconName } from './icons';
 
-type SectionKey = keyof Omit<
-  Dictionary['nav'],
-  'label' | 'more' | 'moreTitle' | 'groups' | 'compare' | 'members'
->;
+type SectionKey = keyof Omit<Dictionary['nav'], 'label' | 'more' | 'moreTitle' | 'groups'>;
 
 type GroupKey = keyof Dictionary['nav']['groups'];
 
@@ -47,6 +51,14 @@ const SECTIONS: readonly Section[] = [
     icon: 'income',
     group: 'money',
     usesMonth: true,
+    primary: false,
+  },
+  {
+    href: '/compare',
+    key: 'compare',
+    icon: 'compare',
+    group: 'money',
+    usesMonth: false,
     primary: false,
   },
   {
@@ -94,6 +106,14 @@ const SECTIONS: readonly Section[] = [
     key: 'review',
     icon: 'review',
     group: 'insight',
+    usesMonth: true,
+    primary: false,
+  },
+  {
+    href: '/members',
+    key: 'members',
+    icon: 'members',
+    group: 'household',
     usesMonth: true,
     primary: false,
   },
@@ -205,44 +225,140 @@ function RefreshButton({ t }: { readonly t: Dictionary }): ReactNode {
   );
 }
 
-function SidebarNav({
+interface Tip {
+  readonly label: string;
+  readonly top: number;
+  readonly visible: boolean;
+  readonly glide: boolean;
+}
+
+const HIDDEN_TIP: Tip = { label: '', top: 0, visible: false, glide: false };
+
+function Rail({
   t,
   month,
   pathname,
+  signOut,
+  memberName,
 }: {
   readonly t: Dictionary;
   readonly month: string | null;
   readonly pathname: string;
+  readonly signOut: () => Promise<void>;
+  readonly memberName: string;
 }): ReactNode {
+  const [tip, setTip] = useState<Tip>(HIDDEN_TIP);
+  const show =
+    (label: string) =>
+    (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>): void => {
+      const box = event.currentTarget.getBoundingClientRect();
+      const top = box.top + box.height / 2;
+      setTip((previous) => ({ label, top, visible: true, glide: previous.visible }));
+    };
+  const hide = (): void => {
+    setTip((previous) => ({ ...previous, visible: false, glide: false }));
+  };
+  const tipped = (
+    label: string,
+  ): {
+    readonly 'aria-label': string;
+    readonly onMouseEnter: (event: MouseEvent<HTMLElement>) => void;
+    readonly onFocus: (event: FocusEvent<HTMLElement>) => void;
+    readonly onBlur: () => void;
+  } => ({
+    'aria-label': label,
+    onMouseEnter: show(label),
+    onFocus: show(label),
+    onBlur: hide,
+  });
+  const item =
+    'group relative grid h-10 w-10 place-items-center rounded-xl transition-colors duration-200';
   return (
-    <nav aria-label={t.nav.label} className="space-y-6">
-      {GROUPS.map((group) => (
-        <div key={group}>
-          <p className="eyebrow px-3 text-muted">{t.nav.groups[group]}</p>
-          <ul className="mt-2 space-y-0.5">
-            {SECTIONS.filter((section) => section.group === group).map((section) => {
-              const current = isCurrent(section, pathname);
-              return (
-                <li key={section.href}>
-                  <Link
-                    href={withMonth(section, month)}
-                    aria-current={current ? 'page' : undefined}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
-                      current
-                        ? 'bg-accent font-medium text-accent-ink'
-                        : 'text-ink-soft hover:bg-raised'
-                    }`}
-                  >
-                    <Icon name={section.icon} className="h-[18px] w-[18px]" />
-                    {t.nav[section.key]}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </nav>
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-24 items-center lg:flex">
+      <div
+        onMouseLeave={hide}
+        className="ml-4 flex max-h-[calc(100dvh-2rem)] w-16 flex-col items-center rounded-[1.75rem] bg-hero py-3 text-hero-muted shadow-panel ring-1 ring-black/5"
+      >
+        <Link
+          href={month === null ? '/' : `/?month=${month}`}
+          {...tipped(t.brand)}
+          className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl ring-1 ring-brass/40 transition-transform duration-200 hover:scale-105"
+        >
+          <img src="/icons/icon-192.png" alt="" width={40} height={40} className="h-10 w-10" />
+        </Link>
+        <nav
+          aria-label={t.nav.label}
+          onScroll={hide}
+          className="rail-scroll my-3 w-full flex-1 overflow-y-auto overflow-x-hidden border-y border-hero-ink/10 py-2"
+        >
+          {GROUPS.map((group, position) => (
+            <ul
+              key={group}
+              aria-label={t.nav.groups[group]}
+              className={`space-y-1 ${position === 0 ? '' : 'mt-2 border-t border-hero-ink/10 pt-2'}`}
+            >
+              {SECTIONS.filter((section) => section.group === group).map((section) => {
+                const current = isCurrent(section, pathname);
+                return (
+                  <li key={section.href} className="relative flex justify-center">
+                    {current ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brass"
+                      />
+                    ) : null}
+                    <Link
+                      href={withMonth(section, month)}
+                      aria-current={current ? 'page' : undefined}
+                      {...tipped(t.nav[section.key])}
+                      className={`${item} ${
+                        current
+                          ? 'bg-hero-ink/10 text-hero-ink'
+                          : 'hover:bg-hero-ink/5 hover:text-hero-ink'
+                      }`}
+                    >
+                      <Icon
+                        name={section.icon}
+                        className="h-[19px] w-[19px] transition-transform duration-200 group-hover:-translate-y-px group-hover:scale-110"
+                      />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
+        </nav>
+        <span
+          {...tipped(memberName)}
+          tabIndex={0}
+          role="img"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brass/20 font-display text-sm text-brass"
+        >
+          <span aria-hidden="true">{memberName.slice(0, 1)}</span>
+        </span>
+        <form action={signOut} className="mt-1.5">
+          <button
+            type="submit"
+            {...tipped(t.shell.signOut)}
+            className={`${item} hover:bg-concern/15 hover:text-concern`}
+          >
+            <Icon name="sign-out" className="h-[18px] w-[18px]" />
+          </button>
+        </form>
+      </div>
+      <div
+        aria-hidden="true"
+        style={{ top: tip.top }}
+        className={`pointer-events-none fixed left-[5.5rem] z-50 -translate-y-1/2 rounded-lg bg-ink px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-bg shadow-panel ${
+          tip.glide
+            ? 'transition-[top,opacity,translate] duration-200 ease-out'
+            : 'transition-[opacity,translate] duration-150'
+        } ${tip.visible ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'}`}
+      >
+        <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 rounded-[1px] bg-ink" />
+        <span className="relative">{tip.label}</span>
+      </div>
+    </aside>
   );
 }
 
@@ -404,33 +520,15 @@ export function Shell({
   const month = useSearchParams().get('month');
   const usesMonth = SECTIONS.find((section) => isCurrent(section, pathname))?.usesMonth ?? true;
   return (
-    <div className="lg:grid lg:min-h-screen lg:grid-cols-[16.5rem_1fr]">
-      <aside className="hidden border-r border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <div className="px-6 pb-6 pt-8">
-          <p className="eyebrow text-brass">{t.brand}</p>
-          <p className="mt-1.5 font-display text-2xl leading-tight">{session.household}</p>
-        </div>
-        <div className="flex-1 overflow-y-auto px-3">
-          <SidebarNav t={t} month={month} pathname={pathname} />
-        </div>
-        <div className="flex items-center justify-between border-t border-line px-5 py-4 text-sm">
-          <span className="truncate text-muted">{session.member}</span>
-          <form action={signOut}>
-            <button
-              type="submit"
-              aria-label={t.shell.signOut}
-              title={t.shell.signOut}
-              className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-raised hover:text-ink"
-            >
-              <Icon name="sign-out" className="h-4 w-4" />
-            </button>
-          </form>
-        </div>
-      </aside>
-      <div className="min-w-0">
+    <div className="lg:min-h-screen">
+      <Rail t={t} month={month} pathname={pathname} signOut={signOut} memberName={session.member} />
+      <div className="min-w-0 lg:pl-24">
         <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
-            <p className="truncate font-display text-lg lg:hidden">{session.household}</p>
+            <p className="min-w-0 truncate">
+              <span className="eyebrow mr-2 hidden text-brass lg:inline">{t.brand}</span>
+              <span className="font-display text-lg">{session.household}</span>
+            </p>
             <div className="ml-auto flex items-center gap-1">
               {usesMonth ? <MonthStepper session={session} t={t} /> : null}
               <RefreshButton t={t} />

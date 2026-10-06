@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
-import type { BudgetView } from '@/lib/contracts';
+import type { BudgetRowView, BudgetView } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
+import { percentOf } from '../charts';
 import { ActionLink, Badge, Figure, Meter, type Tone } from '../ui';
+
+type Pace = NonNullable<BudgetRowView['pace']>;
 
 const STATUS_TONE: Record<BudgetView['status'], Tone> = {
   NOT_STARTED: 'neutral',
@@ -10,13 +13,23 @@ const STATUS_TONE: Record<BudgetView['status'], Tone> = {
   EXCEEDED: 'concern',
 };
 
+const PACE_TONE: Record<Pace['status'], string> = {
+  NOT_STARTED: 'text-muted',
+  FASTER: 'text-caution',
+  ON_PACE: 'text-kept',
+  SLOWER: 'text-kept',
+};
+
 export function BudgetList({
   budgets,
   detailed = false,
   editHref,
   t,
 }: {
-  readonly budgets: readonly (BudgetView & { readonly key?: string })[];
+  readonly budgets: readonly (BudgetView & {
+    readonly key?: string;
+    readonly pace?: BudgetRowView['pace'];
+  })[];
   readonly detailed?: boolean;
   readonly editHref?: (key: string) => string;
   readonly t: Dictionary;
@@ -48,12 +61,30 @@ export function BudgetList({
                 </span>
               )}
             </div>
-            <Meter
-              value={budget.usage}
-              tone={status.tone}
-              label={t.budgets.used(budget.category)}
-              t={t}
-            />
+            <div className="relative">
+              <Meter
+                value={budget.usage}
+                tone={status.tone}
+                label={t.budgets.used(budget.category)}
+                t={t}
+              />
+              {budget.pace === undefined || budget.pace === null ? null : (
+                <span
+                  aria-hidden="true"
+                  title={t.charts.elapsed(budget.pace.elapsed.text)}
+                  className="absolute -top-1 h-3.5 w-0.5 -translate-x-1/2 rounded-full bg-ink/60"
+                  style={{ left: percentOf(budget.pace.elapsed) }}
+                />
+              )}
+            </div>
+            {detailed && budget.pace !== undefined && budget.pace !== null ? (
+              <p className="mt-2 text-xs">
+                <span className={`font-medium ${PACE_TONE[budget.pace.status]}`}>
+                  {t.charts.pace[budget.pace.status]}
+                </span>
+                <span className="text-muted"> · {t.charts.elapsed(budget.pace.elapsed.text)}</span>
+              </p>
+            ) : null}
             {detailed ? (
               <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm text-muted sm:grid-cols-2">
                 <div>

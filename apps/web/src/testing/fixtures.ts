@@ -4,7 +4,11 @@ import type {
   BudgetView,
   BudgetsView,
   Comparison,
+  CompareView,
+  EvolutionView,
   GoalEditView,
+  MemberView,
+  MembersView,
   GoalsView,
   IncomeView,
   Money,
@@ -673,4 +677,121 @@ export const GOAL_EDIT: GoalEditView = {
   currency: 'EUR',
   targetDate: '2027-06-30',
   options: GOALS.options,
+};
+
+function evolutionMonth(
+  key: string,
+  label: string,
+  shortLabel: string,
+  amounts: { income: string; expenses: string; net: string; netMinor: number },
+  bars: { income: number; expenses: number },
+): EvolutionView['currencies'][number]['months'][number] {
+  return {
+    key,
+    label,
+    shortLabel,
+    income: eur(amounts.income),
+    expenses: eur(amounts.expenses),
+    net: eur(amounts.net, amounts.netMinor),
+    incomeBar: share(String(bars.income), bars.income),
+    expensesBar: share(String(bars.expenses), bars.expenses),
+  };
+}
+
+export const EVOLUTION: EvolutionView = {
+  months: 6,
+  currencies: [
+    {
+      currency: 'EUR',
+      months: [
+        evolutionMonth(
+          '2026-09',
+          'September 2026',
+          'Sep 26',
+          { income: '3,000.00', expenses: '3,200.00', net: '-200.00', netMinor: -20000 },
+          { income: 9375, expenses: 10000 },
+        ),
+        evolutionMonth(
+          '2026-10',
+          'October 2026',
+          'Oct 26',
+          { income: '3,000.00', expenses: '2,220.00', net: '780.00', netMinor: 78000 },
+          { income: 9375, expenses: 6938 },
+        ),
+      ],
+    },
+  ],
+};
+
+export const COMPARE: CompareView = {
+  first: { key: '2026-09', label: 'September 2026' },
+  second: { key: '2026-10', label: 'October 2026' },
+  months: [
+    { key: '2026-10', label: 'October 2026' },
+    { key: '2026-09', label: 'September 2026' },
+  ],
+  currencies: [
+    {
+      currency: 'EUR',
+      income: comparison('3,000.00', '3,000.00', 'UNCHANGED'),
+      expenses: comparison('2,220.00', '2,130.00', 'INCREASE'),
+      net: comparison('780.00', '870.00', 'DECREASE'),
+      categories: [
+        {
+          category: 'Food',
+          first: eur('330.00'),
+          second: eur('420.00'),
+          comparison: comparison('420.00', '330.00', 'INCREASE'),
+          firstBar: share('78.57%', 7857),
+          secondBar: share('100%', 10000),
+        },
+      ],
+    },
+  ],
+};
+
+export const MEMBERS: MembersView = {
+  members: [
+    { key: 'member-key-a', name: 'Member A' },
+    { key: 'member-key-b', name: 'Member B' },
+  ],
+};
+
+export const MEMBER: MemberView = {
+  month: OCTOBER,
+  member: { key: 'member-key-b', name: 'Member B' },
+  members: MEMBERS.members,
+  currencies: [
+    {
+      currency: 'EUR',
+      spending: eur('180.00', 18000),
+      income: eur('0.00'),
+      transactionCount: 1,
+      householdSpending: eur('2,220.00', 222000),
+      shareOfHousehold: share('8.11%', 811),
+      comparison: comparison('180.00', '90.00', 'INCREASE'),
+      composition: [
+        {
+          category: 'Food',
+          isOther: false,
+          total: eur('180.00', 18000),
+          share: share('100%', 10000),
+          offset: share('0%', 0),
+        },
+      ],
+      byCategory: [
+        { category: 'Food', isTopLevel: true, total: eur('180.00'), share: share('100%', 10000) },
+      ],
+      largestExpenses: [
+        {
+          date: '2026-10-12',
+          amount: eur('180.00', 18000),
+          merchant: 'Bistro',
+          category: 'Restaurants',
+          member: 'Member B',
+          account: 'Joint Account',
+        },
+      ],
+    },
+  ],
 };

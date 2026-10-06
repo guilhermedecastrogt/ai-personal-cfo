@@ -56,6 +56,36 @@ export async function apiFind<View>(path: string): Promise<View> {
   }
 }
 
+export interface ApiDownload {
+  readonly status: number;
+  readonly body: ArrayBuffer;
+  readonly contentType: string | null;
+  readonly disposition: string | null;
+}
+
+export async function apiDownload(
+  path: string,
+  parameters: QueryParameters = {},
+): Promise<ApiDownload> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (token === undefined) {
+    redirect('/login');
+  }
+  const response = await fetch(apiUrl(path, parameters), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (response.status === HTTP_UNAUTHORIZED) {
+    redirect('/login');
+  }
+  return {
+    status: response.status,
+    body: await response.arrayBuffer(),
+    contentType: response.headers.get('content-type'),
+    disposition: response.headers.get('content-disposition'),
+  };
+}
+
 export type ApiOutcome<View> =
   | { readonly ok: true; readonly data: View | undefined }
   | { readonly ok: false; readonly status: number; readonly body: unknown };

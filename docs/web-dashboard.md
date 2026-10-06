@@ -126,24 +126,27 @@ The web application imports the TypeScript types of these schemas and nothing el
 - **Themes.** Light and dark follow the device setting through `prefers-color-scheme`. Colours are semantic CSS variables in `app/globals.css`, mapped into Tailwind with `@theme inline`, so every component switches theme without its own dark classes.
 - **Language.** The dashboard's own labels come from a dictionary per language in `lib/i18n/`, chosen from `session.locale`, which the API takes from the household. Text produced by the API (categories, alerts, findings, months, amounts) is already in that language. Dates show as `DD/MM/YYYY` in Portuguese. The sign-in page follows the browser's language.
 - **Phones.** A bottom bar holds Overview, Transactions, Budgets and Goals; the rest open from a "More" sheet. Transactions show as cards below the `md` breakpoint and as a table above it, and filters collapse. No page scrolls sideways at 390 px.
-- **Larger screens.** A sidebar groups the sections, and the month is chosen with previous and next buttons around a selector.
+- **Larger screens.** A floating rail on the left holds the sections as icons only, grouped by thin dividers. Pointing at an icon or focusing it with the keyboard shows its name in a label that slides between icons; each link also carries the name as `aria-label`. A brass mark shows the current section. The household's name sits in the header, and the month is chosen with previous and next buttons around a selector.
+- **Charts.** Bars, rings and markers are drawn from basis points the API already scaled (bar heights, ring shares and offsets, elapsed share of a budget period). The browser only turns basis points into CSS percentages; it adds, compares and rounds nothing. Every chart has the same figures as text or in a visually hidden table, and hover effects are CSS only.
 - Each request fetches the session once (`lib/session.ts`, cached per request), and server components receive the dictionary as a prop. Client components choose it themselves, because functions cannot cross from server to client.
 
 ## Views
 
-| Page         | Shows                                                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview     | The month in one line, comparison, findings, top categories, budgets, projection, balances, members                                   |
-| Spending     | Total, categories with subcategories, members, accounts, risers and fallers, largest expenses                                         |
-| Income       | Total, sources, members                                                                                                               |
-| Budgets      | Usage, status, remainder, projection and who spent what                                                                               |
-| Goals        | Progress, remainder, date and required monthly saving                                                                                 |
-| Outlook      | Actual figures beside projected ones, budgets projected over, recurring commitments                                                   |
-| Recurring    | Monthly and annual commitment, each recurring expense with cadence, dates, payers and price changes, and what appears to have stopped |
-| Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read                                       |
-| Review       | Summary, strengths, concerns, suggestions and priorities                                                                              |
-| Transactions | History with filters and paging; each transaction opens for editing or deletion                                                       |
-| Accounts     | Accounts, ownership, balances, totals per currency, members                                                                           |
+| Page         | Shows                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview     | The month in one line, income and spending over the last 6 or 12 months, comparison, findings, top categories, budgets, projection, balances, members                    |
+| Spending     | Total, a ring of the top categories, categories with subcategories, members, accounts, risers and fallers, largest expenses                                              |
+| Compare      | Any two months: totals with their change, and each category as a pair of bars                                                                                            |
+| People       | Each member's month: spending with its change, income, share of the household's spending, a category ring, categories, largest expenses                                  |
+| Income       | Total, sources, members                                                                                                                                                  |
+| Budgets      | Usage, status, pace against the elapsed period (a marker on the bar and a sentence), remainder, projection and who spent what                                            |
+| Goals        | Progress, remainder, date and required monthly saving                                                                                                                    |
+| Outlook      | Actual figures beside projected ones, budgets projected over, recurring commitments                                                                                      |
+| Recurring    | Monthly and annual commitment, each recurring expense with cadence, dates, payers and price changes, and what appears to have stopped                                    |
+| Signals      | Insights by severity, unusual spending, and the notifications the CFO raised, with mark as read                                                                          |
+| Review       | Summary, strengths, concerns, suggestions and priorities                                                                                                                 |
+| Transactions | History with text search, filters, a free period of up to a year, order and paging; a CSV download of the same selection; each transaction opens for editing or deletion |
+| Accounts     | Accounts, ownership, balances, totals per currency, members                                                                                                              |
 
 ## Editing
 
@@ -168,7 +171,7 @@ Views that depend on currency return one entry per currency, and the pages rende
 
 ## Data fetching
 
-Pages are rendered on the server on every request and fetch with caching disabled, so a page always reflects the database. A page makes one request for its view, and the layout makes one for the session.
+Pages are rendered on the server on every request and fetch with caching disabled, so a page always reflects the database. A page makes one request for its view (the overview makes two, adding the evolution), and the layout makes one for the session.
 
 There are no WebSockets and no polling. The Refresh button re-renders the current page, which is how a transaction just sent on WhatsApp appears.
 
@@ -204,5 +207,5 @@ The web application runs on port 3001 and reads the API's address from `API_URL`
 - The review is generated on each visit and is not stored.
 - Text produced by the API follows the household's language; the dashboard's own labels are covered by the web dictionary.
 - Signals and findings are not persisted, so they are not marked as seen.
-- Proportion bars are the only charts.
+- The CSV download goes through `app/(dashboard)/transactions/export/route.ts`, which forwards only the known filters with the session token. A period the API refuses falls back to the month, with a notice.
 - Exercised end to end locally against the seeded demo household. The web tests render views from fixtures and do not drive a browser.

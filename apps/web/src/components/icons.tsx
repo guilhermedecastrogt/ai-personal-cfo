@@ -12,6 +12,10 @@ export type IconName =
   | 'signals'
   | 'review'
   | 'accounts'
+  | 'compare'
+  | 'members'
+  | 'search'
+  | 'download'
   | 'more'
   | 'chevron-left'
   | 'chevron-right'
@@ -34,6 +38,11 @@ const PATHS: Record<IconName, string> = {
   signals: 'M12 4a5 5 0 0 0-5 5v3.5L5 16h14l-2-3.5V9a5 5 0 0 0-5-5zM10 19a2 2 0 0 0 4 0',
   review: 'M7 4h7l4 4v12H7zM14 4v4h4M10 12h5M10 16h5',
   accounts: 'M4 8h16v11H4zM4 8l2-3h12l2 3M8 13h3',
+  compare: 'M8 20V9M16 20V4M4 20h16M5 12l3-3 3 3M13 7l3-3 3 3',
+  members:
+    'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20a6 6 0 0 1 12 0M16 4.6a3.5 3.5 0 0 1 0 6.3M21 20a6 6 0 0 0-3.6-5.5',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   'chevron-left': 'M15 5l-7 7 7 7',
   'chevron-right': 'M9 5l7 7-7 7',

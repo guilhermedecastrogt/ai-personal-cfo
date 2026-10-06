@@ -1,4 +1,4 @@
-import { ApiError, apiFind, apiGet, apiPost, apiSend, apiUrl } from './api';
+import { ApiError, apiDownload, apiFind, apiGet, apiPost, apiSend, apiUrl } from './api';
 
 const cookieValue = jest.fn<string | undefined, []>();
 const redirect = jest.fn((path: string): never => {
@@ -188,5 +188,55 @@ describe('apiFind', () => {
     respondWith(503);
 
     await expect(apiFind('/dashboard/transactions/k')).rejects.toEqual(new ApiError(503));
+  });
+});
+
+describe('apiDownload', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    cookieValue.mockReturnValue('session-token');
+  });
+
+  function respondWithFile(status: number, headers: Record<string, string>): void {
+    fetchMock.mockResolvedValue({
+      ok: status === 200,
+      status,
+      headers: { get: (name: string) => headers[name] ?? null },
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(3)),
+    } as unknown as Response);
+  }
+
+  it('fetches a file with the session, uncached, and keeps its type and name', async () => {
+    respondWithFile(200, {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': 'attachment; filename="transactions-2026-10.csv"',
+    });
+
+    const download = await apiDownload('/dashboard/transactions/export', { q: 'lidl', to: '' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/dashboard/transactions/export?q=lidl',
+      { headers: { Authorization: 'Bearer session-token' }, cache: 'no-store' },
+    );
+    expect(download).toMatchObject({
+      status: 200,
+      contentType: 'text/csv; charset=utf-8',
+      disposition: 'attachment; filename="transactions-2026-10.csv"',
+    });
+    expect(download.body.byteLength).toBe(3);
+  });
+
+  it('sends the visitor to sign in when there is no session or it is refused', async () => {
+    cookieValue.mockReturnValue(undefined);
+    await expect(apiDownload('/dashboard/transactions/export')).rejects.toThrow(
+      'redirected to /login',
+    );
+
+    cookieValue.mockReturnValue('expired');
+    respondWithFile(401, {});
+    await expect(apiDownload('/dashboard/transactions/export')).rejects.toThrow(
+      'redirected to /login',
+    );
   });
 });
