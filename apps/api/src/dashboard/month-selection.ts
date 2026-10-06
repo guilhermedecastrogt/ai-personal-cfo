@@ -31,6 +31,31 @@ const LABEL_FORMATS: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
   'pt-BR': new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
 };
 
+const SHORT_FORMATS: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
+  en: new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' }),
+  'pt-BR': new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' }),
+};
+
+export interface MonthDescription {
+  readonly key: string;
+  readonly label: string;
+  readonly shortLabel: string;
+}
+
+export function describeMonth(
+  period: DateRange,
+  locale: Locale = DEFAULT_LOCALE,
+): MonthDescription {
+  const short = SHORT_FORMATS[locale]
+    .format(new Date(`${period.start}T00:00:00Z`))
+    .replace('.', '');
+  return {
+    key: keyOf(period),
+    label: labelOf(period, locale),
+    shortLabel: `${short.charAt(0).toLocaleUpperCase(locale)}${short.slice(1)} ${period.start.slice(2, 4)}`,
+  };
+}
+
 function keyOf(period: DateRange): string {
   return period.start.slice(0, MONTH_KEY_LENGTH);
 }

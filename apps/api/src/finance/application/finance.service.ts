@@ -22,7 +22,16 @@ import {
   type CashFlow,
   type CashFlowOutlook,
 } from '../domain/cash-flow/cash-flow.js';
+import { budgetPace, type BudgetPaceResult } from '../domain/analytics/budget-pace.js';
+import {
+  composeByTopLevelCategory,
+  type CompositionSlice,
+} from '../domain/analytics/category-composition.js';
+import { compareMonths, type MonthComparison } from '../domain/analytics/month-comparison.js';
+import { buildMonthlySeries, type MonthlyCashFlow } from '../domain/analytics/monthly-series.js';
 import { CategoryTree } from '../domain/categories/category-tree.js';
+import { compareAmounts, type AmountComparison } from '../domain/trends/spending-trends.js';
+import { ratioInBasisPoints } from '../../money/money-math.js';
 import { DEFAULT_FINANCE_POLICY } from '../domain/finance-policy.js';
 import { summarizeFlow, type FlowBreakdown } from '../domain/flow/flow-breakdown.js';
 import {
@@ -41,6 +50,7 @@ import {
   monthToDate,
   periodContaining,
   previousEquivalentRange,
+  previousPeriod as previousPeriodOf,
   previousPeriods,
   span,
   type DateRange,
@@ -95,6 +105,23 @@ export interface LargestExpenses {
 export interface HouseholdBalances {
   readonly accounts: readonly AccountBalance[];
   readonly totals: readonly CurrencyBalances[];
+}
+
+export interface CurrencyMonthlySeries {
+  readonly currency: string;
+  readonly months: readonly MonthlyCashFlow[];
+}
+
+export interface MemberActivity {
+  readonly currency: string;
+  readonly spending: FlowBreakdown;
+  readonly income: FlowBreakdown;
+  readonly householdSpendingMinor: number;
+  readonly shareOfHouseholdBasisPoints: number | null;
+  readonly spendingComparison: AmountComparison;
+  readonly previousPeriod: DateRange;
+  readonly composition: readonly CompositionSlice[];
+  readonly largestExpenses: readonly ExpenseItem[];
 }
 
 interface Scope {
@@ -207,12 +234,114 @@ export class FinanceService {
     });
   }
 
+  async cashFlowSeries(
+    householdId: string,
+    periods: readonly DateRange[],
+  ): Promise<CurrencyMonthlySeries[]> {
+    const scope = await this.scopeOf(householdId);
+    const currencies = await this.currenciesOf(householdId, scope);
+    const entries = await this.ledger.findEntries(householdId, { period: span([...periods]) });
+    return currencies
+      .map((currency) => ({
+        currency,
+        months: buildMonthlySeries(inCurrency(entries, currency), currency, periods),
+      }))
+      .filter(
+        (series) =>
+          series.currency === scope.currency ||
+          series.months.some((month) => month.incomeMinor > 0 || month.expensesMinor > 0),
+      );
+  }
+
+  async compareMonths(
+    householdId: string,
+    first: DateRange,
+    second: DateRange,
+  ): Promise<MonthComparison[]> {
+    const scope = await this.scopeOf(householdId);
+    const currencies = await this.currenciesOf(householdId, scope);
+    const entries = await this.ledger.findEntries(householdId, {
+      period: span([first, second]),
+    });
+    return currencies
+      .map((currency) =>
+        compareMonths({
+          entries: inCurrency(entries, currency),
+          currency,
+          first,
+          second,
+          categories: scope.categories,
+        }),
+      )
+      .filter(
+        (comparison) =>
+          comparison.currency === scope.currency ||
+          comparison.categories.length > 0 ||
+          comparison.income.currentMinor > 0 ||
+          comparison.income.previousMinor > 0,
+      );
+  }
+
+  async spendingComposition(
+    householdId: string,
+    period: DateRange,
+    currency?: string,
+  ): Promise<CompositionSlice[]> {
+    const scope = await this.scopeOf(householdId, currency);
+    const flow = await this.spending(householdId, period, scope.currency);
+    return composeByTopLevelCategory(flow, scope.categories);
+  }
+
+  async memberActivity(
+    householdId: string,
+    memberId: string,
+    period: DateRange,
+  ): Promise<MemberActivity[]> {
+    const scope = await this.scopeOf(householdId);
+    const currencies = await this.currenciesOf(householdId, scope);
+    const previous = previousPeriodOf('MONTHLY', period);
+    const entries = await this.ledger.findEntries(householdId, {
+      period: span([previous, period]),
+    });
+    const activities = currencies.map((currency) => {
+      const ofCurrency = inCurrency(entries, currency);
+      const current = within(ofCurrency, period);
+      const own = current.filter((entry) => entry.memberId === memberId);
+      const ownBefore = within(ofCurrency, previous).filter((entry) => entry.memberId === memberId);
+      const flowOf = (flowEntries: readonly LedgerEntry[], type: FlowType): FlowBreakdown =>
+        summarizeFlow({ entries: flowEntries, type, currency, categories: scope.categories });
+      const spending = flowOf(own, 'EXPENSE');
+      const household = flowOf(current, 'EXPENSE');
+      return {
+        currency,
+        spending,
+        income: flowOf(own, 'INCOME'),
+        householdSpendingMinor: household.totalMinor,
+        shareOfHouseholdBasisPoints: ratioInBasisPoints(spending.totalMinor, household.totalMinor),
+        spendingComparison: compareAmounts(
+          spending.totalMinor,
+          flowOf(ownBefore, 'EXPENSE').totalMinor,
+        ),
+        previousPeriod: previous,
+        composition: composeByTopLevelCategory(spending, scope.categories),
+        largestExpenses: selectLargestExpenses(own, currency, this.policy.listing.largestExpenses),
+      };
+    });
+    return activities.filter(
+      (activity) =>
+        activity.currency === scope.currency ||
+        activity.spending.transactionCount > 0 ||
+        activity.income.transactionCount > 0,
+    );
+  }
+
+  async budgetPaces(householdId: string, asOf: IsoDate): Promise<BudgetPaceResult[]> {
+    return (await this.budgets(householdId, asOf)).map((usage) => budgetPace(usage, asOf));
+  }
+
   async recurringCommitments(householdId: string, asOf: IsoDate): Promise<RecurringSummary[]> {
     const scope = await this.scopeOf(householdId);
-    const accounts = await this.accounts.list(householdId);
-    const currencies = [
-      ...new Set([scope.currency, ...accounts.map((account) => account.currency).sort()]),
-    ];
+    const currencies = await this.currenciesOf(householdId, scope);
     const summaries = await Promise.all(
       currencies.map(async (currency) =>
         summarizeRecurringExpenses(
@@ -415,6 +544,11 @@ export class FinanceService {
     };
   }
 
+  private async currenciesOf(householdId: string, scope: Scope): Promise<string[]> {
+    const accounts = await this.accounts.list(householdId);
+    return [...new Set([scope.currency, ...accounts.map((account) => account.currency).sort()])];
+  }
+
   private async scopeOf(householdId: string, currency?: string): Promise<Scope> {
     const [household, members, categories] = await Promise.all([
       this.households.findHousehold(householdId),
@@ -432,4 +566,8 @@ export class FinanceService {
       categories: new CategoryTree(categories),
     };
   }
+}
+
+function inCurrency(entries: readonly LedgerEntry[], currency: string): LedgerEntry[] {
+  return entries.filter((entry) => entry.currency === currency);
 }

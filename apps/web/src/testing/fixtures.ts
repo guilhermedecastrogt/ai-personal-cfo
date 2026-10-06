@@ -238,6 +238,22 @@ export const SPENDING: SpendingView = {
           account: 'Joint Account',
         },
       ],
+      composition: [
+        {
+          category: 'Housing',
+          isOther: false,
+          total: eur('1,800.00', 180000),
+          share: share('81.08%', 8108),
+          offset: share('0%', 0),
+        },
+        {
+          category: 'Food',
+          isOther: false,
+          total: eur('420.00', 42000),
+          share: share('18.92%', 1892),
+          offset: share('81.08%', 8108),
+        },
+      ],
     },
   ],
 };
@@ -269,7 +285,13 @@ export const BUDGETS: BudgetsView = {
   currencies: [
     {
       currency: 'EUR',
-      budgets: [{ key: 'budget-key-restaurants', ...RESTAURANTS_BUDGET }],
+      budgets: [
+        {
+          key: 'budget-key-restaurants',
+          pace: { elapsed: share('64.52%', 6452), status: 'FASTER' },
+          ...RESTAURANTS_BUDGET,
+        },
+      ],
       forecast: EUR_OVERVIEW.forecast,
     },
   ],
@@ -385,6 +407,8 @@ export const REVIEW: ReviewView = {
 
 export const TRANSACTIONS: TransactionsView = {
   month: OCTOBER,
+  range: null,
+  sort: 'date_desc',
   page: 1,
   pageCount: 2,
   total: 61,

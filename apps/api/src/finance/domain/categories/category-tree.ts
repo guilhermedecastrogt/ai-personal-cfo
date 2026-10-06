@@ -20,6 +20,10 @@ export class CategoryTree {
     return lineage;
   }
 
+  isTopLevel(categoryId: string | null): boolean {
+    return categoryId === null || this.lineageOf(categoryId).length === 1;
+  }
+
   isWithin(categoryId: string | null, ancestorId: string): boolean {
     return categoryId !== null && this.lineageOf(categoryId).includes(ancestorId);
   }

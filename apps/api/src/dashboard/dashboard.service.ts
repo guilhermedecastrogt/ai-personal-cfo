@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE } from '../i18n/locale.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.js';
 import { Injectable } from '@nestjs/common';
 import { CfoService, type CurrencyAnalysis, type MonthlyAnalysis } from '../cfo/cfo.service.js';
 import type { ReviewBudget } from '../cfo/analysis/monthly-review.js';
@@ -10,15 +10,30 @@ import {
   type NamedEntry,
 } from '../directory/household-directory.service.js';
 import { FinanceService, HouseholdNotFoundError } from '../finance/application/finance.service.js';
-import type { IsoDate } from '../finance/domain/period/period.js';
+import type { CompositionSlice } from '../finance/domain/analytics/category-composition.js';
+import {
+  daysBetween,
+  monthContaining,
+  previousPeriod,
+  type DateRange,
+  type IsoDate,
+} from '../finance/domain/period/period.js';
 import type { RecurringCommitment } from '../finance/domain/recurring/recurring-summary.js';
 import type { RequestContext } from '../households/request-context.js';
 import { ProactiveCfoService } from '../proactive/proactive-cfo.service.js';
-import { TransactionsService } from '../transactions/transactions.service.js';
+import {
+  TransactionsService,
+  type TransactionSearch,
+  type TransactionSort,
+} from '../transactions/transactions.service.js';
 import { TRANSACTION_TYPES, type TransactionType } from '../transactions/transaction-vocabulary.js';
 import {
   accountsSchema,
   budgetsSchema,
+  compareSchema,
+  evolutionSchema,
+  memberSchema,
+  membersSchema,
   goalsSchema,
   incomeSchema,
   outlookViewSchema,
@@ -32,6 +47,10 @@ import {
   transactionsSchema,
   type AccountsView,
   type BudgetsView,
+  type CompareView,
+  type EvolutionView,
+  type MemberView,
+  type MembersView,
   type GoalsView,
   type IncomeView,
   type OutlookView,
@@ -46,7 +65,8 @@ import {
   type TransactionsView,
 } from './dashboard.contracts.js';
 import { budgetOptions, goalOptions } from './edit-options.js';
-import { listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
+import { describeMonth, listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
+import { transactionsCsv } from './transactions-csv.js';
 import {
   allSpendingLabel,
   describeAnomalies,
@@ -59,8 +79,28 @@ export interface TransactionFilters {
   readonly category?: string | undefined;
   readonly account?: string | undefined;
   readonly member?: string | undefined;
+  readonly q?: string | undefined;
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  readonly sort?: TransactionSort | undefined;
   readonly page: number;
 }
+
+export interface TransactionExport {
+  readonly filename: string;
+  readonly content: string;
+}
+
+export class InvalidRangeError extends Error {
+  constructor() {
+    super('The date range is not valid');
+    this.name = InvalidRangeError.name;
+  }
+}
+
+const MAXIMUM_RANGE_IN_DAYS = 366;
+const MAXIMUM_EXPORTED_TRANSACTIONS = 5_000;
+export type EvolutionMonths = 6 | 12;
 
 const TRANSACTIONS_PER_PAGE = 50;
 
@@ -156,12 +196,10 @@ export class DashboardService {
     const currencies = await Promise.all(
       analysis.analyses.map(async (currency) => {
         const { snapshot, review } = currency;
-        const largest = await this.finance.largestExpenses(
-          context.householdId,
-          snapshot.period,
-          {},
-          snapshot.currency,
-        );
+        const [largest, composition] = await Promise.all([
+          this.finance.largestExpenses(context.householdId, snapshot.period, {}, snapshot.currency),
+          this.finance.spendingComposition(context.householdId, snapshot.period, snapshot.currency),
+        ]);
         return presentResult(
           {
             ...flowOf(currency, 'spending'),
@@ -170,6 +208,7 @@ export class DashboardService {
             categoryIncreases: review.categoryIncreases,
             categoryDecreases: review.categoryDecreases,
             largestExpenses: largest.expenses,
+            composition: composition.map(sliceIn(localeOf(analysis.directory))),
           },
           analysis.directory,
         );
@@ -205,10 +244,19 @@ export class DashboardService {
       this.directories.load(context.householdId),
       this.householdCurrency(context),
     ]);
+    const paces = new Map(
+      (await this.finance.budgetPaces(context.householdId, month.asOf)).map((pace) => [
+        pace.budgetId,
+        presentResult(
+          { elapsedBasisPoints: pace.elapsedBasisPoints, status: pace.pace },
+          analysis.directory,
+        ),
+      ]),
+    );
     return budgetsSchema.parse({
       month,
       currencies: analysis.analyses.map(({ review }) =>
-        withRowKeys(
+        withRowExtras(
           presentResult(
             {
               currency: review.currency,
@@ -218,7 +266,10 @@ export class DashboardService {
             analysis.directory,
           ),
           'budgets',
-          review.budgets.map((budget) => budget.budgetId),
+          review.budgets.map((budget) => ({
+            key: budget.budgetId,
+            pace: paces.get(budget.budgetId) ?? null,
+          })),
         ),
       ),
       options: budgetOptions(directory, currency, month.period.start),
@@ -386,21 +437,20 @@ export class DashboardService {
     filters: TransactionFilters,
     instant: Date,
   ): Promise<TransactionsView> {
-    const [{ month }, directory] = await Promise.all([
-      this.monthOf(context, filters.month, instant),
-      this.directories.load(context.householdId),
-    ]);
+    const { month, directory, search, range } = await this.transactionSearch(
+      context,
+      filters,
+      instant,
+    );
     const found = await this.transactions.search(context.householdId, {
-      period: month.period,
-      type: filters.type,
-      memberId: keyWithin(directory.members, filters.member),
-      accountId: keyWithin(directory.accounts, filters.account),
-      categoryIds: categoriesWithin(directory, filters.category),
+      ...search,
       limit: TRANSACTIONS_PER_PAGE,
       offset: (filters.page - 1) * TRANSACTIONS_PER_PAGE,
     });
     return transactionsSchema.parse({
       month,
+      range,
+      sort: search.sort,
       page: filters.page,
       pageCount: Math.max(Math.ceil(found.total / TRANSACTIONS_PER_PAGE), 1),
       total: found.total,
@@ -434,6 +484,201 @@ export class DashboardService {
         ) as Record<string, unknown>),
       })),
     });
+  }
+
+  async exportTransactions(
+    context: RequestContext,
+    filters: TransactionFilters,
+    instant: Date,
+  ): Promise<TransactionExport> {
+    const { directory, search, period } = await this.transactionSearch(context, filters, instant);
+    const found = await this.transactions.search(context.householdId, {
+      ...search,
+      limit: MAXIMUM_EXPORTED_TRANSACTIONS,
+      offset: 0,
+    });
+    const names = namesOf(directory);
+    return {
+      filename: `${EXPORT_NAMES[directory.locale]}-${period.start}-${period.end}.csv`,
+      content: transactionsCsv(found.transactions, names, directory.locale),
+    };
+  }
+
+  async evolution(
+    context: RequestContext,
+    months: EvolutionMonths,
+    instant: Date,
+  ): Promise<EvolutionView> {
+    const today = await this.finance.currentDate(context.householdId, instant);
+    const locale = context.locale ?? DEFAULT_LOCALE;
+    const periods = recentMonths(today, months);
+    const [series, directory] = await Promise.all([
+      this.finance.cashFlowSeries(context.householdId, periods),
+      this.directories.load(context.householdId),
+    ]);
+    return evolutionSchema.parse({
+      months,
+      currencies: series.map(({ currency, months: points }) => ({
+        currency,
+        months: points.map((point) => ({
+          ...describeMonth(point.period, locale),
+          ...(presentResult(
+            {
+              currency,
+              incomeMinor: point.incomeMinor,
+              expensesMinor: point.expensesMinor,
+              netMinor: point.netMinor,
+              incomeBarBasisPoints: point.incomeBarBasisPoints,
+              expensesBarBasisPoints: point.expensesBarBasisPoints,
+            },
+            namesOf(directory),
+          ) as Record<string, unknown>),
+        })),
+      })),
+    });
+  }
+
+  async compare(
+    context: RequestContext,
+    firstKey: string | undefined,
+    secondKey: string | undefined,
+    instant: Date,
+  ): Promise<CompareView> {
+    const locale = context.locale ?? DEFAULT_LOCALE;
+    const [today, directory, earliest] = await Promise.all([
+      this.finance.currentDate(context.householdId, instant),
+      this.directories.load(context.householdId),
+      this.transactions.earliestDate(context.householdId),
+    ]);
+    const second = selectMonth(secondKey, today, locale);
+    const first =
+      firstKey === undefined
+        ? selectMonth(describeMonth(previousMonthOf(second.period), locale).key, today, locale)
+        : selectMonth(firstKey, today, locale);
+    const comparisons = await this.finance.compareMonths(
+      context.householdId,
+      first.period,
+      second.period,
+    );
+    const names = namesOf(directory);
+    return compareSchema.parse({
+      first: { key: first.key, label: first.label },
+      second: { key: second.key, label: second.label },
+      months: listMonths(earliest, today, locale),
+      currencies: comparisons.map((comparison) =>
+        presentResult(
+          {
+            currency: comparison.currency,
+            income: comparison.income,
+            expenses: comparison.expenses,
+            net: comparison.net,
+            categories: comparison.categories.map((category) => ({
+              categoryId: category.categoryId,
+              firstMinor: category.firstMinor,
+              secondMinor: category.secondMinor,
+              comparison: category.comparison,
+              firstBarBasisPoints: category.firstBarBasisPoints,
+              secondBarBasisPoints: category.secondBarBasisPoints,
+            })),
+          },
+          names,
+        ),
+      ),
+    });
+  }
+
+  async members(context: RequestContext): Promise<MembersView> {
+    const directory = await this.directories.load(context.householdId);
+    return membersSchema.parse({ members: directory.members.map(toOption) });
+  }
+
+  async member(
+    context: RequestContext,
+    memberKey: string,
+    monthKey: string | undefined,
+    instant: Date,
+  ): Promise<MemberView | undefined> {
+    const [{ month }, directory] = await Promise.all([
+      this.monthOf(context, monthKey, instant),
+      this.directories.load(context.householdId),
+    ]);
+    const member = directory.members.find((entry) => entry.id === memberKey);
+    if (member === undefined) {
+      return undefined;
+    }
+    const activities = await this.finance.memberActivity(
+      context.householdId,
+      member.id,
+      month.period,
+    );
+    const names = namesOf(directory);
+    const topLevel = new Set(
+      directory.categories.filter((category) => category.parentId === null).map((c) => c.id),
+    );
+    return memberSchema.parse({
+      month,
+      member: toOption(member),
+      members: directory.members.map(toOption),
+      currencies: activities.map((activity) =>
+        presentResult(
+          {
+            currency: activity.currency,
+            spendingMinor: activity.spending.totalMinor,
+            incomeMinor: activity.income.totalMinor,
+            transactionCount: activity.spending.transactionCount,
+            householdSpendingMinor: activity.householdSpendingMinor,
+            shareOfHouseholdBasisPoints: activity.shareOfHouseholdBasisPoints,
+            comparison: activity.spendingComparison,
+            composition: activity.composition.map(sliceIn(directory.locale)),
+            byCategory: activity.spending.byCategory.map(
+              ({ categoryId, totalMinor, shareBasisPoints }) => ({
+                categoryId,
+                isTopLevel: categoryId === null || topLevel.has(categoryId),
+                totalMinor,
+                shareBasisPoints,
+              }),
+            ),
+            largestExpenses: activity.largestExpenses,
+          },
+          names,
+        ),
+      ),
+    });
+  }
+
+  private async transactionSearch(
+    context: RequestContext,
+    filters: TransactionFilters,
+    instant: Date,
+  ): Promise<{
+    month: SelectedMonth;
+    directory: HouseholdDirectory;
+    search: Omit<TransactionSearch, 'limit' | 'offset'> & { sort: TransactionSort };
+    range: DateRange | null;
+    period: DateRange;
+  }> {
+    const [{ month, today }, directory] = await Promise.all([
+      this.monthOf(context, filters.month, instant),
+      this.directories.load(context.householdId),
+    ]);
+    const range = rangeOf(filters, month, today);
+    const period = range ?? month.period;
+    const sort = filters.sort ?? 'date_desc';
+    return {
+      month,
+      directory,
+      range,
+      period,
+      search: {
+        period,
+        type: filters.type,
+        memberId: keyWithin(directory.members, filters.member),
+        accountId: keyWithin(directory.accounts, filters.account),
+        categoryIds: categoriesWithin(directory, filters.category),
+        text: filters.q,
+        sort,
+      },
+    };
   }
 
   async accounts(context: RequestContext, instant: Date): Promise<AccountsView> {
@@ -525,9 +770,70 @@ function withBudgetScope(budget: ReviewBudget, allSpending: string): Record<stri
 }
 
 function withRowKeys(presented: unknown, field: string, keys: readonly string[]): unknown {
+  return withRowExtras(
+    presented,
+    field,
+    keys.map((key) => ({ key })),
+  );
+}
+
+function withRowExtras(
+  presented: unknown,
+  field: string,
+  extras: readonly Record<string, unknown>[],
+): unknown {
   const section = presented as Record<string, unknown>;
   const rows = section[field] as readonly Record<string, unknown>[];
-  return { ...section, [field]: rows.map((row, index) => ({ key: keys[index], ...row })) };
+  return { ...section, [field]: rows.map((row, index) => ({ ...extras[index], ...row })) };
+}
+
+const OTHER_CATEGORIES: Readonly<Record<Locale, string>> = {
+  en: 'Others',
+  'pt-BR': 'Outros',
+};
+
+function sliceIn(locale: Locale): (slice: CompositionSlice) => Record<string, unknown> {
+  return ({ categoryId, isOther, ...rest }) =>
+    isOther
+      ? { category: OTHER_CATEGORIES[locale], isOther, ...rest }
+      : { categoryId, isOther, ...rest };
+}
+
+const EXPORT_NAMES: Readonly<Record<Locale, string>> = {
+  en: 'transactions',
+  'pt-BR': 'movimentos',
+};
+
+function rangeOf(
+  filters: TransactionFilters,
+  month: SelectedMonth,
+  today: IsoDate,
+): DateRange | null {
+  if (filters.from === undefined && filters.to === undefined) {
+    return null;
+  }
+  const start = filters.from ?? month.period.start;
+  const end = filters.to ?? today;
+  if (start > end || daysBetween(start, end) >= MAXIMUM_RANGE_IN_DAYS) {
+    throw new InvalidRangeError();
+  }
+  return { start, end };
+}
+
+function recentMonths(today: IsoDate, count: number): DateRange[] {
+  const months: DateRange[] = [monthContaining(today)];
+  while (months.length < count) {
+    const [earliest] = months;
+    if (earliest === undefined) {
+      break;
+    }
+    months.unshift(previousMonthOf(earliest));
+  }
+  return months;
+}
+
+function previousMonthOf(period: DateRange): DateRange {
+  return previousPeriod('MONTHLY', period);
 }
 
 function toOption(entry: NamedEntry): { key: string; name: string } {

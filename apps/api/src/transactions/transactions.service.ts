@@ -18,6 +18,7 @@ import {
   type TransactionPage,
   type TransactionSearch,
 } from './transactions.repository.js';
+import type { TransactionSort } from './transaction-vocabulary.js';
 import type { ExpenseScope, TransactionType } from './transaction-vocabulary.js';
 
 export type TransactionRejectionReason =
@@ -49,7 +50,7 @@ export type TransactionEditOutcome =
 
 const RECENT_TRANSACTIONS_LIMIT = 20;
 
-export type { NewTransaction, Transaction, TransactionPage, TransactionSearch };
+export type { NewTransaction, Transaction, TransactionPage, TransactionSearch, TransactionSort };
 
 export class TransactionRejectedError extends Error {
   constructor(readonly reasons: readonly TransactionRejectionReason[]) {

@@ -203,6 +203,23 @@ export const overviewSchema = z.object({
   ),
 });
 
+const largestExpenseSchema = z.object({
+  date: z.string(),
+  amount: moneySchema,
+  merchant: z.string().nullable(),
+  category: z.string(),
+  member: z.string(),
+  account: z.string(),
+});
+
+const compositionSliceSchema = z.object({
+  category: z.string(),
+  isOther: z.boolean(),
+  total: moneySchema,
+  share: ratioSchema,
+  offset: ratioSchema,
+});
+
 export const spendingSchema = z.object({
   month: monthSchema,
   currencies: z.array(
@@ -219,16 +236,8 @@ export const spendingSchema = z.object({
       ),
       categoryIncreases: z.array(categoryChangeSchema),
       categoryDecreases: z.array(categoryChangeSchema),
-      largestExpenses: z.array(
-        z.object({
-          date: z.string(),
-          amount: moneySchema,
-          merchant: z.string().nullable(),
-          category: z.string(),
-          member: z.string(),
-          account: z.string(),
-        }),
-      ),
+      largestExpenses: z.array(largestExpenseSchema),
+      composition: z.array(compositionSliceSchema),
     }),
   ),
 });
@@ -269,7 +278,17 @@ export const budgetsSchema = z.object({
   currencies: z.array(
     z.object({
       currency: z.string(),
-      budgets: z.array(budgetSchema.extend({ key: z.string() })),
+      budgets: z.array(
+        budgetSchema.extend({
+          key: z.string(),
+          pace: z
+            .object({
+              elapsed: ratioSchema,
+              status: z.enum(['NOT_STARTED', 'FASTER', 'ON_PACE', 'SLOWER']),
+            })
+            .nullable(),
+        }),
+      ),
       forecast: forecastSchema.nullable(),
     }),
   ),
@@ -373,6 +392,8 @@ export const reviewSchema = z.object({
 
 export const transactionsSchema = z.object({
   month: monthSchema,
+  range: periodSchema.nullable(),
+  sort: z.enum(['date_desc', 'date_asc', 'amount_desc', 'amount_asc']),
   page: z.number(),
   pageCount: z.number(),
   total: z.number(),
@@ -442,6 +463,73 @@ export const fieldErrorSchema = z.object({
   code: z.enum(FIELD_ERROR_CODES),
 });
 
+export const evolutionSchema = z.object({
+  months: z.number(),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      months: z.array(
+        z.object({
+          key: z.string(),
+          label: z.string(),
+          shortLabel: z.string(),
+          income: moneySchema,
+          expenses: moneySchema,
+          net: moneySchema,
+          incomeBar: ratioSchema,
+          expensesBar: ratioSchema,
+        }),
+      ),
+    }),
+  ),
+});
+
+export const compareSchema = z.object({
+  first: monthOptionSchema,
+  second: monthOptionSchema,
+  months: z.array(monthOptionSchema),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      income: comparisonSchema,
+      expenses: comparisonSchema,
+      net: comparisonSchema,
+      categories: z.array(
+        z.object({
+          category: z.string(),
+          first: moneySchema,
+          second: moneySchema,
+          comparison: comparisonSchema,
+          firstBar: ratioSchema,
+          secondBar: ratioSchema,
+        }),
+      ),
+    }),
+  ),
+});
+
+export const membersSchema = z.object({ members: z.array(optionSchema) });
+
+export const memberSchema = z.object({
+  month: monthSchema,
+  member: optionSchema,
+  members: z.array(optionSchema),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      spending: moneySchema,
+      income: moneySchema,
+      transactionCount: z.number(),
+      householdSpending: moneySchema,
+      shareOfHousehold: ratioSchema.nullable(),
+      comparison: comparisonSchema,
+      composition: z.array(compositionSliceSchema),
+      byCategory: z.array(categoryAmountSchema),
+      largestExpenses: z.array(largestExpenseSchema),
+    }),
+  ),
+});
+
 export const accountsSchema = z.object({
   today: z.string(),
   accounts: z.array(
@@ -479,6 +567,12 @@ export type SignalsView = z.infer<typeof signalsSchema>;
 export type ReviewView = z.infer<typeof reviewSchema>;
 export type TransactionsView = z.infer<typeof transactionsSchema>;
 export type AccountsView = z.infer<typeof accountsSchema>;
+export type EvolutionView = z.infer<typeof evolutionSchema>;
+export type CompareView = z.infer<typeof compareSchema>;
+export type MembersView = z.infer<typeof membersSchema>;
+export type MemberView = z.infer<typeof memberSchema>;
+export type CompositionSliceView = z.infer<typeof compositionSliceSchema>;
+export type TransactionSort = TransactionsView['sort'];
 export type Comparison = z.infer<typeof comparisonSchema>;
 export type BudgetView = z.infer<typeof budgetSchema>;
 export type GoalView = z.infer<typeof goalSchema>;

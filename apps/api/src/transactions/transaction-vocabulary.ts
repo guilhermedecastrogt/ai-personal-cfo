@@ -23,3 +23,7 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export type ExpenseScope = (typeof EXPENSE_SCOPES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export type TransactionSource = (typeof TRANSACTION_SOURCES)[number];
+
+export const TRANSACTION_SORTS = ['date_desc', 'date_asc', 'amount_desc', 'amount_asc'] as const;
+
+export type TransactionSort = (typeof TRANSACTION_SORTS)[number];

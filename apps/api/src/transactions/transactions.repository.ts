@@ -1,12 +1,38 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, between, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, between, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import type { DatabaseExecutor } from '../database/database-executor.js';
 import { requireRow } from '../database/require-row.js';
 import type { NewTransaction } from './new-transaction.schema.js';
 import { transactions } from './transactions.schema.js';
+import type { TransactionSort } from './transaction-vocabulary.js';
 
 export type Transaction = typeof transactions.$inferSelect;
+
+function orderOf(sort: TransactionSort): SQL[] {
+  switch (sort) {
+    case 'date_asc':
+      return [asc(transactions.transactionDate), asc(transactions.createdAt), asc(transactions.id)];
+    case 'amount_desc':
+      return [
+        desc(transactions.amountMinor),
+        desc(transactions.transactionDate),
+        desc(transactions.id),
+      ];
+    case 'amount_asc':
+      return [
+        asc(transactions.amountMinor),
+        desc(transactions.transactionDate),
+        desc(transactions.id),
+      ];
+    case 'date_desc':
+      return [
+        desc(transactions.transactionDate),
+        desc(transactions.createdAt),
+        desc(transactions.id),
+      ];
+  }
+}
 
 function noHook(): Promise<void> {
   return Promise.resolve();
@@ -23,8 +49,14 @@ export interface TransactionSearch {
   readonly memberId?: string | undefined;
   readonly accountId?: string | undefined;
   readonly categoryIds?: readonly string[] | undefined;
+  readonly text?: string | undefined;
+  readonly sort?: TransactionSort | undefined;
   readonly limit: number;
   readonly offset: number;
+}
+
+function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 export interface TransactionChanges {
@@ -185,6 +217,17 @@ export class TransactionsRepository {
     if (search.categoryIds !== undefined) {
       conditions.push(inArray(transactions.categoryId, [...search.categoryIds]));
     }
+    const text = search.text?.trim() ?? '';
+    if (text !== '') {
+      const pattern = `%${escapeLike(text)}%`;
+      const matching = or(
+        ilike(transactions.merchant, pattern),
+        ilike(transactions.description, pattern),
+      );
+      if (matching !== undefined) {
+        conditions.push(matching);
+      }
+    }
     const where = and(...conditions);
     const [total, rows] = await Promise.all([
       this.database.$count(transactions, where),
@@ -192,11 +235,7 @@ export class TransactionsRepository {
         .select()
         .from(transactions)
         .where(where)
-        .orderBy(
-          desc(transactions.transactionDate),
-          desc(transactions.createdAt),
-          desc(transactions.id),
-        )
+        .orderBy(...orderOf(search.sort ?? 'date_desc'))
         .limit(search.limit)
         .offset(search.offset),
     ]);
