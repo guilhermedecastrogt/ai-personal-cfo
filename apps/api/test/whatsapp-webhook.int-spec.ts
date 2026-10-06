@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import request from 'supertest';
 import { AccountsRepository } from '../src/accounts/accounts.repository.js';
 import { AI_PROVIDER } from '../src/ai/ai-provider.js';
@@ -138,7 +138,8 @@ describe('WhatsApp webhook', () => {
     return testDatabase.database
       .select()
       .from(transactions)
-      .where(eq(transactions.householdId, fixture.household.id));
+      .where(eq(transactions.householdId, fixture.household.id))
+      .orderBy(asc(transactions.createdAt), asc(transactions.sourceMessageId));
   }
 
   async function eventStatus(messageId: string): Promise<string | undefined> {
