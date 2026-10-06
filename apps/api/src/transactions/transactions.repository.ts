@@ -75,6 +75,27 @@ export class TransactionsRepository {
     return rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
   }
 
+  async findBySourceMessages(
+    householdId: string,
+    sourceMessageIds: readonly string[],
+    limit: number,
+  ): Promise<Transaction[]> {
+    if (sourceMessageIds.length === 0) {
+      return [];
+    }
+    return this.database
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          inArray(transactions.sourceMessageId, [...sourceMessageIds]),
+        ),
+      )
+      .orderBy(desc(transactions.createdAt), desc(transactions.id))
+      .limit(limit);
+  }
+
   async findById(householdId: string, transactionId: string): Promise<Transaction | undefined> {
     const [transaction] = await this.database
       .select()

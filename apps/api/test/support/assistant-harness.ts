@@ -12,6 +12,7 @@ import { FinancialSnapshotBuilder } from '../../src/cfo/analysis/financial-snaps
 import { CfoService } from '../../src/cfo/cfo.service.js';
 import { ReviewExplainer } from '../../src/cfo/explanation/review-explainer.js';
 import type { AppConfig } from '../../src/config/app-config.js';
+import { CorrectionService } from '../../src/conversation/corrections/correction.service.js';
 import { ConversationsRepository } from '../../src/conversation/conversations.repository.js';
 import { TransactionExtractionService } from '../../src/conversation/extraction/transaction-extraction.service.js';
 import { FinancialAssistant } from '../../src/conversation/financial-assistant.service.js';
@@ -104,6 +105,7 @@ export async function createAssistantHarness(
     accounts,
   );
   const provider = new FakeAIProvider();
+  const conversations = new ConversationsRepository(database);
   const mediaSource = new FakeMediaSource();
   const directory = new HouseholdDirectoryService(households, accounts, categories, goals);
   const extraction = new TransactionExtractionService(transactionsService, directory, TEST_CONFIG);
@@ -129,8 +131,9 @@ export async function createAssistantHarness(
     ),
     cfo,
     finance,
-    new ConversationsRepository(database),
+    conversations,
     directory,
+    new CorrectionService(transactionsService, conversations, directory),
   );
   return {
     assistant,

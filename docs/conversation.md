@@ -15,7 +15,8 @@ flowchart TD
     Resolve --> Engine[Finance engine]
     Kind -->|transaction| Complete[Merge with the pending transaction]
     Complete --> Rules[Drafting and transaction rules]
-    Kind -->|correction| Decline[Decline: editing is not supported]
+    Kind -->|correction| Find[Find the transaction among this conversation's]
+    Find --> Apply[Apply the change, or ask yes or no to delete]
     Kind -->|unclear| Ask[Ask what is meant]
     Engine --> Reply[Model: phrase verified facts]
     Rules --> Reply
@@ -186,13 +187,28 @@ A bare yes or no ("sim", "não", "pode", "deixa", "ok") is handled without the m
 
 A message with a figure or any other content is never read as yes or no.
 
-### Corrections are not applied
+### Corrections
 
-"Actually it was €28", "I meant yesterday" and "delete that" after a recorded transaction are interpreted as corrections. The assistant replies that changing or deleting a recorded transaction is not supported yet, and changes nothing.
+"Isso foi dia 1", "foram 45", "coloca em restaurantes", "na verdade foi a Bia" and "apaga esse" are corrections ([ADR-031](adr/ADR-031-corrections-in-the-chat.md)). The model never sees transactions, so it only describes which one the member means, in the member's words, and what should change. The application finds it and applies the change.
 
-Editing is deliberately out of scope. Applying a correction means choosing which transaction is meant and changing a financial record on the strength of a model's reading of a short message, and that needs its own design with confirmation.
+**Which transactions can be corrected.** Those recorded through this conversation and still within its last 20 messages. They are found by the message identifiers stored with the conversation, so the state holds no identifier. Older ones are corrected in the dashboard, and the reply says so.
 
-The model is told what happened last, for example that a transaction was just recorded, so that a correction is recognisable. Recognising one is still the model's judgement: a correction that it reads as a new expense would be recorded as a second transaction. The reply always states what was recorded, so the member can see it.
+**Which one is meant.**
+
+- "isso" or nothing identifying: the transaction recorded by the latest message. If that message recorded several, the assistant asks which one, listing them.
+- "o primeiro", "o segundo": counts only within the latest message, in the order written.
+- A merchant, category, amount, date or member: matched in the latest message first, then across the conversation.
+- More than one match is never guessed: the assistant asks, listing up to three.
+
+**What happens.**
+
+- An edit is applied at once, through the same validation as the dashboard, and confirmed: `Corrigido: € 22,75 em Five Guys (Restaurantes), conta Revolut Bia, em 01/10.` If the transaction changed in the meantime, the edit is retried once on the current version.
+- A deletion is asked first: `Apagar este lançamento: … ? Responda sim ou não.` The "sim" or "não" is handled without the model. The deletion is applied only if the transaction is still as it was when asked. Any other message cancels the pending deletion.
+- A change that cannot apply (an unknown category, a future date, a currency that does not match the account) changes nothing, and the reply says what is needed.
+
+Corrections, like confirmations, are written by the application without the model.
+
+A correction that the model reads as a new expense would still be recorded as a second transaction. The confirmation always states what was recorded, so the member can see it.
 
 ## Images
 
@@ -223,6 +239,7 @@ Messages from one sender are processed one at a time in the order they arrived (
 
 - Recorded transactions cannot be edited or deleted through conversation.
 - A correction misread by the model as a new expense would be recorded as one.
+- Only transactions within the conversation's last 20 messages can be corrected in the chat.
 - A follow-up depends on the model listing the right slots to inherit. A wrong list produces an answer to a different question, with correct figures for that question. The reply states the category, period and member it answered for.
 - Only the previous question is remembered, not a history of them. "The one before that" is not resolvable.
 - Questions are answered in the household's currency. Accounts in other currencies appear in balances.

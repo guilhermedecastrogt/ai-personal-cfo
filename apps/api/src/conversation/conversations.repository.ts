@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, notInArray } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { requireRow } from '../database/require-row.js';
 import type { RequestContext } from '../households/request-context.js';
@@ -92,6 +92,23 @@ export class ConversationsRepository {
           eq(aiConversations.memberId, context.memberId),
         ),
       );
+  }
+
+  async recentSourceMessageIds(householdId: string, conversationId: string): Promise<string[]> {
+    const rows = await this.database
+      .select({ sourceMessageId: aiMessages.sourceMessageId })
+      .from(aiMessages)
+      .innerJoin(aiConversations, eq(aiConversations.id, aiMessages.conversationId))
+      .where(
+        and(
+          eq(aiConversations.householdId, householdId),
+          eq(aiMessages.conversationId, conversationId),
+          eq(aiMessages.role, 'USER'),
+          isNotNull(aiMessages.sourceMessageId),
+        ),
+      )
+      .orderBy(desc(aiMessages.createdAt), desc(aiMessages.id));
+    return rows.flatMap((row) => (row.sourceMessageId === null ? [] : [row.sourceMessageId]));
   }
 
   private async recentUserMessages(householdId: string, conversationId: string): Promise<string[]> {

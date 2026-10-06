@@ -45,6 +45,8 @@ export type TransactionEditOutcome =
   | { readonly status: 'NOT_FOUND' }
   | { readonly status: 'STALE' };
 
+const RECENT_TRANSACTIONS_LIMIT = 20;
+
 export type { NewTransaction, Transaction, TransactionPage, TransactionSearch };
 
 export class TransactionRejectedError extends Error {
@@ -77,6 +79,17 @@ export class TransactionsService {
     instant: Date,
   ): Promise<Transaction[]> {
     return this.transactions.createMany(householdId, batch, instant);
+  }
+
+  async findBySourceMessages(
+    householdId: string,
+    sourceMessageIds: readonly string[],
+  ): Promise<Transaction[]> {
+    return this.transactions.findBySourceMessages(
+      householdId,
+      sourceMessageIds,
+      RECENT_TRANSACTIONS_LIMIT,
+    );
   }
 
   async find(householdId: string, transactionId: string): Promise<Transaction | undefined> {

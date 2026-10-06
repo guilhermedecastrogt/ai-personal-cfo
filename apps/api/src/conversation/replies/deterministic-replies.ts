@@ -16,6 +16,16 @@ interface Wording {
   readonly notRecorded: string;
   readonly stillNeeded: (needs: string) => string;
   readonly unknownAccount: string;
+  readonly corrected: string;
+  readonly deleted: string;
+  readonly confirmDeletion: (line: string) => string;
+  readonly keptTransaction: string;
+  readonly whichOne: string;
+  readonly whichOneHint: string;
+  readonly notFound: string;
+  readonly stale: string;
+  readonly unchanged: (line: string) => string;
+  readonly notCorrected: (needs: string) => string;
 }
 
 const WORDING: Readonly<Record<Locale, Wording>> = {
@@ -34,6 +44,17 @@ const WORDING: Readonly<Record<Locale, Wording>> = {
     notRecorded: 'All right, nothing was recorded.',
     stillNeeded: (needs) => `To record it I still need ${needs}.`,
     unknownAccount: 'another account',
+    corrected: 'Corrected',
+    deleted: 'Deleted',
+    confirmDeletion: (line) => `Delete this transaction: ${line}? Reply yes or no.`,
+    keptTransaction: 'All right, nothing was deleted.',
+    whichOne: 'Which one?',
+    whichOneHint: 'Tell me the merchant or the amount.',
+    notFound:
+      'I could not find that transaction among the ones recorded in this conversation. Older ones can be corrected in the dashboard, under Transactions.',
+    stale: 'That transaction has just changed. Check it and tell me again what to correct.',
+    unchanged: (line) => `Nothing changed, it was already recorded this way: ${line}.`,
+    notCorrected: (needs) => `Nothing was changed: I need ${needs}.`,
   },
   'pt-BR': {
     recorded: 'Registrado',
@@ -51,6 +72,17 @@ const WORDING: Readonly<Record<Locale, Wording>> = {
     notRecorded: 'Certo, não registrei.',
     stillNeeded: (needs) => `Para registrar, ainda preciso saber ${needs}.`,
     unknownAccount: 'outra conta',
+    corrected: 'Corrigido',
+    deleted: 'Apagado',
+    confirmDeletion: (line) => `Apagar este lançamento: ${line}? Responda sim ou não.`,
+    keptTransaction: 'Certo, não apaguei nada.',
+    whichOne: 'Qual deles?',
+    whichOneHint: 'Diga o estabelecimento ou o valor.',
+    notFound:
+      'Não encontrei esse lançamento entre os registrados nesta conversa. Os mais antigos você corrige no painel, em Movimentos.',
+    stale: 'Esse lançamento acabou de mudar. Confira e me diga de novo o que corrigir.',
+    unchanged: (line) => `Nada mudou, o lançamento já estava assim: ${line}.`,
+    notCorrected: (needs) => `Não alterei nada, porque preciso saber ${needs}.`,
   },
 };
 
@@ -126,12 +158,65 @@ export function discardedReply(locale: Locale): string {
   return WORDING[locale].notRecorded;
 }
 
+function joinNeeds(needs: readonly string[], locale: Locale): string {
+  return needs.length < 2
+    ? (needs[0] ?? '')
+    : `${needs.slice(0, -1).join(', ')} ${locale === 'en' ? 'and' : 'e'} ${needs.at(-1) ?? ''}`;
+}
+
 export function stillNeededReply(needs: readonly string[], locale: Locale): string {
-  const joined =
-    needs.length < 2
-      ? (needs[0] ?? '')
-      : `${needs.slice(0, -1).join(', ')} ${locale === 'en' ? 'and' : 'e'} ${needs.at(-1) ?? ''}`;
-  return WORDING[locale].stillNeeded(joined);
+  return WORDING[locale].stillNeeded(joinNeeds(needs, locale));
+}
+
+export function correctedReply(summary: TransactionSummary, locale: Locale, today: string): string {
+  return `${WORDING[locale].corrected}: ${describeTransactionLine(summary, locale, today)}.`;
+}
+
+export function deletedReply(summary: TransactionSummary, locale: Locale, today: string): string {
+  return `${WORDING[locale].deleted}: ${describeTransactionLine(summary, locale, today)}.`;
+}
+
+export function confirmDeletionReply(
+  summary: TransactionSummary,
+  locale: Locale,
+  today: string,
+): string {
+  return WORDING[locale].confirmDeletion(describeTransactionLine(summary, locale, today));
+}
+
+export function keptTransactionReply(locale: Locale): string {
+  return WORDING[locale].keptTransaction;
+}
+
+export function whichOneReply(
+  summaries: readonly TransactionSummary[],
+  locale: Locale,
+  today: string,
+): string {
+  const words = WORDING[locale];
+  return [
+    words.whichOne,
+    ...summaries.map(
+      (summary) => `${capitalize(describeTransactionLine(summary, locale, today))}.`,
+    ),
+    words.whichOneHint,
+  ].join('\n');
+}
+
+export function notFoundReply(locale: Locale): string {
+  return WORDING[locale].notFound;
+}
+
+export function staleReply(locale: Locale): string {
+  return WORDING[locale].stale;
+}
+
+export function unchangedReply(summary: TransactionSummary, locale: Locale, today: string): string {
+  return WORDING[locale].unchanged(describeTransactionLine(summary, locale, today));
+}
+
+export function notCorrectedReply(needs: readonly string[], locale: Locale): string {
+  return WORDING[locale].notCorrected(joinNeeds(needs, locale));
 }
 
 function capitalize(text: string): string {

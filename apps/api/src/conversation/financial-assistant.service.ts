@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE } from '../i18n/locale.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.js';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AIProviderError,
@@ -51,15 +51,25 @@ import {
 } from './queries/financial-query.service.js';
 import { resolvePeriodReference } from './queries/period-reference.js';
 import { readConfirmation, type Confirmation } from './confirmation.js';
-import { describeStoredNeeds } from './extraction/clarification-needs.js';
+import { CorrectionService, type CorrectionOutcome } from './corrections/correction.service.js';
+import { describeNeeds, describeStoredNeeds } from './extraction/clarification-needs.js';
 import {
   acknowledgementReply,
   alreadyRecordedReply,
+  confirmDeletionReply,
+  correctedReply,
+  deletedReply,
   discardedReply,
+  keptTransactionReply,
+  notCorrectedReply,
+  notFoundReply,
   recordedReply,
+  staleReply,
   stillNeededReply,
+  unchangedReply,
+  whichOneReply,
 } from './replies/deterministic-replies.js';
-import { summarizeTransaction } from './replies/transaction-summary.js';
+import { summarizeTransaction, type TransactionSummary } from './replies/transaction-summary.js';
 import type { Transaction } from '../transactions/transactions.service.js';
 
 const IMAGE_PLACEHOLDER = '[image]';
@@ -96,7 +106,7 @@ export type AssistantOutcome =
   | { readonly kind: 'QUESTION'; readonly query: QueryOutcome }
   | { readonly kind: 'IMAGE'; readonly image: ImageOutcome }
   | { readonly kind: 'REVIEW'; readonly review: MonthlyReviewResult }
-  | { readonly kind: 'CORRECTION' }
+  | { readonly kind: 'CORRECTION'; readonly result: CorrectionOutcome }
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' }
   | { readonly kind: 'WELCOME'; readonly facts: ReplyFacts }
@@ -143,6 +153,7 @@ export class FinancialAssistant {
     private readonly finance: FinanceService,
     private readonly conversations: ConversationsRepository,
     private readonly directories: HouseholdDirectoryService,
+    private readonly corrections: CorrectionService,
   ) {}
 
   async handle(
@@ -198,6 +209,8 @@ export class FinancialAssistant {
     if (confirmed !== undefined) {
       return confirmed;
     }
+    const hadPendingDeletion = conversation.state.pendingDeletion !== null;
+    const current: ConversationState = { ...conversation.state, pendingDeletion: null };
     let interpretation: MessageInterpretation;
     try {
       interpretation = await this.interpreter.interpret(
@@ -209,13 +222,9 @@ export class FinancialAssistant {
       }
       throw error;
     }
-    const { outcome, state } = await this.act(
-      context,
-      message,
-      today,
-      conversation.state,
-      interpretation,
-    );
+    const acted = await this.act(context, message, today, conversation.id, current, interpretation);
+    const { outcome } = acted;
+    const state = acted.state ?? (hadPendingDeletion ? current : undefined);
     if (outcome.kind === 'REVIEW') {
       return { response: { reply: formatNarrative(outcome.review.narrative), outcome }, state };
     }
@@ -239,9 +248,12 @@ export class FinancialAssistant {
       return this.compose(context, plan.situation, plan.facts, userMessage);
     }
     const directory = await this.directories.load(context.householdId);
-    const summaries = plan.transactions.map((transaction) =>
-      summarizeTransaction(transaction, directory, context.memberId),
-    );
+    const summaryOf = (transaction: Transaction): TransactionSummary =>
+      summarizeTransaction(transaction, directory, context.memberId);
+    if (plan.kind === 'CORRECTION') {
+      return correctionReply(plan.result, summaryOf, locale, today);
+    }
+    const summaries = plan.transactions.map(summaryOf);
     const [first] = summaries;
     if (plan.kind === 'RECORDED_AND_ASK') {
       const question = await this.compose(context, 'CLARIFICATION_NEEDED', plan.facts, userMessage);
@@ -281,6 +293,26 @@ export class FinancialAssistant {
     const { state } = conversation;
     const pending = state.pendingTransaction;
     const acknowledged = { kind: 'ACKNOWLEDGED', confirmation } as const;
+    if (state.pendingDeletion !== null) {
+      const cleared: ConversationState = { ...state, pendingDeletion: null };
+      if (confirmation === 'NO') {
+        return {
+          response: { reply: keptTransactionReply(locale), outcome: acknowledged },
+          state: { ...cleared, lastOutcome: 'NONE' },
+        };
+      }
+      const result = await this.corrections.confirmDeletion(
+        context,
+        conversation.id,
+        state.pendingDeletion,
+        today,
+      );
+      const outcome = { kind: 'CORRECTION', result } as const;
+      return {
+        response: { reply: await this.reply(context, outcome, message.text, today), outcome },
+        state: afterCorrection(cleared, result) ?? cleared,
+      };
+    }
     if (pending === null) {
       return conversation.recentUserMessages.length === 0
         ? undefined
@@ -371,6 +403,7 @@ export class FinancialAssistant {
     context: RequestContext,
     message: IncomingMessage,
     today: IsoDate,
+    conversationId: string,
     state: ConversationState,
     interpretation: MessageInterpretation,
   ): Promise<Action> {
@@ -390,8 +423,15 @@ export class FinancialAssistant {
               completesPending: true,
             });
       }
-      case 'CORRECTION':
-        return { outcome: { kind: interpretation.kind }, state: undefined };
+      case 'CORRECTION': {
+        const result = await this.corrections.correct(
+          context,
+          conversationId,
+          interpretation.correction,
+          today,
+        );
+        return { outcome: { kind: 'CORRECTION', result }, state: afterCorrection(state, result) };
+      }
     }
   }
 
@@ -524,6 +564,7 @@ export class FinancialAssistant {
         question: query.frame ?? state.question,
         pendingTransaction: null,
         queuedTransactions: [],
+        pendingDeletion: null,
       },
     };
   }
@@ -556,6 +597,7 @@ export class FinancialAssistant {
         },
         pendingTransaction: null,
         queuedTransactions: [],
+        pendingDeletion: null,
       },
     };
   }
@@ -624,6 +666,50 @@ function afterImage(
   return undefined;
 }
 
+function afterCorrection(
+  state: ConversationState,
+  result: CorrectionOutcome,
+): ConversationState | undefined {
+  switch (result.status) {
+    case 'CORRECTED':
+      return { ...state, lastOutcome: 'TRANSACTION_CORRECTED', pendingDeletion: null };
+    case 'DELETED':
+      return { ...state, lastOutcome: 'TRANSACTION_DELETED', pendingDeletion: null };
+    case 'CONFIRM_DELETION':
+      return { ...state, lastOutcome: 'DELETION_PENDING', pendingDeletion: result.pending };
+    case 'AMBIGUOUS':
+      return { ...state, lastOutcome: 'CORRECTION_PENDING', pendingDeletion: null };
+    default:
+      return undefined;
+  }
+}
+
+function correctionReply(
+  result: CorrectionOutcome,
+  summarize: (transaction: Transaction) => TransactionSummary,
+  locale: Locale,
+  today: IsoDate,
+): string {
+  switch (result.status) {
+    case 'CORRECTED':
+      return correctedReply(summarize(result.transaction), locale, today);
+    case 'CONFIRM_DELETION':
+      return confirmDeletionReply(summarize(result.transaction), locale, today);
+    case 'DELETED':
+      return deletedReply(summarize(result.transaction), locale, today);
+    case 'AMBIGUOUS':
+      return whichOneReply(result.transactions.map(summarize), locale, today);
+    case 'UNCHANGED':
+      return unchangedReply(summarize(result.transaction), locale, today);
+    case 'REJECTED':
+      return notCorrectedReply(describeNeeds(result.reasons, locale), locale);
+    case 'STALE':
+      return staleReply(locale);
+    case 'NOT_FOUND':
+      return notFoundReply(locale);
+  }
+}
+
 function toPending(item: PendingTransaction, outcome: ExtractionOutcome): PendingTransaction {
   return outcome.status === 'NEEDS_CLARIFICATION'
     ? { ...item, candidate: outcome.candidate, reasons: [...outcome.reasons] }
@@ -651,7 +737,8 @@ type ReplyPlanned =
       readonly kind: 'RECORDED_AND_ASK';
       readonly transactions: readonly Transaction[];
       readonly facts: ReplyFacts;
-    };
+    }
+  | { readonly kind: 'CORRECTION'; readonly result: CorrectionOutcome };
 
 function compose(situation: ReplySituation, facts: ReplyFacts): ReplyPlanned {
   return { kind: 'COMPOSE', situation, facts };
@@ -669,7 +756,7 @@ function planReply(outcome: RepliedOutcome): ReplyPlanned {
     case 'IMAGE':
       return planImageReply(outcome.image);
     case 'CORRECTION':
-      return compose('EDIT_NOT_SUPPORTED', {});
+      return { kind: 'CORRECTION', result: outcome.result };
     case 'UNCLEAR':
       return compose('CLARIFICATION_NEEDED', { reasons: ['AMBIGUOUS_REFERENCE'] });
     case 'OTHER':
@@ -722,6 +809,8 @@ function summarize(outcome: AssistantOutcome): string {
       return `question:${outcome.query.status}`;
     case 'IMAGE':
       return `image:${outcome.image.status}`;
+    case 'CORRECTION':
+      return `correction:${outcome.result.status}`;
     case 'REVIEW':
       return `review:${outcome.review.narrativeSource}`;
     case 'AI_UNAVAILABLE':

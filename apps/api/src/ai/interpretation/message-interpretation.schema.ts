@@ -97,15 +97,32 @@ export const financialQuestionSchema = z.object({
   inheritFromPrevious: z.array(z.enum(QUESTION_SLOTS)),
 });
 
+export const correctionTargetSchema = z.object({
+  ordinal: z.number().int().min(1).max(MAXIMUM_TRANSACTIONS_PER_MESSAGE).nullable(),
+  merchant: z.string().nullable(),
+  amount: z.string().nullable(),
+  member: z.string().nullable(),
+  date: dateReferenceSchema,
+});
+
+export const correctionSchema = z.object({
+  action: z.enum(['EDIT', 'DELETE']),
+  target: correctionTargetSchema,
+  changes: transactionCandidateSchema,
+});
+
 export const messageInterpretationWireSchema = z.object({
   kind: z.enum(['TRANSACTION', 'QUESTION', 'CORRECTION', 'UNCLEAR', 'OTHER']),
   transactions: z.array(transactionCandidateSchema).max(MAXIMUM_TRANSACTIONS_PER_MESSAGE),
   completesPendingTransaction: z.boolean(),
   question: financialQuestionSchema.nullable(),
+  correction: correctionSchema.nullable(),
 });
 
 export type DateReference = z.infer<typeof dateReferenceSchema>;
 export type TransactionCandidate = z.infer<typeof transactionCandidateSchema>;
+export type CorrectionTarget = z.infer<typeof correctionTargetSchema>;
+export type Correction = z.infer<typeof correctionSchema>;
 export type PeriodReference = z.infer<typeof periodReferenceSchema>;
 export type FinancialQuestion = z.infer<typeof financialQuestionSchema>;
 export type FinancialIntent = (typeof FINANCIAL_INTENTS)[number];
@@ -120,7 +137,7 @@ export type MessageInterpretation =
       readonly completesPending: boolean;
     }
   | { readonly kind: 'QUESTION'; readonly question: FinancialQuestion }
-  | { readonly kind: 'CORRECTION' }
+  | { readonly kind: 'CORRECTION'; readonly correction: Correction }
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' };
 

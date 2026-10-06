@@ -6,8 +6,6 @@ const HEADLINES: Readonly<Record<Locale, Readonly<Record<ReplySituation, string>
     CLARIFICATION_NEEDED: 'I need a bit more information before I can continue.',
     QUESTION_ANSWERED: 'Here is what I found.',
     IMAGE_NOT_USABLE: 'I could not record anything from that image.',
-    EDIT_NOT_SUPPORTED:
-      'Nothing was changed here. To correct or delete a transaction, open it under Transactions in the dashboard.',
     WELCOME:
       'Welcome. I am your household CFO on WhatsApp: tell me what you spend or receive, send a photo of a receipt, or ask me about your money.',
     PROACTIVE_NOTIFICATION: 'A note about your household finances.',
@@ -18,8 +16,6 @@ const HEADLINES: Readonly<Record<Locale, Readonly<Record<ReplySituation, string>
     CLARIFICATION_NEEDED: 'Preciso de um pouco mais de informação para continuar.',
     QUESTION_ANSWERED: 'Aqui está o que encontrei.',
     IMAGE_NOT_USABLE: 'Não consegui registrar nada a partir dessa imagem.',
-    EDIT_NOT_SUPPORTED:
-      'Por aqui nada foi alterado. Para corrigir ou apagar um lançamento, abra-o em Movimentos, no painel.',
     WELCOME:
       'Seja bem-vindo. Sou o CFO da sua casa no WhatsApp: me conte o que gastou ou recebeu, envie a foto de um recibo ou pergunte sobre as suas finanças.',
     PROACTIVE_NOTIFICATION: 'Uma observação sobre as finanças da casa.',

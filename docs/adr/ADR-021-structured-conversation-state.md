@@ -1,6 +1,6 @@
 # ADR-021: Conversations carry structured state, and the model never sees its earlier replies
 
-- Status: Accepted
+- Status: Accepted. Corrections refined by [ADR-031](ADR-031-corrections-in-the-chat.md)
 - Date: 2026-10-05
 - Refines: [ADR-016](ADR-016-task-level-ai-capabilities.md)
 

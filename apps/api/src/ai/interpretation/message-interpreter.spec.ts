@@ -5,6 +5,7 @@ import {
   FakeAIProvider,
   UNCLEAR_INTERPRETATION,
   completionOf,
+  correctionInterpretation,
   OTHER_INTERPRETATION,
   questionInterpretation,
   transactionInterpretation,
@@ -60,6 +61,7 @@ describe('MessageInterpreter', () => {
         kind: 'TRANSACTION',
         transactions: [],
         question: null,
+        correction: null,
         completesPendingTransaction: false,
       }),
     ).toEqual({ kind: 'UNCLEAR' });
@@ -82,11 +84,25 @@ describe('MessageInterpreter', () => {
     expect(await interpret(OTHER_INTERPRETATION)).toEqual({ kind: 'OTHER' });
   });
 
-  it.each([
-    ['CORRECTION', CORRECTION_INTERPRETATION],
-    ['UNCLEAR', UNCLEAR_INTERPRETATION],
-  ])('returns %s without a candidate or a question', async (kind, output) => {
-    expect(await interpret(output)).toEqual({ kind });
+  it('returns UNCLEAR without a candidate or a question', async () => {
+    expect(await interpret(UNCLEAR_INTERPRETATION)).toEqual({ kind: 'UNCLEAR' });
+  });
+
+  it('returns a correction with its target and changes', async () => {
+    expect(
+      await interpret(correctionInterpretation('EDIT', { merchant: 'Lidl' }, { amount: '28' })),
+    ).toMatchObject({
+      kind: 'CORRECTION',
+      correction: {
+        action: 'EDIT',
+        target: { merchant: 'Lidl', ordinal: null },
+        changes: { amount: '28', merchant: null },
+      },
+    });
+  });
+
+  it('reads a correction that says nothing about what to change as unclear', async () => {
+    expect(await interpret(CORRECTION_INTERPRETATION)).toEqual({ kind: 'UNCLEAR' });
   });
 
   it('says whether a transaction completes the pending one', async () => {

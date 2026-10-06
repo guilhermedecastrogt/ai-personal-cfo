@@ -35,7 +35,11 @@ export class MessageInterpreter {
     if (kind === 'QUESTION' && question !== null) {
       return { kind, question };
     }
-    if (kind === 'OTHER' || kind === 'CORRECTION' || kind === 'UNCLEAR') {
+    if (kind === 'CORRECTION') {
+      const { correction } = parsed.data;
+      return correction === null ? { kind: 'UNCLEAR' } : { kind, correction };
+    }
+    if (kind === 'OTHER' || kind === 'UNCLEAR') {
       return { kind };
     }
     throw new AIProviderError('INVALID_RESPONSE');

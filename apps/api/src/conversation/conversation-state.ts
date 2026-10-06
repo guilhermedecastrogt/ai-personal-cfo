@@ -3,6 +3,7 @@ import {
   FINANCIAL_INTENTS,
   periodReferenceSchema,
   MEMBER_REFERENCES,
+  correctionTargetSchema,
   transactionCandidateSchema,
 } from '../ai/interpretation/message-interpretation.schema.js';
 
@@ -11,6 +12,10 @@ export const CONVERSATION_OUTCOMES = [
   'TRANSACTION_RECORDED',
   'TRANSACTIONS_RECORDED',
   'TRANSACTION_PENDING',
+  'TRANSACTION_CORRECTED',
+  'TRANSACTION_DELETED',
+  'CORRECTION_PENDING',
+  'DELETION_PENDING',
   'QUESTION_ANSWERED',
   'QUESTION_PENDING',
   'REVIEW_GIVEN',
@@ -45,10 +50,15 @@ export const conversationStateSchema = z.object({
     .array(pendingTransactionSchema)
     .max(MAXIMUM_QUEUED_TRANSACTIONS)
     .default([]),
+  pendingDeletion: z
+    .object({ target: correctionTargetSchema, version: z.iso.datetime() })
+    .nullable()
+    .default(null),
 });
 
 export type QuestionFrame = z.infer<typeof questionFrameSchema>;
 export type PendingTransaction = z.infer<typeof pendingTransactionSchema>;
+export type PendingDeletion = NonNullable<ConversationState['pendingDeletion']>;
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
 export const EMPTY_CONVERSATION_STATE: ConversationState = {
@@ -56,6 +66,7 @@ export const EMPTY_CONVERSATION_STATE: ConversationState = {
   question: null,
   pendingTransaction: null,
   queuedTransactions: [],
+  pendingDeletion: null,
 };
 
 const MILLISECONDS_PER_MINUTE = 60_000;

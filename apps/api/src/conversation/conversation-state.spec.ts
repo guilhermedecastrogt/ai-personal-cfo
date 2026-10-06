@@ -16,6 +16,7 @@ const STATE = {
   },
   pendingTransaction: null,
   queuedTransactions: [],
+  pendingDeletion: null,
 };
 
 function read(stored: unknown, minutesLater: number, storedAt: Date | null = STORED_AT): unknown {
@@ -34,9 +35,10 @@ describe('readConversationState', () => {
   });
 
   it('reads a state saved before transactions could be queued', () => {
-    const { queuedTransactions, ...older } = STATE;
+    const { queuedTransactions, pendingDeletion, ...older } = STATE;
 
     expect(queuedTransactions).toEqual([]);
+    expect(pendingDeletion).toBeNull();
     expect(read(older, 5)).toEqual(STATE);
   });
 

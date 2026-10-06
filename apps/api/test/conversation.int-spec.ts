@@ -3,13 +3,14 @@ import { eq } from 'drizzle-orm';
 import { AI_UNAVAILABLE_REPLY } from '../src/ai/reply/fallback-reply.js';
 import {
   completionOf,
-  CORRECTION_INTERPRETATION,
+  correctionInterpretation,
   transactionsInterpretation,
   OTHER_INTERPRETATION,
   imageReading,
   questionInterpretation,
   transactionInterpretation,
   UNCLEAR_INTERPRETATION,
+  UNSPECIFIED_DATE,
   UNSPECIFIED_PERIOD,
 } from '../src/ai/testing/fake-ai-provider.fixture.js';
 import { categories } from '../src/categories/categories.schema.js';
@@ -1379,38 +1380,182 @@ describe('conversational assistant', () => {
       expect(await recorded(fixture)).toEqual([]);
     });
 
-    it.each(['Actually it was €28', 'I meant yesterday', 'Delete that'])(
-      'does not change a recorded transaction when told "%s"',
-      async (correction) => {
-        const fixture = await createHouseholdFixture(
-          testDatabase.database,
-          `Correction ${correction}`,
-          1,
-        );
-        await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
-        const before = await recorded(fixture);
+    const YESTERDAY_REFERENCE = { ...UNSPECIFIED_DATE, kind: 'YESTERDAY' as const };
+    const FIRST_OF_MONTH = { ...UNSPECIFIED_DATE, kind: 'DAY_OF_MONTH' as const, dayOfMonth: 1 };
 
-        const response = await say(fixture, correction, CORRECTION_INTERPRETATION);
+    it.each([
+      ['Actually it was €28', { amount: '28' }, { amountMinor: 2800 }, 'Corrected: €28.00 at Lidl'],
+      [
+        'I meant yesterday',
+        { date: YESTERDAY_REFERENCE },
+        { transactionDate: '2026-10-19' },
+        'Corrected: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-19.',
+      ],
+      [
+        'isso foi dia 1',
+        { date: FIRST_OF_MONTH },
+        { transactionDate: '2026-10-01' },
+        'Corrected: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-01.',
+      ],
+    ])('applies "%s" to the transaction just recorded', async (text, changes, stored, reply) => {
+      const fixture = await createHouseholdFixture(testDatabase.database, `Fix ${text}`, 1);
+      await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
+      const replies = harness.provider.replyRequests.length;
 
-        expect(response.outcome).toEqual({ kind: 'CORRECTION' });
-        expect(harness.provider.replyRequests.at(-1)).toMatchObject({
-          situation: 'EDIT_NOT_SUPPORTED',
-          facts: {},
-        });
-        expect(await recorded(fixture)).toEqual(before);
-        expect(before).toEqual([
-          expect.objectContaining({ amountMinor: 2300, transactionDate: '2026-10-20' }),
-        ]);
-      },
-    );
+      const response = await say(fixture, text, correctionInterpretation('EDIT', {}, changes));
+
+      expect(response.reply.startsWith(reply)).toBe(true);
+      expect(harness.provider.replyRequests).toHaveLength(replies);
+      expect(await recorded(fixture)).toEqual([expect.objectContaining(stored)]);
+    });
+
+    it('deletes only after a yes, without asking the model what the yes means', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Delete Yes', 1);
+      await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
+
+      const asked = await say(fixture, 'apaga esse', correctionInterpretation('DELETE'));
+      const kept = await recorded(fixture);
+      const interpreted = harness.provider.interpretationRequests.length;
+      const confirmed = await answer(fixture, 'sim');
+
+      expect(asked.reply).toBe(
+        'Delete this transaction: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-20? Reply yes or no.',
+      );
+      expect(kept).toHaveLength(1);
+      expect(confirmed.reply).toBe(
+        'Deleted: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-20.',
+      );
+      expect(harness.provider.interpretationRequests).toHaveLength(interpreted);
+      expect(await recorded(fixture)).toEqual([]);
+    });
+
+    it('keeps the transaction on a no, and forgets the deletion once the subject changes', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Delete No', 1);
+      await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
+
+      await say(fixture, 'apaga esse', correctionInterpretation('DELETE'));
+      const refused = await answer(fixture, 'não');
+      await say(fixture, 'apaga esse', correctionInterpretation('DELETE'));
+      await say(
+        fixture,
+        'How much did we spend this month?',
+        questionInterpretation({ period: CURRENT_MONTH }),
+      );
+      const late = await answer(fixture, 'sim');
+
+      expect(refused.reply).toBe('All right, nothing was deleted.');
+      expect(late.reply).toBe('All right.');
+      expect(await recorded(fixture)).toHaveLength(1);
+    });
+
+    it('asks which one when the last message recorded several, then corrects the one named', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Which One', 1);
+      await say(
+        fixture,
+        'gastei 10,65 no café e 117,72 no lidl',
+        transactionsInterpretation(
+          { amount: '10.65', merchant: 'Café Central', category: 'Coffee' },
+          { amount: '117.72', merchant: 'Lidl', category: 'Groceries' },
+        ),
+      );
+
+      const asked = await say(
+        fixture,
+        'isso foi dia 1',
+        correctionInterpretation('EDIT', {}, { date: FIRST_OF_MONTH }),
+      );
+      const corrected = await say(
+        fixture,
+        'o do lidl',
+        correctionInterpretation('EDIT', { merchant: 'lidl' }, { date: FIRST_OF_MONTH }),
+      );
+      const second = await say(
+        fixture,
+        'o primeiro foi 11',
+        correctionInterpretation('EDIT', { ordinal: 1 }, { amount: '11' }),
+      );
+      const rows = await recorded(fixture);
+
+      expect(asked.reply).toBe(
+        [
+          'Which one?',
+          '€10.65 at Café Central (Coffee), account Joint Account, on 2026-10-20.',
+          '€117.72 at Lidl (Groceries), account Joint Account, on 2026-10-20.',
+          'Tell me the merchant or the amount.',
+        ].join('\n'),
+      );
+      expect(corrected.reply).toMatch(/^Corrected: €117\.72 at Lidl .* on 2026-10-01\.$/);
+      expect(second.reply).toMatch(/^Corrected: €11\.00 at Café Central/);
+      expect(rows.find((row) => row.merchant === 'Lidl')?.transactionDate).toBe('2026-10-01');
+      expect(rows.find((row) => row.merchant === 'Café Central')).toMatchObject({
+        amountMinor: 1100,
+        transactionDate: '2026-10-20',
+      });
+    });
+
+    it('reaches only transactions recorded in this conversation', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Other Chat', 2);
+      const other = await createHouseholdFixture(testDatabase.database, 'Other Home', 1);
+      await say(fixture, 'I spent €23 at Lidl', transactionInterpretation(), { member: 1 });
+      await say(other, 'I spent €23 at Lidl', transactionInterpretation());
+
+      const response = await say(
+        fixture,
+        'apaga o do lidl',
+        correctionInterpretation('DELETE', { merchant: 'Lidl' }),
+      );
+
+      expect(response.reply).toBe(
+        'I could not find that transaction among the ones recorded in this conversation. Older ones can be corrected in the dashboard, under Transactions.',
+      );
+      expect(await recorded(fixture)).toHaveLength(1);
+      expect(await recorded(other)).toHaveLength(1);
+    });
+
+    it('refuses a deletion confirmed after the transaction changed elsewhere', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Changed Meanwhile', 1);
+      await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
+      await say(fixture, 'apaga esse', correctionInterpretation('DELETE'));
+      const [row] = await recorded(fixture);
+      if (row === undefined) {
+        throw new Error('expected a recorded transaction');
+      }
+      await harness.transactionsService.edit(
+        fixture.household.id,
+        row.id,
+        row.updatedAt.toISOString(),
+        {
+          type: row.type,
+          amountMinor: 2500,
+          memberId: row.memberId,
+          accountId: row.accountId,
+          categoryId: row.categoryId,
+          merchant: row.merchant,
+          description: row.description,
+          expenseScope: row.expenseScope,
+          transactionDate: row.transactionDate,
+        },
+      );
+
+      const response = await answer(fixture, 'sim');
+
+      expect(response.reply).toBe(
+        'That transaction has just changed. Check it and tell me again what to correct.',
+      );
+      expect(await recorded(fixture)).toEqual([expect.objectContaining({ amountMinor: 2500 })]);
+    });
 
     it('tells the model that a transaction was just recorded', async () => {
       const fixture = await createHouseholdFixture(testDatabase.database, 'Last Outcome', 1);
       await say(fixture, 'I spent €23 at Lidl', transactionInterpretation());
 
-      await say(fixture, 'Actually it was €28', CORRECTION_INTERPRETATION);
+      await say(
+        fixture,
+        'Actually it was €28',
+        correctionInterpretation('EDIT', {}, { amount: '28' }),
+      );
 
-      expect(harness.provider.interpretationRequests[1]?.conversation).toMatchObject({
+      expect(harness.provider.interpretationRequests.at(-1)?.conversation).toMatchObject({
         lastOutcome: 'TRANSACTION_RECORDED',
         pendingTransaction: null,
         recentUserMessages: ['I spent €23 at Lidl'],

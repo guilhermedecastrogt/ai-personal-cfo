@@ -11,6 +11,7 @@ import type {
   DateReference,
   FinancialQuestion,
   PeriodReference,
+  CorrectionTarget,
   TransactionCandidate,
 } from '../interpretation/message-interpretation.schema.js';
 
@@ -65,6 +66,7 @@ export function transactionsInterpretation(
     question: null,
     completesPendingTransaction: false,
     transactions: candidates.map((overrides) => transactionCandidate(overrides)),
+    correction: null,
   };
 }
 
@@ -76,6 +78,7 @@ export function questionInterpretation(overrides: Partial<FinancialQuestion> = {
   return {
     kind: 'QUESTION',
     transactions: [],
+    correction: null,
     completesPendingTransaction: false,
     question: {
       intent: 'SPENDING_TOTAL',
@@ -105,6 +108,7 @@ export function completionOf(
   return {
     kind: 'TRANSACTION',
     question: null,
+    correction: null,
     completesPendingTransaction: true,
     transactions: [
       {
@@ -129,7 +133,53 @@ export function completionOf(
 }
 
 function bareInterpretation(kind: 'OTHER' | 'CORRECTION' | 'UNCLEAR'): unknown {
-  return { kind, transactions: [], question: null, completesPendingTransaction: false };
+  return {
+    kind,
+    transactions: [],
+    question: null,
+    correction: null,
+    completesPendingTransaction: false,
+  };
+}
+
+export function correctionInterpretation(
+  action: 'EDIT' | 'DELETE',
+  target: Partial<CorrectionTarget> = {},
+  changes: Partial<TransactionCandidate> = {},
+): unknown {
+  return {
+    kind: 'CORRECTION',
+    transactions: [],
+    question: null,
+    completesPendingTransaction: false,
+    correction: {
+      action,
+      target: {
+        ordinal: null,
+        merchant: null,
+        amount: null,
+        member: null,
+        date: UNSPECIFIED_DATE,
+        ...target,
+      },
+      changes: {
+        type: null,
+        amount: null,
+        currency: null,
+        merchant: null,
+        description: null,
+        category: null,
+        account: null,
+        transferAccount: null,
+        member: null,
+        memberReference: 'SENDER',
+        paymentMethod: null,
+        date: UNSPECIFIED_DATE,
+        confidence: 0.95,
+        ...changes,
+      },
+    },
+  };
 }
 
 export const OTHER_INTERPRETATION = bareInterpretation('OTHER');

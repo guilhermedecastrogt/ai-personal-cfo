@@ -82,11 +82,13 @@ describe('architecture', () => {
 
   it('lets the conversation layer reach data only through application services', () => {
     const conversation = within('conversation/');
-    const ownRepository = './conversations.repository.js';
+    const ownRepository = /^(\.|\.\.)\/conversations\.repository\.js$/;
 
     expect(
       offenders(conversation, (file) =>
-        importsOf(file).some((name) => name.endsWith('.repository.js') && name !== ownRepository),
+        importsOf(file).some(
+          (name) => name.endsWith('.repository.js') && !ownRepository.test(name),
+        ),
       ),
     ).toEqual([]);
     expect(
@@ -119,7 +121,9 @@ describe('architecture', () => {
   it('keeps conversation state free of figures and identifiers', () => {
     const state = files.find((file) => file.path === 'conversation/conversation-state.ts');
 
-    expect(state?.text).not.toMatch(/Minor|BasisPoints|householdId|memberId|accountId|uuid/);
+    expect(state?.text).not.toMatch(
+      /Minor|BasisPoints|householdId|memberId|accountId|transactionId|goalId|uuid/,
+    );
   });
 
   it('resolves the household from the request context before any financial operation', () => {
