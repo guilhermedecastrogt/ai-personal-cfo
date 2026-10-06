@@ -51,6 +51,8 @@ export const dateReferenceSchema = z.object({
   isoDate: z.string().nullable(),
 });
 
+export const MEMBER_REFERENCES = ['SENDER', 'NAMED', 'THIRD_PERSON_UNSTATED'] as const;
+
 export const transactionCandidateSchema = z.object({
   type: z.enum(TRANSACTION_TYPES).nullable(),
   amount: z.string().nullable(),
@@ -61,6 +63,7 @@ export const transactionCandidateSchema = z.object({
   account: z.string().nullable(),
   transferAccount: z.string().nullable(),
   member: z.string().nullable(),
+  memberReference: z.enum(MEMBER_REFERENCES),
   paymentMethod: z.enum(PAYMENT_METHODS).nullable(),
   date: dateReferenceSchema,
   confidence: z.number().min(0).max(1),

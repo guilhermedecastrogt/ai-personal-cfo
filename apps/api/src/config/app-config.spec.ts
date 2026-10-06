@@ -40,6 +40,7 @@ describe('loadAppConfig', () => {
       databaseUrl: DATABASE_URL,
       openaiApiKey: 'test-key',
       openaiModel: 'test-model',
+      openaiReasoningEffort: 'low',
       aiConfidenceThreshold: 0.8,
       kapsoApiKey: 'kapso-key',
       kapsoWebhookSecret: 'kapso-secret',

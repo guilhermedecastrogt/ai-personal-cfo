@@ -12,6 +12,7 @@ const EMPTY: TransactionCandidate = {
   account: null,
   transferAccount: null,
   member: null,
+  memberReference: 'SENDER',
   paymentMethod: null,
   date: UNSPECIFIED_DATE,
   confidence: 0.95,

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   FINANCIAL_INTENTS,
   periodReferenceSchema,
+  MEMBER_REFERENCES,
   transactionCandidateSchema,
 } from '../ai/interpretation/message-interpretation.schema.js';
 
@@ -24,7 +25,10 @@ export const questionFrameSchema = z.object({
 });
 
 export const pendingTransactionSchema = z.object({
-  candidate: transactionCandidateSchema.extend({ member: z.string().nullable().default(null) }),
+  candidate: transactionCandidateSchema.extend({
+    member: z.string().nullable().default(null),
+    memberReference: z.enum(MEMBER_REFERENCES).default('SENDER'),
+  }),
   reasons: z.array(z.string()),
   medium: z.enum(['TEXT', 'IMAGE']),
   sourceMessageId: z.string().nullable(),

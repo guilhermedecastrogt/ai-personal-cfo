@@ -3,7 +3,6 @@ import type { ReplyFacts, ReplySituation } from '../ai-provider.js';
 
 const HEADLINES: Readonly<Record<Locale, Readonly<Record<ReplySituation, string>>>> = {
   en: {
-    TRANSACTION_RECORDED: 'Recorded.',
     CLARIFICATION_NEEDED: 'I need a bit more information before I can continue.',
     QUESTION_ANSWERED: 'Here is what I found.',
     IMAGE_NOT_USABLE: 'I could not record anything from that image.',
@@ -16,7 +15,6 @@ const HEADLINES: Readonly<Record<Locale, Readonly<Record<ReplySituation, string>
       'I can record expenses and income, and answer questions about spending, budgets, goals and balances.',
   },
   'pt-BR': {
-    TRANSACTION_RECORDED: 'Registrado.',
     CLARIFICATION_NEEDED: 'Preciso de um pouco mais de informação para continuar.',
     QUESTION_ANSWERED: 'Aqui está o que encontrei.',
     IMAGE_NOT_USABLE: 'Não consegui registrar nada a partir dessa imagem.',

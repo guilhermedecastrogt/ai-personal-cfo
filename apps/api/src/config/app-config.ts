@@ -12,6 +12,7 @@ export interface AppConfig {
   readonly databaseUrl: string;
   readonly openaiApiKey: string;
   readonly openaiModel: string;
+  readonly openaiReasoningEffort: Environment['OPENAI_REASONING_EFFORT'];
   readonly aiConfidenceThreshold: number;
   readonly kapsoApiKey: string;
   readonly kapsoWebhookSecret: string;
@@ -51,6 +52,7 @@ export function loadAppConfig(variables: Variables): AppConfig {
     databaseUrl: environment.DATABASE_URL,
     openaiApiKey: environment.OPENAI_API_KEY,
     openaiModel: environment.OPENAI_MODEL,
+    openaiReasoningEffort: environment.OPENAI_REASONING_EFFORT,
     aiConfidenceThreshold: environment.AI_CONFIDENCE_THRESHOLD,
     kapsoApiKey: environment.KAPSO_API_KEY,
     kapsoWebhookSecret: environment.KAPSO_WEBHOOK_SECRET,

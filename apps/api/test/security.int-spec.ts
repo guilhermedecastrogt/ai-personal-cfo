@@ -278,6 +278,7 @@ describe('security', () => {
       databaseUrl: testDatabase.url,
       openaiApiKey: OPENAI_TEST_KEY,
       openaiModel: 'unused',
+      openaiReasoningEffort: 'low',
       aiConfidenceThreshold: 0.8,
       kapsoApiKey: KAPSO_TEST_API_KEY,
       kapsoWebhookSecret: KAPSO_TEST_SECRET,

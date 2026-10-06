@@ -19,6 +19,7 @@ import type {
 import { FinanceService } from '../src/finance/application/finance.service.js';
 import { calendarMonth } from '../src/finance/domain/period/period.js';
 import { GoalsRepository } from '../src/goals/goals.repository.js';
+import { households } from '../src/households/households.schema.js';
 import type { RequestContext } from '../src/households/request-context.js';
 import { TransactionsRepository } from '../src/transactions/transactions.repository.js';
 import {
@@ -152,19 +153,12 @@ describe('financial assistant', () => {
     it('confirms with the verified amount, not with anything the model computed', async () => {
       const fixture = await householdWithDefaultAccount('Confirmation');
 
-      await send(fixture, 'Gastei €23 no Lidl', transactionInterpretation());
+      const response = await send(fixture, 'Gastei €23 no Lidl', transactionInterpretation());
 
-      expect(provider.replyRequests[0]).toMatchObject({
-        situation: 'TRANSACTION_RECORDED',
-        facts: {
-          kind: 'expense',
-          amount: '€23.00',
-          merchant: 'Lidl',
-          category: 'Groceries',
-          account: 'Joint Account',
-          date: '2026-10-20',
-        },
-      });
+      expect(response.reply).toBe(
+        'Recorded: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-20.',
+      );
+      expect(provider.replyRequests).toEqual([]);
     });
 
     it('records valid income in the currency of the account when none was stated', async () => {
@@ -763,15 +757,42 @@ describe('financial assistant', () => {
       },
     );
 
-    it('keeps the recorded transaction and confirms plainly when only the reply fails', async () => {
+    it('confirms a recorded transaction without the model, so a reply failure cannot affect it', async () => {
       const fixture = await householdWithDefaultAccount('Reply Failure');
       provider.willFailToReply('UNAVAILABLE');
 
       const response = await send(fixture, 'Gastei €23 no Lidl', transactionInterpretation());
 
       expect(await transactions.list(fixture.household.id)).toHaveLength(1);
-      expect(response.reply).toContain('Recorded.');
-      expect(response.reply).toContain('amount: €23.00');
+      expect(response.reply).toBe(
+        'Recorded: €23.00 at Lidl (Groceries), account Joint Account, on 2026-10-20.',
+      );
+    });
+
+    it('confirms in Brazilian Portuguese for a Portuguese household, without a question', async () => {
+      const fixture = await householdWithDefaultAccount('Confirmação');
+      await testDatabase.database
+        .update(households)
+        .set({ locale: 'pt-BR' })
+        .where(eq(households.id, fixture.household.id));
+
+      provider.willInterpretAs(
+        transactionInterpretation({
+          amount: '22.75',
+          merchant: 'five guys',
+          category: 'Restaurantes',
+        }),
+      );
+      const response = await assistant.handle(
+        { ...contextOf(fixture), locale: 'pt-BR' },
+        { text: 'gastei 22,75 no five guys' },
+        INSTANT,
+      );
+
+      expect(response.reply.replace(/\s/g, ' ')).toBe(
+        'Registrado: € 22,75 em Five Guys (Restaurantes), conta Joint Account, em 20/10.',
+      );
+      expect(response.reply).not.toContain('?');
     });
   });
 
@@ -821,7 +842,8 @@ describe('financial assistant', () => {
       const response = await send(fixture, 'Gastei €23 no Lidl', transactionInterpretation());
 
       expect(response.outcome.kind).toBe('TRANSACTION');
-      expect(provider.replyRequests.at(-1)?.situation).toBe('TRANSACTION_RECORDED');
+      expect(response.reply).toMatch(/^Recorded: /);
+      expect(provider.replyRequests).toEqual([]);
     });
 
     it('accepts a welcome that uses the example amounts, and falls back when one is invented', async () => {

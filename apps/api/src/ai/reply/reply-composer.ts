@@ -4,10 +4,17 @@ import {
   AIProviderError,
   type AIProvider,
   type ReplyRequest,
+  type ReplySituation,
 } from '../ai-provider.js';
 import { normalizeAssistantVoice } from '../voice.js';
 import { renderFallbackReply } from './fallback-reply.js';
 import { findUnverifiedFigures } from './reply-guard.js';
+import { withoutTrailingQuestion } from './reply-shape.js';
+
+const SITUATIONS_THAT_ASK: ReadonlySet<ReplySituation> = new Set([
+  'CLARIFICATION_NEEDED',
+  'WELCOME',
+]);
 
 @Injectable()
 export class ReplyComposer {
@@ -17,7 +24,10 @@ export class ReplyComposer {
 
   async compose(request: ReplyRequest): Promise<string> {
     try {
-      const reply = normalizeAssistantVoice(await this.provider.composeReply(request)).trim();
+      const voiced = normalizeAssistantVoice(await this.provider.composeReply(request)).trim();
+      const reply = SITUATIONS_THAT_ASK.has(request.situation)
+        ? voiced
+        : withoutTrailingQuestion(voiced);
       if (reply === '') {
         return this.fallback(request, 'empty reply');
       }

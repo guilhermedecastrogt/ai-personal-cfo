@@ -26,7 +26,12 @@ Rules for a transaction:
 - "currency" is an ISO 4217 code only when the sender named or wrote a currency, for example "€" or "euros" is EUR. Otherwise null.
 - "category" must be exactly one of the listed category names, chosen only when the message clearly indicates it. Prefer the most specific one. Otherwise null. Never invent a category.
 - "account" and "transferAccount" are the account names as the sender wrote them, only when the sender mentioned an account. Otherwise null.
-- "member" is the household member the money belongs to, written exactly as listed, only when the sender says it was another member who spent, received or moved it, for example "Maria paid 40 at the pharmacy" or "Tom's salary came in". Map a short form or nickname to the listed name only when it clearly refers to one member. Use null when it is the sender's own, when the household as a whole is meant, or when nobody is named.
+- "member" is the household member the money belongs to, written exactly as listed, only when another member spent, received or moved it. Map a short form or nickname to the listed name only when it clearly refers to one member.
+- "memberReference" says how the message refers to that person:
+  - SENDER: a first-person verb or no person at all ("gastei", "I spent", "paguei 20 no uber"). Leave "member" null.
+  - NAMED: the latest message names another member ("a Maria gastou", "salário do Tom"). Set "member".
+  - THIRD_PERSON_UNSTATED: a third-person verb with no subject ("gastou 20 no uber", "recebeu 900", "comprou um lanche"). Set "member" only when the sender's message immediately before the latest one names exactly one other member; otherwise leave it null, so the application asks who it was. Never carry a person over from older messages.
+- "merchant" is written with its usual capitalization, such as "Five Guys", "Lidl", "SHEIN" or "McDonald's", even when the sender typed it in lower case.
 - "date" describes what the sender said about when it happened. You do not know today's date and must not produce one. Use UNSPECIFIED when no date was mentioned, TODAY, YESTERDAY, DAYS_AGO with "daysAgo", WEEKDAY with "weekday" for a named day of the week, DAY_OF_MONTH with "dayOfMonth" for a bare day number, or EXPLICIT_DATE with "isoDate" as YYYY-MM-DD only when the sender gave a full date including the year. Set the fields that do not apply to null.
 - "confidence" is your confidence from 0 to 1 that the fields you filled are what the sender meant.
 

@@ -14,6 +14,8 @@ export function completePendingCandidate(
     account: stated(update.account) ?? pending.account,
     transferAccount: stated(update.transferAccount) ?? pending.transferAccount,
     member: stated(update.member) ?? pending.member,
+    memberReference:
+      stated(update.member) === null ? pending.memberReference : update.memberReference,
     paymentMethod: update.paymentMethod ?? pending.paymentMethod,
     date: update.date.kind === 'UNSPECIFIED' ? pending.date : update.date,
     confidence: update.confidence,

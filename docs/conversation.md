@@ -166,6 +166,22 @@ The amount comes from the stored candidate, which came from the member's own mes
 
 A completing message with nothing pending is treated as a new, incomplete transaction and leads to a question.
 
+### Whose transaction it is
+
+The model says how the message refers to the person: the sender ("gastei"), a named member ("a Bia gastou") or a third-person verb with no subject ("gastou 20 no uber"). A third-person message takes a member only from the sender's message immediately before it, when that one named exactly one member. Otherwise the application asks who it was, listing the members, and a reply with just the name completes it. A person is never carried over from older messages.
+
+### Yes and no
+
+A bare yes or no ("sim", "não", "pode", "deixa", "ok") is handled without the model:
+
+| Pending                       | "sim"                                  | "não"        |
+| ----------------------------- | -------------------------------------- | ------------ |
+| A transaction, low confidence | Recorded as understood                 | Dropped      |
+| A transaction, missing data   | The reply repeats what is still needed | Dropped      |
+| Nothing                       | Acknowledged                           | Acknowledged |
+
+A message with a figure or any other content is never read as yes or no.
+
 ### Corrections are not applied
 
 "Actually it was €28", "I meant yesterday" and "delete that" after a recorded transaction are interpreted as corrections. The assistant replies that changing or deleting a recorded transaction is not supported yet, and changes nothing.
@@ -180,7 +196,7 @@ An image is handled by the image flow ([vision-extraction.md](vision-extraction.
 
 ## Replies and fallback
 
-Replies are composed as before ([ai-integration.md](ai-integration.md)): the model phrases facts the application supplies as finished text, and a reply containing any number that is not among those facts is replaced by a plain rendering of the facts.
+A recorded transaction is confirmed by the application, without the model, from the saved row ([ADR-030](adr/ADR-030-deterministic-confirmations.md)). Other replies are composed as before ([ai-integration.md](ai-integration.md)): the model phrases facts the application supplies as finished text, and a reply containing any number that is not among those facts is replaced by a plain rendering of the facts. No reply offers to do more, and only a clarification ends with a question.
 
 | Failure                                                 | Result                                                                                                                           |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |

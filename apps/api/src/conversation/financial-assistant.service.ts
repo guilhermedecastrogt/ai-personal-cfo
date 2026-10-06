@@ -44,6 +44,17 @@ import {
   type QueryOutcome,
 } from './queries/financial-query.service.js';
 import { resolvePeriodReference } from './queries/period-reference.js';
+import { readConfirmation, type Confirmation } from './confirmation.js';
+import { describeStoredNeeds } from './extraction/clarification-needs.js';
+import {
+  acknowledgementReply,
+  alreadyRecordedReply,
+  discardedReply,
+  recordedReply,
+  stillNeededReply,
+} from './replies/deterministic-replies.js';
+import { summarizeTransaction } from './replies/transaction-summary.js';
+import type { Transaction } from '../transactions/transactions.service.js';
 
 const IMAGE_PLACEHOLDER = '[image]';
 
@@ -78,6 +89,7 @@ export type AssistantOutcome =
   | { readonly kind: 'UNCLEAR' }
   | { readonly kind: 'OTHER' }
   | { readonly kind: 'WELCOME'; readonly facts: ReplyFacts }
+  | { readonly kind: 'ACKNOWLEDGED'; readonly confirmation: Confirmation }
   | { readonly kind: 'AI_UNAVAILABLE'; readonly category: AIFailureCategory };
 
 export interface AssistantResponse {
@@ -85,7 +97,15 @@ export interface AssistantResponse {
   readonly outcome: AssistantOutcome;
 }
 
-type ActedOutcome = Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' | 'IMAGE' }>;
+type ActedOutcome = Exclude<
+  AssistantOutcome,
+  { kind: 'AI_UNAVAILABLE' | 'IMAGE' | 'ACKNOWLEDGED' }
+>;
+
+type RepliedOutcome = Exclude<
+  AssistantOutcome,
+  { kind: 'AI_UNAVAILABLE' | 'REVIEW' | 'ACKNOWLEDGED' }
+>;
 
 interface Turn {
   readonly response: AssistantResponse;
@@ -95,11 +115,6 @@ interface Turn {
 interface Action {
   readonly outcome: ActedOutcome;
   readonly state: ConversationState | undefined;
-}
-
-interface ReplyPlan {
-  readonly situation: ReplySituation;
-  readonly facts: ReplyFacts;
 }
 
 @Injectable()
@@ -168,6 +183,10 @@ export class FinancialAssistant {
     today: IsoDate,
     conversation: OpenConversation,
   ): Promise<Turn> {
+    const confirmed = await this.answerWithoutInterpreter(context, message, today, conversation);
+    if (confirmed !== undefined) {
+      return confirmed;
+    }
     let interpretation: MessageInterpretation;
     try {
       interpretation = await this.interpreter.interpret(
@@ -193,13 +212,92 @@ export class FinancialAssistant {
       outcome.kind === 'OTHER' && conversation.recentUserMessages.length === 0
         ? await this.welcome(context)
         : outcome;
-    const reply = await this.replies.compose({
-      ...planReply(settled),
-      userMessage: message.text,
-      senderName: context.memberName,
-      locale: context.locale ?? DEFAULT_LOCALE,
-    });
+    const reply = await this.reply(context, settled, message.text, today);
     return { response: { reply, outcome: settled }, state };
+  }
+
+  private async reply(
+    context: RequestContext,
+    outcome: RepliedOutcome,
+    userMessage: string,
+    today: IsoDate,
+  ): Promise<string> {
+    const locale = context.locale ?? DEFAULT_LOCALE;
+    const plan = planReply(outcome);
+    if (plan.kind === 'COMPOSE') {
+      return this.replies.compose({
+        situation: plan.situation,
+        facts: plan.facts,
+        userMessage,
+        senderName: context.memberName,
+        locale,
+      });
+    }
+    const directory = await this.directories.load(context.householdId);
+    const summaries = plan.transactions.map((transaction) =>
+      summarizeTransaction(transaction, directory, context.memberId),
+    );
+    const [first] = summaries;
+    return plan.alreadyRecorded && first !== undefined
+      ? alreadyRecordedReply(first, locale, today)
+      : recordedReply(summaries, locale, today);
+  }
+
+  private async answerWithoutInterpreter(
+    context: RequestContext,
+    message: IncomingMessage,
+    today: IsoDate,
+    conversation: OpenConversation,
+  ): Promise<Turn | undefined> {
+    const confirmation = readConfirmation(message.text);
+    if (confirmation === undefined) {
+      return undefined;
+    }
+    const locale = context.locale ?? DEFAULT_LOCALE;
+    const { state } = conversation;
+    const pending = state.pendingTransaction;
+    const acknowledged = { kind: 'ACKNOWLEDGED', confirmation } as const;
+    if (pending === null) {
+      return conversation.recentUserMessages.length === 0
+        ? undefined
+        : {
+            response: { reply: acknowledgementReply(locale), outcome: acknowledged },
+            state: undefined,
+          };
+    }
+    if (confirmation === 'NO') {
+      return {
+        response: { reply: discardedReply(locale), outcome: acknowledged },
+        state: { ...state, lastOutcome: 'NONE', pendingTransaction: null },
+      };
+    }
+    if (!pending.reasons.every((reason) => reason === 'LOW_CONFIDENCE')) {
+      return {
+        response: {
+          reply: stillNeededReply(describeStoredNeeds(pending.reasons, locale), locale),
+          outcome: acknowledged,
+        },
+        state: undefined,
+      };
+    }
+    const { outcome, state: recorded } = await this.recordTransaction(
+      context,
+      message,
+      today,
+      state,
+      {
+        kind: 'TRANSACTION',
+        transaction: { ...pending.candidate, confidence: 1 },
+        completesPending: true,
+      },
+    );
+    if (outcome.kind !== 'TRANSACTION') {
+      return undefined;
+    }
+    return {
+      response: { reply: await this.reply(context, outcome, message.text, today), outcome },
+      state: recorded,
+    };
   }
 
   private async welcome(context: RequestContext): Promise<AssistantOutcome & { kind: 'WELCOME' }> {
@@ -238,12 +336,7 @@ export class FinancialAssistant {
       throw error;
     }
     const outcome = { kind: 'IMAGE', image } as const;
-    const reply = await this.replies.compose({
-      ...planReply(outcome),
-      userMessage: caption,
-      senderName: context.memberName,
-      locale: context.locale ?? DEFAULT_LOCALE,
-    });
+    const reply = await this.reply(context, outcome, caption, today);
     return {
       response: { reply, outcome },
       state: afterImage(state, image, message.sourceMessageId ?? null),
@@ -464,43 +557,58 @@ function clarifyQuestion(
   };
 }
 
-function planReply(
-  outcome: Exclude<AssistantOutcome, { kind: 'AI_UNAVAILABLE' | 'REVIEW' }>,
-): ReplyPlan {
+type ReplyPlanned =
+  | { readonly kind: 'COMPOSE'; readonly situation: ReplySituation; readonly facts: ReplyFacts }
+  | {
+      readonly kind: 'RECORDED';
+      readonly transactions: readonly Transaction[];
+      readonly alreadyRecorded: boolean;
+    };
+
+function compose(situation: ReplySituation, facts: ReplyFacts): ReplyPlanned {
+  return { kind: 'COMPOSE', situation, facts };
+}
+
+function planReply(outcome: RepliedOutcome): ReplyPlanned {
   switch (outcome.kind) {
     case 'TRANSACTION':
-      return {
-        situation:
-          outcome.extraction.status === 'RECORDED'
-            ? 'TRANSACTION_RECORDED'
-            : 'CLARIFICATION_NEEDED',
-        facts: outcome.extraction.facts,
-      };
+      return outcome.extraction.status === 'RECORDED'
+        ? {
+            kind: 'RECORDED',
+            transactions: [outcome.extraction.transaction],
+            alreadyRecorded: false,
+          }
+        : compose('CLARIFICATION_NEEDED', outcome.extraction.facts);
     case 'QUESTION':
-      return {
-        situation:
-          outcome.query.status === 'ANSWERED' ? 'QUESTION_ANSWERED' : 'CLARIFICATION_NEEDED',
-        facts: outcome.query.facts,
-      };
+      return compose(
+        outcome.query.status === 'ANSWERED' ? 'QUESTION_ANSWERED' : 'CLARIFICATION_NEEDED',
+        outcome.query.facts,
+      );
     case 'IMAGE':
-      return { situation: IMAGE_SITUATIONS[outcome.image.status], facts: outcome.image.facts };
+      return planImageReply(outcome.image);
     case 'CORRECTION':
-      return { situation: 'EDIT_NOT_SUPPORTED', facts: {} };
+      return compose('EDIT_NOT_SUPPORTED', {});
     case 'UNCLEAR':
-      return { situation: 'CLARIFICATION_NEEDED', facts: { reasons: ['AMBIGUOUS_REFERENCE'] } };
+      return compose('CLARIFICATION_NEEDED', { reasons: ['AMBIGUOUS_REFERENCE'] });
     case 'OTHER':
-      return { situation: 'OUT_OF_SCOPE', facts: {} };
+      return compose('OUT_OF_SCOPE', {});
     case 'WELCOME':
-      return { situation: 'WELCOME', facts: outcome.facts };
+      return compose('WELCOME', outcome.facts);
   }
 }
 
-const IMAGE_SITUATIONS: Record<ImageOutcome['status'], ReplySituation> = {
-  RECORDED: 'TRANSACTION_RECORDED',
-  ALREADY_RECORDED: 'TRANSACTION_RECORDED',
-  NEEDS_CLARIFICATION: 'CLARIFICATION_NEEDED',
-  IMAGE_NOT_USABLE: 'IMAGE_NOT_USABLE',
-};
+function planImageReply(image: ImageOutcome): ReplyPlanned {
+  switch (image.status) {
+    case 'RECORDED':
+      return { kind: 'RECORDED', transactions: [image.transaction], alreadyRecorded: false };
+    case 'ALREADY_RECORDED':
+      return { kind: 'RECORDED', transactions: [image.transaction], alreadyRecorded: true };
+    case 'NEEDS_CLARIFICATION':
+      return compose('CLARIFICATION_NEEDED', image.facts);
+    case 'IMAGE_NOT_USABLE':
+      return compose('IMAGE_NOT_USABLE', image.facts);
+  }
+}
 
 function unavailable(error: AIProviderError, context: RequestContext): AssistantResponse {
   return {

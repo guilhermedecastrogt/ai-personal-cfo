@@ -167,6 +167,7 @@ describe('WhatsApp webhook', () => {
       databaseUrl: testDatabase.url,
       openaiApiKey: 'sk-test-openai-secret',
       openaiModel: 'unused',
+      openaiReasoningEffort: 'low',
       aiConfidenceThreshold: 0.8,
       kapsoApiKey: KAPSO_TEST_API_KEY,
       kapsoWebhookSecret: KAPSO_TEST_SECRET,
@@ -208,14 +209,16 @@ describe('WhatsApp webhook', () => {
   describe('text messages', () => {
     it('sends a reply written as several paragraphs as separate messages, in order', async () => {
       const { phones } = await householdWithSenders('Paragraphs');
-      ai.willInterpretAs(transactionInterpretation());
-      ai.willReply('Registrei a despesa.\n\nEstá na conta conjunta.');
+      ai.willInterpretAs(questionInterpretation());
+      ai.willReply('Vocês ainda não gastaram nada.\n\nO mês começou agora.');
 
-      await deliver(kapsoTextEvent({ id: nextMessageId(), from: phones[0] ?? '' }, MESSAGE_TEXT));
+      await deliver(
+        kapsoTextEvent({ id: nextMessageId(), from: phones[0] ?? '' }, 'Quanto gastamos?'),
+      );
 
       expect(repliesTo(phones[0] ?? '')).toEqual([
-        'Registrei a despesa.',
-        'Está na conta conjunta.',
+        'Vocês ainda não gastaram nada.',
+        'O mês começou agora.',
       ]);
     });
 
@@ -239,7 +242,11 @@ describe('WhatsApp webhook', () => {
           sourceMessageId: messageId,
         }),
       ]);
-      expect(repliesTo(phones[1] ?? '')).toEqual(['[TRANSACTION_RECORDED]']);
+      expect(repliesTo(phones[1] ?? '')).toEqual([
+        expect.stringMatching(
+          /^Recorded: €23\.00 at Lidl \(Groceries\), account Joint Account, on \d{4}-\d{2}-\d{2}\.$/,
+        ) as string,
+      ]);
       expect(await eventStatus(messageId)).toBe('PROCESSED');
     });
 
@@ -335,7 +342,9 @@ describe('WhatsApp webhook', () => {
           sourceMessageId: messageId,
         }),
       ]);
-      expect(repliesTo(phones[0] ?? '')).toEqual(['[TRANSACTION_RECORDED]']);
+      expect(repliesTo(phones[0] ?? '')).toEqual([
+        expect.stringMatching(/^Recorded: €43\.27 at Tesco \(Groceries\)/) as string,
+      ]);
       expect(await remainingTemporaryMedia()).toEqual([]);
     });
 
@@ -599,7 +608,7 @@ describe('WhatsApp webhook', () => {
       expect([first.status, second.status]).toEqual([200, 200]);
       expect(await transactionsOf(fixture)).toHaveLength(1);
       expect(ai.interpretationRequests).toHaveLength(1);
-      expect(ai.replyRequests).toHaveLength(1);
+      expect(ai.replyRequests).toHaveLength(0);
       expect(repliesTo(phones[0] ?? '')).toHaveLength(1);
     });
 

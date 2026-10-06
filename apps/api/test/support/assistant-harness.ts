@@ -37,6 +37,7 @@ export const TEST_CONFIG: AppConfig = {
   databaseUrl: 'postgres://unused',
   openaiApiKey: 'unused',
   openaiModel: 'unused',
+  openaiReasoningEffort: 'low',
   aiConfidenceThreshold: 0.8,
   kapsoApiKey: 'unused',
   kapsoWebhookSecret: 'unused',

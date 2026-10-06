@@ -1,6 +1,6 @@
 import type { TransactionCandidate } from '../../ai/interpretation/message-interpretation.schema.js';
 import { UNSPECIFIED_DATE } from '../../ai/testing/fake-ai-provider.fixture.js';
-import { draftTransaction, type DraftingContext } from './transaction-draft.js';
+import { draftTransaction, presentMerchant, type DraftingContext } from './transaction-draft.js';
 
 const CURRENT = { id: 'current', name: 'Current', currency: 'EUR', ownerMemberId: 'sender' };
 const SAVINGS = { id: 'savings', name: 'Savings', currency: 'EUR', ownerMemberId: null };
@@ -31,6 +31,7 @@ function candidate(overrides: Partial<TransactionCandidate> = {}): TransactionCa
     account: null,
     transferAccount: null,
     member: null,
+    memberReference: 'SENDER',
     paymentMethod: null,
     date: UNSPECIFIED_DATE,
     confidence: 0.98,
@@ -44,6 +45,17 @@ function draft(
 ): ReturnType<typeof draftTransaction> {
   return draftTransaction(candidate(overrides), { ...CONTEXT, ...context });
 }
+
+describe('presentMerchant', () => {
+  it.each([
+    ['five guys', 'Five Guys'],
+    ['casa do pão', 'Casa do Pão'],
+    ['SHEIN', 'SHEIN'],
+    ["McDonald's", "McDonald's"],
+  ])('writes %j as %j', (merchant, expected) => {
+    expect(presentMerchant(merchant)).toBe(expected);
+  });
+});
 
 describe('draftTransaction', () => {
   it('turns a complete candidate into transaction fields', () => {

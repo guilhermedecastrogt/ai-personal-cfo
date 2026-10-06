@@ -22,6 +22,28 @@ describe('ReplyComposer', () => {
     Logger.overrideLogger(false);
   });
 
+  it('drops an offer the system could not act on', async () => {
+    const provider = new FakeAIProvider().willReply(
+      'You spent €625.00 this month.\n\nWould you like me to break it down?',
+    );
+
+    expect(await new ReplyComposer(provider).compose(REQUEST)).toBe(
+      'You spent €625.00 this month.',
+    );
+  });
+
+  it('keeps the question when the reply exists to ask one', async () => {
+    const provider = new FakeAIProvider().willReply('I understood €12.00. Which account was it?');
+
+    expect(
+      await new ReplyComposer(provider).compose({
+        ...REQUEST,
+        situation: 'CLARIFICATION_NEEDED',
+        facts: { amount: '€12.00' },
+      }),
+    ).toBe('I understood €12.00. Which account was it?');
+  });
+
   it('returns the reply when every figure in it comes from the facts', async () => {
     const provider = new FakeAIProvider().willReply('You spent €625.00 this month.');
 

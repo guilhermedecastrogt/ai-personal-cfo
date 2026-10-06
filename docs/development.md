@@ -71,6 +71,7 @@ The backend reads its configuration from the environment once, at startup, and v
 | `LOG_LEVEL`                    | No       | `log`                | `error`, `warn`, `log` or `debug`                                                                |
 | `OPENAI_API_KEY`               | Yes      |                      | Credential for the OpenAI API                                                                    |
 | `OPENAI_MODEL`                 | Yes      |                      | Model used for interpretation and replies                                                        |
+| `OPENAI_REASONING_EFFORT`      | No       | `low`                | `minimal`, `low`, `medium`, `high`, or `off` for a model that does not reason                    |
 | `AI_CONFIDENCE_THRESHOLD`      | No       | `0.8`                | Below this, an extracted transaction is confirmed instead of recorded                            |
 | `KAPSO_API_KEY`                | Yes      |                      | Kapso project API key                                                                            |
 | `KAPSO_WEBHOOK_SECRET`         | Yes      |                      | Secret for verifying webhook signatures                                                          |

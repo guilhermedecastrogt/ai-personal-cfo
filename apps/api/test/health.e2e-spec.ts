@@ -13,6 +13,7 @@ const TEST_CONFIG: AppConfig = {
   databaseUrl: 'postgres://unused:unused@localhost:5432/unused',
   openaiApiKey: 'unused',
   openaiModel: 'unused',
+  openaiReasoningEffort: 'low',
   aiConfidenceThreshold: 0.8,
   kapsoApiKey: 'unused',
   kapsoWebhookSecret: 'unused',

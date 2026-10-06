@@ -33,3 +33,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [027](ADR-027-per-household-display-language.md)              | Each household has a display language, and canonical names stay in English                     | Accepted |
 | [028](ADR-028-email-and-password-sign-in.md)                  | Members sign in with email and password, and access codes become one-time invitations          | Accepted |
 | [029](ADR-029-dashboard-writes.md)                            | The dashboard edits and deletes transactions, and manages budgets and goals                    | Accepted |
+| [030](ADR-030-deterministic-confirmations.md)                 | Recorded transactions are confirmed without the model                                          | Accepted |

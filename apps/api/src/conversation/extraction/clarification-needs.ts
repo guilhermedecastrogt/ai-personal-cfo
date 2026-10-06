@@ -98,3 +98,10 @@ export function describeDate(date: string | undefined, locale: Locale): string |
   }
   return date;
 }
+
+export function describeStoredNeeds(reasons: readonly string[], locale: Locale): string[] {
+  return describeNeeds(
+    reasons.filter((reason): reason is ClarificationReason => Object.hasOwn(NEEDS, reason)),
+    locale,
+  );
+}

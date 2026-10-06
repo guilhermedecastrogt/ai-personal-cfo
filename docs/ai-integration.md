@@ -65,14 +65,15 @@ A lint rule forbids importing the OpenAI SDK anywhere outside `ai/openai`.
 
 The provider uses the OpenAI Responses API.
 
-| Aspect         | Choice                                                                                 |
-| -------------- | -------------------------------------------------------------------------------------- |
-| Interpretation | `responses.create` with `text.format` set to a strict JSON schema                      |
-| Reply          | `responses.create` with instructions and the facts as input                            |
-| Storage        | `store: false` on every request                                                        |
-| Model          | `OPENAI_MODEL`, used for both calls                                                    |
-| Timeout        | 30 seconds per request                                                                 |
-| Retries        | At most two, performed by the SDK, on connection errors, rate limits and server errors |
+| Aspect         | Choice                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------- |
+| Interpretation | `responses.create` with `text.format` set to a strict JSON schema                       |
+| Reply          | `responses.create` with instructions and the facts as input                             |
+| Storage        | `store: false` on every request                                                         |
+| Model          | `OPENAI_MODEL`, used for both calls                                                     |
+| Reasoning      | `OPENAI_REASONING_EFFORT`, `low` by default, sent as `reasoning.effort`; `off` omits it |
+| Timeout        | 30 seconds per request                                                                  |
+| Retries        | At most two, performed by the SDK, on connection errors, rate limits and server errors  |
 
 The JSON schema sent to OpenAI is generated from the same Zod schema the application validates with, so the two cannot drift.
 
@@ -80,11 +81,12 @@ Strict structured output requires every property to be present and every object 
 
 ## Configuration
 
-| Variable                  | Required | Default | Purpose                                                                  |
-| ------------------------- | -------- | ------- | ------------------------------------------------------------------------ |
-| `OPENAI_API_KEY`          | Yes      |         | Credential for the OpenAI API                                            |
-| `OPENAI_MODEL`            | Yes      |         | Model used for interpretation and replies                                |
-| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`   | Below this, a candidate is confirmed with the member instead of recorded |
+| Variable                  | Required | Default | Purpose                                                                       |
+| ------------------------- | -------- | ------- | ----------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`          | Yes      |         | Credential for the OpenAI API                                                 |
+| `OPENAI_MODEL`            | Yes      |         | Model used for interpretation and replies                                     |
+| `OPENAI_REASONING_EFFORT` | No       | `low`   | `minimal`, `low`, `medium`, `high`, or `off` for a model that does not reason |
+| `AI_CONFIDENCE_THRESHOLD` | No       | `0.8`   | Below this, a candidate is confirmed with the member instead of recorded      |
 
 The model name appears nowhere in the source code. Any model that supports structured outputs through the Responses API can be configured, and a small, inexpensive one is appropriate: the tasks are classification, extraction and short rewriting.
 
@@ -204,13 +206,19 @@ This design uses a structured intent in place of a tool-calling loop. The intent
 
 ## Replies
 
-`ReplyComposer` asks the model to phrase a reply for one of four situations: a transaction was recorded, clarification is needed, a question was answered, or the message was out of scope. It passes the facts and the member's message.
+A recorded transaction is confirmed without the model ([ADR-030](adr/ADR-030-deterministic-confirmations.md)). The confirmation is built from the saved row, in the household's language, as one short message such as `Registrado: € 22,75 em Five Guys (Restaurantes), conta Revolut Bia, para Beatriz, em 01/10.` It never ends with a question.
+
+`ReplyComposer` asks the model to phrase every other reply: clarification is needed, a question was answered, an image was not usable, a welcome, or the message was out of scope. It passes the facts, the member's message and the household's language.
+
+**No offers.** The instructions forbid offering to do more and ending with a question unless the situation asks one. As a backstop, a closing question is removed from every reply except clarifications and the welcome.
+
+**Yes and no.** A bare "sim", "não", "ok" or similar is answered without the model. It confirms or drops a transaction pending only for low confidence, drops one pending for missing data on "não" and repeats what is missing on "sim", and is acknowledged when nothing is pending. A message with any figure or other content always goes to the interpreter.
 
 **Figure guard.** Every number in the model's reply must appear in the facts or in the member's own message. Figures are compared by value, so `€625.00`, `625 €` and `625,00` are the same. If the reply contains any other number, it is discarded and a plain deterministic rendering of the facts is sent instead. This is what makes "the model does not calculate" a property of the system and not a hope about the prompt.
 
 The guard is strict. A reply that counts things, such as "three categories", is replaced as well unless the count is in the facts.
 
-**Fallback.** The same deterministic rendering is used when the model is unavailable while composing. A recorded transaction stays recorded, and the member is told so.
+**Fallback.** The same deterministic rendering is used when the model is unavailable while composing. Confirmations of recorded transactions never depend on the model.
 
 ## Authorization boundary
 

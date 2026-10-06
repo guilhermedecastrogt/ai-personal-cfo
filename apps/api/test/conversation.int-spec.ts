@@ -1019,7 +1019,9 @@ describe('conversational assistant', () => {
         kind: 'TRANSACTION',
         extraction: { status: 'RECORDED' },
       });
-      expect(harness.provider.replyRequests.at(-1)?.situation).toBe('TRANSACTION_RECORDED');
+      expect(answered.reply).toMatch(
+        /^Recorded: income of R\$1,200\.00 from Sliftio \(Salary\), account Inter Reais, on /,
+      );
       const [salary] = await recorded(fixture);
       const inter = (await harness.accounts.list(fixture.household.id)).find(
         (account) => account.name === 'Inter Reais',
@@ -1088,7 +1090,9 @@ describe('conversational assistant', () => {
       );
 
       expect(response.outcome).toMatchObject({ extraction: { status: 'RECORDED' } });
-      expect(lastFacts()).toMatchObject({ forMember: partner.name, account: 'Partner Revolut' });
+      expect(response.reply).toBe(
+        `Recorded: income of €900.00 (Salary), account Partner Revolut, for ${partner.name}, on 2026-10-20.`,
+      );
       expect(await recorded(fixture)).toEqual([
         expect.objectContaining({
           memberId: partner.id,
@@ -1102,13 +1106,13 @@ describe('conversational assistant', () => {
     it('keeps the sender as the member when the model names the sender', async () => {
       const { fixture } = await householdWithPersonalDefaults('Self Named');
 
-      await say(
+      const response = await say(
         fixture,
         'Gastei 23 no Lidl',
         transactionInterpretation({ member: memberAt(fixture, 0).name }),
       );
 
-      expect(lastFacts()).not.toHaveProperty('forMember');
+      expect(response.reply).not.toContain(' for ');
       expect(await recorded(fixture)).toEqual([
         expect.objectContaining({
           memberId: memberAt(fixture, 0).id,
@@ -1145,6 +1149,96 @@ describe('conversational assistant', () => {
         }),
       ]);
       expect(await recorded(outsider)).toEqual([]);
+    });
+
+    async function answer(fixture: HouseholdFixture, text: string): Promise<AssistantResponse> {
+      clock += 1;
+      return harness.assistant.handle(
+        contextOf(fixture),
+        { text },
+        new Date(START.getTime() + clock * 1000),
+      );
+    }
+
+    it('acknowledges a bare "não" with nothing pending, without the model', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Bare No', 1);
+      await say(fixture, 'Gastei 23 no Lidl', transactionInterpretation());
+      const interpreted = harness.provider.interpretationRequests.length;
+
+      const response = await answer(fixture, 'não');
+
+      expect(response.reply).toBe('All right.');
+      expect(harness.provider.interpretationRequests).toHaveLength(interpreted);
+      expect(await recorded(fixture)).toHaveLength(1);
+    });
+
+    it('records a low-confidence transaction when the member says yes, without the model', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Confirmed Yes', 1);
+      const asked = await say(
+        fixture,
+        'uns 23 no lidl',
+        transactionInterpretation({ confidence: 0.2 }),
+      );
+      const interpreted = harness.provider.interpretationRequests.length;
+
+      const response = await answer(fixture, 'sim');
+
+      expect(reasonsOf(asked)).toEqual(['LOW_CONFIDENCE']);
+      expect(response.reply).toMatch(/^Recorded: €23\.00 at Lidl/);
+      expect(harness.provider.interpretationRequests).toHaveLength(interpreted);
+      expect(await recorded(fixture)).toHaveLength(1);
+    });
+
+    it('drops a pending transaction when the member says no', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Confirmed No', 1);
+      await say(fixture, 'uns 23 no lidl', transactionInterpretation({ confidence: 0.2 }));
+
+      const response = await answer(fixture, 'não');
+      const later = await answer(fixture, 'sim');
+
+      expect(response.reply).toBe('All right, nothing was recorded.');
+      expect(later.reply).toBe('All right.');
+      expect(await recorded(fixture)).toEqual([]);
+    });
+
+    it('asks again for what is missing when the member only says yes', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Yes Is Not Enough', 1);
+      await say(
+        fixture,
+        'Gastei 30',
+        transactionInterpretation({ amount: '30', merchant: null, category: null }),
+      );
+
+      const response = await answer(fixture, 'sim');
+
+      expect(response.reply).toBe('To record it I still need the category.');
+      expect(await recorded(fixture)).toEqual([]);
+    });
+
+    it('asks who it was for a third-person message that names nobody, then records for them', async () => {
+      const { fixture, partnerAccountId } = await householdWithPersonalDefaults('Unstated Subject');
+      const partner = memberAt(fixture, 1);
+
+      const asked = await say(
+        fixture,
+        'gastou 20 no uber',
+        transactionInterpretation({
+          amount: '20',
+          merchant: 'Uber',
+          category: 'Uber',
+          memberReference: 'THIRD_PERSON_UNSTATED',
+        }),
+      );
+      const answered = await say(fixture, partner.name, OTHER_INTERPRETATION);
+
+      expect(reasonsOf(asked)).toEqual(['UNKNOWN_MEMBER']);
+      expect(lastFacts()).toMatchObject({
+        memberOptions: [memberAt(fixture, 0).name, partner.name],
+      });
+      expect(answered.reply).toContain(`for ${partner.name}`);
+      expect(await recorded(fixture)).toEqual([
+        expect.objectContaining({ memberId: partner.id, accountId: partnerAccountId }),
+      ]);
     });
 
     it('does not complete anything when nothing is pending', async () => {

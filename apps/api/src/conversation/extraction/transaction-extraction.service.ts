@@ -100,7 +100,9 @@ export class TransactionExtractionService {
         members,
         locale,
       });
-    if (named?.status === 'UNKNOWN') {
+    const unstatedMember =
+      named === undefined && candidate.memberReference === 'THIRD_PERSON_UNSTATED';
+    if (named?.status === 'UNKNOWN' || unstatedMember) {
       return clarify(['UNKNOWN_MEMBER', ...draft.problems]);
     }
     if (draft.fields === undefined) {

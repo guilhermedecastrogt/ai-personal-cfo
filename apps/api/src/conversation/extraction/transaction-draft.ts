@@ -117,7 +117,7 @@ export function draftTransaction(
     type: candidate.type,
     amountMinor: amount.amountMinor,
     currency,
-    merchant: textOrUndefined(candidate.merchant),
+    merchant: presentMerchant(textOrUndefined(candidate.merchant)),
     category: category.category,
     account,
     transferAccount: transfer.account,
@@ -249,4 +249,33 @@ function resolved(resolution: AccountResolution<AccountOption>): AccountOption |
 function textOrUndefined(value: string | null): string | undefined {
   const text = value?.trim() ?? '';
   return text === '' ? undefined : text;
+}
+
+const LOWER_CASE_JOINERS: ReadonlySet<string> = new Set([
+  'de',
+  'da',
+  'do',
+  'das',
+  'dos',
+  'e',
+  'of',
+  'the',
+  'and',
+]);
+
+export function presentMerchant(merchant: string | undefined): string | undefined {
+  if (merchant?.toLowerCase() !== merchant) {
+    return merchant;
+  }
+  if (merchant === undefined) {
+    return undefined;
+  }
+  return merchant
+    .split(' ')
+    .map((word, position) =>
+      position > 0 && LOWER_CASE_JOINERS.has(word)
+        ? word
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(' ');
 }

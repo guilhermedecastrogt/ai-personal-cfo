@@ -11,6 +11,8 @@ const DEVELOPMENT_DATABASE_CREDENTIALS = '://cfo:cfo@';
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
 const DEFAULT_KAPSO_API_BASE_URL = 'https://api.kapso.ai/meta/whatsapp/v24.0';
 
+export const REASONING_EFFORTS = ['off', 'minimal', 'low', 'medium', 'high'] as const;
+
 const flag = z
   .enum(['true', 'false'])
   .default('false')
@@ -23,6 +25,7 @@ const baseEnvironmentSchema = z.object({
   DATABASE_URL: z.url({ protocol: POSTGRES_PROTOCOL }),
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL: z.string().min(1),
+  OPENAI_REASONING_EFFORT: z.enum(REASONING_EFFORTS).default('low'),
   KAPSO_API_KEY: z.string().min(1),
   KAPSO_WEBHOOK_SECRET: z.string().min(1),
   KAPSO_PHONE_NUMBER_ID: z.string().regex(/^\d+$/),

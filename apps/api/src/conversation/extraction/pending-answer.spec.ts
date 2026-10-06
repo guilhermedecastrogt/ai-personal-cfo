@@ -21,6 +21,7 @@ const SALARY: TransactionCandidate = {
   account: null,
   transferAccount: null,
   member: null,
+  memberReference: 'SENDER',
   paymentMethod: null,
   date: { kind: 'TODAY' },
   confidence: 0.95,

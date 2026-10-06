@@ -167,17 +167,15 @@ describe('financial image extraction', () => {
     it('confirms with the verified amount', async () => {
       const fixture = await household('Receipt Confirmation');
 
-      await sendImage(fixture, imageReading({ amount: '23.50', merchant: 'Tesco' }));
+      const response = await sendImage(
+        fixture,
+        imageReading({ amount: '23.50', merchant: 'Tesco' }),
+      );
 
-      expect(harness.provider.replyRequests[0]).toMatchObject({
-        situation: 'TRANSACTION_RECORDED',
-        facts: {
-          amount: '€23.50',
-          merchant: 'Tesco',
-          category: 'Groceries',
-          account: 'Joint Account',
-        },
-      });
+      expect(response.reply).toMatch(
+        /^Recorded: €23\.50 at Tesco \(Groceries\), account Joint Account, on \d{4}-\d{2}-\d{2}\.$/,
+      );
+      expect(harness.provider.replyRequests).toEqual([]);
     });
 
     it('records a restaurant receipt', async () => {

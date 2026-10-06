@@ -38,7 +38,6 @@ export interface ImageExtractionRequest {
 }
 
 export type ReplySituation =
-  | 'TRANSACTION_RECORDED'
   | 'CLARIFICATION_NEEDED'
   | 'QUESTION_ANSWERED'
   | 'IMAGE_NOT_USABLE'

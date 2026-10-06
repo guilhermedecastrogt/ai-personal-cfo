@@ -43,9 +43,14 @@ import {
 const REQUEST_TIMEOUT_IN_MILLISECONDS = 30_000;
 const MAXIMUM_RETRIES = 2;
 
+export type ReasoningEffortSetting = 'off' | 'minimal' | 'low' | 'medium' | 'high';
+
+const DEFAULT_REASONING_EFFORT: ReasoningEffortSetting = 'low';
+
 export interface OpenAIProviderOptions {
   readonly apiKey: string;
   readonly model: string;
+  readonly reasoningEffort?: ReasoningEffortSetting;
   readonly baseUrl?: string;
   readonly timeoutInMilliseconds?: number;
   readonly maximumRetries?: number;
@@ -58,9 +63,11 @@ export class OpenAIProvider implements AIProvider {
   private readonly logger = new Logger(OpenAIProvider.name);
   private readonly client: OpenAI;
   private readonly model: string;
+  private readonly reasoningEffort: ReasoningEffortSetting;
 
   constructor(options: OpenAIProviderOptions) {
     this.model = options.model;
+    this.reasoningEffort = options.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
     this.client = new OpenAI({
       apiKey: options.apiKey,
       baseURL: options.baseUrl,
@@ -138,8 +145,9 @@ export class OpenAIProvider implements AIProvider {
 
   async composeReply(request: ReplyRequest): Promise<string> {
     return this.respond('composeReply', {
-      instructions: buildReplyInstructions(request.situation),
+      instructions: buildReplyInstructions(request.situation, request.locale),
       input: buildReplyInput(request),
+      text: { verbosity: 'low' },
     });
   }
 
@@ -154,6 +162,7 @@ export class OpenAIProvider implements AIProvider {
     try {
       const response = await this.client.responses.create({
         ...parameters,
+        ...(this.reasoningEffort === 'off' ? {} : { reasoning: { effort: this.reasoningEffort } }),
         model: this.model,
         store: false,
       });
@@ -171,7 +180,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   private logOutcome(operation: Operation, startedAt: number, outcome: string): void {
-    const message = `provider=openai operation=${operation} outcome=${outcome} durationMs=${String(Date.now() - startedAt)}`;
+    const message = `provider=openai operation=${operation} effort=${this.reasoningEffort} outcome=${outcome} durationMs=${String(Date.now() - startedAt)}`;
     if (outcome === 'success') {
       this.logger.log(message);
     } else {

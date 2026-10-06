@@ -111,6 +111,7 @@ Do these once, in order.
 | `POSTGRES_DB`                                              | Yes      |                                                                                        |
 | `OPENAI_API_KEY`                                           | Yes      |                                                                                        |
 | `OPENAI_MODEL`                                             | Yes      |                                                                                        |
+| `OPENAI_REASONING_EFFORT`                                  | No       | Default `low`. `off` for a model that does not reason                                  |
 | `KAPSO_API_KEY`                                            | Yes      |                                                                                        |
 | `KAPSO_WEBHOOK_SECRET`                                     | Yes      | At least 16 characters                                                                 |
 | `KAPSO_PHONE_NUMBER_ID`                                    | Yes      |                                                                                        |

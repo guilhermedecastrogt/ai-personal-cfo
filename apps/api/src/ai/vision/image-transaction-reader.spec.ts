@@ -85,6 +85,7 @@ describe('ImageTransactionReader', () => {
       'date',
       'description',
       'member',
+      'memberReference',
       'merchant',
       'paymentMethod',
       'transferAccount',

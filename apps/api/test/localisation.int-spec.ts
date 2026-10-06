@@ -185,11 +185,9 @@ describe('a household that uses Brazilian Portuguese', () => {
         .from(transactions)
         .where(eq(transactions.merchant, 'Tesco'));
       expect(recorded?.categoryId).toBe(categoryIds.get('Groceries'));
-      expect(ai.replyRequests.at(-1)).toMatchObject({
-        locale: 'pt-BR',
-        facts: { category: 'Mercado' },
-      });
-      expect(String(ai.replyRequests.at(-1)?.facts.amount).replace(SPACES, ' ')).toBe('€ 23,00');
+      expect(response.reply.replace(SPACES, ' ')).toMatch(
+        /^Registrado: € 23,00 em Tesco \(Mercado\), conta .+, em \d{2}\/\d{2}\.$/,
+      );
     });
 
     it('falls back to Portuguese when the model cannot write the reply', async () => {

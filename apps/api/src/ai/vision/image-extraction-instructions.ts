@@ -21,7 +21,7 @@ Rules for the transaction:
 - "merchant" is the shop, company or counterparty name as printed. Otherwise null.
 - "category" must be exactly one of the listed category names, chosen only when the merchant or content clearly indicates it. Otherwise null. Never invent a category.
 - "account" is the paying or receiving account only when its name is visible and it matches one of the listed accounts. For a transfer, "account" is the source and "transferAccount" the destination. Otherwise null.
-- "member" is always null. The application records an image for the member who sent it.
+- "member" is always null and "memberReference" always SENDER. The application records an image for the member who sent it.
 - "paymentMethod" only when the image shows how it was paid.
 - "date" is EXPLICIT_DATE with "isoDate" as YYYY-MM-DD when the image shows a complete date including the year and its day and month order is unambiguous. If a date is shown but is incomplete or ambiguous, use EXPLICIT_DATE with "isoDate" null. If no date is shown, use UNSPECIFIED. You do not know today's date. Set the fields that do not apply to null.
 - "description" is null unless the caption adds a note about the transaction.

@@ -5,7 +5,11 @@ import { APIConnectionTimeoutError } from 'openai';
 import { AIProviderError } from '../ai-provider.js';
 import { pngImage } from '../../media/testing/fake-media-source.fixture.js';
 import { imageReading, transactionInterpretation } from '../testing/fake-ai-provider.fixture.js';
-import { OpenAIProvider, categorizeFailure } from './openai-provider.js';
+import {
+  OpenAIProvider,
+  categorizeFailure,
+  type ReasoningEffortSetting,
+} from './openai-provider.js';
 
 interface RecordedRequest {
   readonly path: string;
@@ -36,7 +40,7 @@ const INTERPRETATION_REQUEST = {
 };
 
 const REPLY_REQUEST = {
-  situation: 'TRANSACTION_RECORDED' as const,
+  situation: 'QUESTION_ANSWERED' as const,
   userMessage: 'Gastei €23 no Lidl',
   senderName: 'Member A',
   facts: { amount: '€23.00', merchant: 'Lidl' },
@@ -83,7 +87,9 @@ describe('OpenAIProvider', () => {
   let requests: RecordedRequest[];
   let responses: StubResponse[];
 
-  function provider(overrides: { maximumRetries?: number } = {}): OpenAIProvider {
+  function provider(
+    overrides: { maximumRetries?: number; reasoningEffort?: ReasoningEffortSetting } = {},
+  ): OpenAIProvider {
     return new OpenAIProvider({
       apiKey: 'sk-test-secret',
       model: 'configured-model',
@@ -255,6 +261,7 @@ describe('OpenAIProvider', () => {
         'input',
         'instructions',
         'model',
+        'reasoning',
         'store',
         'text',
       ]);
@@ -337,7 +344,48 @@ describe('OpenAIProvider', () => {
       expect(reply).toBe('Registrado: €23.00 no Lidl.');
       expect(body).toMatchObject({ model: 'configured-model', store: false });
       expect(body?.input).toEqual(expect.stringContaining('"amount": "€23.00"'));
-      expect(Object.keys(body ?? {})).not.toContain('text');
+      expect(body?.text).toEqual({ verbosity: 'low' });
+    });
+
+    it('asks for Brazilian Portuguese when the household speaks Portuguese', async () => {
+      responses.push(completed('Registrado.'));
+
+      await provider().composeReply({ ...REPLY_REQUEST, locale: 'pt-BR' });
+
+      expect(requests[0]?.body.instructions).toEqual(
+        expect.stringContaining('Never use European Portuguese forms'),
+      );
+    });
+  });
+
+  describe('reasoning effort', () => {
+    it('asks for a low reasoning effort by default on every operation', async () => {
+      responses.push(completed(JSON.stringify(transactionInterpretation())));
+      responses.push(completed('Registrado.'));
+
+      await provider().interpretMessage(INTERPRETATION_REQUEST);
+      await provider().composeReply(REPLY_REQUEST);
+
+      expect(requests.map((request) => request.body.reasoning)).toEqual([
+        { effort: 'low' },
+        { effort: 'low' },
+      ]);
+    });
+
+    it('uses the configured effort', async () => {
+      responses.push(completed(JSON.stringify(transactionInterpretation())));
+
+      await provider({ reasoningEffort: 'minimal' }).interpretMessage(INTERPRETATION_REQUEST);
+
+      expect(requests[0]?.body.reasoning).toEqual({ effort: 'minimal' });
+    });
+
+    it('leaves the reasoning out for a model that does not reason', async () => {
+      responses.push(completed('Registrado.'));
+
+      await provider({ reasoningEffort: 'off' }).composeReply(REPLY_REQUEST);
+
+      expect(Object.keys(requests[0]?.body ?? {})).not.toContain('reasoning');
     });
   });
 

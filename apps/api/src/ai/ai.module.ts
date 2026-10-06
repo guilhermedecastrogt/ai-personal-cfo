@@ -12,7 +12,11 @@ import { ImageTransactionReader } from './vision/image-transaction-reader.js';
       provide: AI_PROVIDER,
       inject: [APP_CONFIG],
       useFactory: (config: AppConfig): AIProvider =>
-        new OpenAIProvider({ apiKey: config.openaiApiKey, model: config.openaiModel }),
+        new OpenAIProvider({
+          apiKey: config.openaiApiKey,
+          model: config.openaiModel,
+          reasoningEffort: config.openaiReasoningEffort,
+        }),
     },
     MessageInterpreter,
     ImageTransactionReader,

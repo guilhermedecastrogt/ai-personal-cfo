@@ -21,7 +21,11 @@ const REQUEST = {
 
 describe('OpenAI, live', () => {
   const config = loadAppConfig(process.env);
-  const provider = new OpenAIProvider({ apiKey: config.openaiApiKey, model: config.openaiModel });
+  const provider = new OpenAIProvider({
+    apiKey: config.openaiApiKey,
+    model: config.openaiModel,
+    reasoningEffort: config.openaiReasoningEffort,
+  });
   const interpreter = new MessageInterpreter(provider);
 
   it(
