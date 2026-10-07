@@ -4,6 +4,7 @@ import { BudgetsModule } from '../budgets/budgets.module.js';
 import { GoalsModule } from '../goals/goals.module.js';
 import { CfoModule } from '../cfo/cfo.module.js';
 import { DirectoryModule } from '../directory/directory.module.js';
+import { PlatformModule } from '../platform/platform.module.js';
 import { ProactiveModule } from '../proactive/proactive.module.js';
 import { FinanceModule } from '../finance/finance.module.js';
 import { TransactionsModule } from '../transactions/transactions.module.js';
@@ -21,6 +22,7 @@ import { DashboardService } from './dashboard.service.js';
     ProactiveModule,
     BudgetsModule,
     GoalsModule,
+    PlatformModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService, DashboardWritesService],

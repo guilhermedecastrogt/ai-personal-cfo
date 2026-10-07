@@ -571,6 +571,7 @@ describe('architecture', () => {
     expect(controllers.map((file) => file.path).sort()).toEqual([
       'auth/auth.controller.ts',
       'dashboard/dashboard.controller.ts',
+      'platform/platform.controller.ts',
       'whatsapp/whatsapp-webhook.controller.ts',
     ]);
     for (const controller of controllers) {
@@ -609,7 +610,61 @@ describe('architecture', () => {
       'database/run-migrations.ts',
       'database/seed/run-seed.ts',
       'households/set-household-locale.ts',
+      'platform/grant-platform-admin.ts',
     ]);
+  });
+
+  it('guards every platform route with the session and the platform admin guard', () => {
+    const controller = files.find((file) => file.path === 'platform/platform.controller.ts');
+    const routes = controller?.text.match(/@(Get|Post|Patch|Delete)\(/g) ?? [];
+    const contexts = controller?.text.match(/@CurrentContext\(\) _?context: RequestContext/g) ?? [];
+
+    expect(controller?.text).toContain(
+      '@UseGuards(RateLimitGuard, SessionGuard, PlatformAdminGuard)',
+    );
+    expect(routes.length).toBeGreaterThan(8);
+    expect(contexts).toHaveLength(routes.length);
+    expect(controller?.text.match(/@(Post|Patch|Delete)\(/g)?.length).toBe(
+      controller?.text.match(/@RateLimit\('DASHBOARD_WRITE'\)/g)?.length,
+    );
+  });
+
+  it('lets the platform manage tenants without reading any financial data', () => {
+    const platform = within('platform/');
+    const financial =
+      /\/(transactions|budgets|goals|accounts|categories|cfo|insights|reports|proactive|conversation|directory)\/|finance\/(application|infrastructure)|ledger|\.schema\.js$/;
+
+    expect(platform.length).toBeGreaterThan(6);
+    expect(
+      offenders(platform, (file) =>
+        importsOf(file).some(
+          (name) =>
+            financial.test(name) &&
+            !/^\.\/platform\.schema\.js$|auth\.schema|households\.schema/.test(name),
+        ),
+      ),
+    ).toEqual([]);
+    expect(
+      offenders(platform, (file) => /Minor\b|BasisPoints|formatMoney/.test(file.text)),
+    ).toEqual([]);
+  });
+
+  it('records every platform action and decides admin access only from the platform_admins table', () => {
+    const service = files.find((file) => file.path === 'platform/platform.service.ts');
+    const guard = files.find((file) => file.path === 'platform/platform-admin.guard.ts');
+    const schema = files.find((file) => file.path === 'platform/platform.schema.ts');
+
+    expect(service?.text.match(/this\.record\(/g)?.length).toBeGreaterThan(8);
+    expect(guard?.text).toContain('isPlatformAdmin(context)');
+    expect(guard?.text).not.toMatch(/headers|query|body|process\.env/);
+    expect(schema?.text).toContain('platform_admins_member_fk');
+    expect(schema?.text).not.toMatch(/email|phone|jsonb|payload/);
+    expect(
+      offenders(
+        files,
+        (file) => file.text.includes('platformAdmins') && !file.path.startsWith('platform/'),
+      ),
+    ).toEqual([]);
   });
 
   it('compares secrets in constant time and stores only their hashes', () => {

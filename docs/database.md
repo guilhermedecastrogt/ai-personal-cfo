@@ -43,29 +43,31 @@ erDiagram
     ai_conversations ||--o{ ai_messages : contains
 ```
 
-| Table                     | Purpose                                                                            | Household scope                                                         |
-| ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `households`              | The unit that owns financial data, with its currency and time zone                 | Is the scope                                                            |
-| `members`                 | People in a household, one to many                                                 | `household_id`                                                          |
-| `whatsapp_identities`     | External sender identity mapped to one member                                      | Through `member_id`                                                     |
-| `accounts`                | Where money is held. `owner_member_id` is null for a joint account                 | `household_id`                                                          |
-| `member_default_accounts` | The account a member's transactions go to when none is named                       | `household_id`                                                          |
-| `categories`              | The controlled category tree                                                       | Global reference data                                                   |
-| `transactions`            | Expenses, income and transfers                                                     | `household_id`                                                          |
-| `budgets`                 | A limit for a category, or for all spending when the category is null              | `household_id`                                                          |
-| `goals`                   | Savings targets                                                                    | `household_id`                                                          |
-| `goal_contributions`      | Amounts counted toward a goal, optionally linked to the transaction they came from | `household_id`, with composite keys to the goal, member and transaction |
-| `recurring_expenses`      | Reserved for commitments confirmed by hand. Not written: detection is derived      | `household_id`                                                          |
-| `insights`                | Findings worth the household's attention                                           | `household_id`                                                          |
-| `monthly_reports`         | One structured report per household, month and currency                            | `household_id`                                                          |
-| `ai_conversations`        | One conversation per member and channel, with its short-lived structured state     | `household_id`                                                          |
-| `ai_messages`             | Text of a conversation's messages                                                  | Through `conversation_id`                                               |
-| `webhook_events`          | Provider event identifiers already seen                                            | None. Holds no financial or personal data                               |
-| `member_access_codes`     | The hash of each member's dashboard access code                                    | `household_id`                                                          |
-| `dashboard_sessions`      | Hashed session tokens with their expiry                                            | `household_id`                                                          |
-| `proactive_notifications` | One row per household and stable event key, with its status and read mark          | `household_id`                                                          |
-| `notification_deliveries` | One row per notification, member, channel and level, with attempts                 | `household_id`, composite key to `members`                              |
-| `evaluation_leases`       | Which process is running a proactive evaluation, and until when                    | None. Holds no financial or personal data                               |
+| Table                     | Purpose                                                                                    | Household scope                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `households`              | The unit that owns financial data, with its currency and time zone                         | Is the scope                                                            |
+| `members`                 | People in a household, one to many                                                         | `household_id`                                                          |
+| `whatsapp_identities`     | External sender identity mapped to one member                                              | Through `member_id`                                                     |
+| `accounts`                | Where money is held. `owner_member_id` is null for a joint account                         | `household_id`                                                          |
+| `member_default_accounts` | The account a member's transactions go to when none is named                               | `household_id`                                                          |
+| `categories`              | The controlled category tree                                                               | Global reference data                                                   |
+| `transactions`            | Expenses, income and transfers                                                             | `household_id`                                                          |
+| `budgets`                 | A limit for a category, or for all spending when the category is null                      | `household_id`                                                          |
+| `goals`                   | Savings targets                                                                            | `household_id`                                                          |
+| `goal_contributions`      | Amounts counted toward a goal, optionally linked to the transaction they came from         | `household_id`, with composite keys to the goal, member and transaction |
+| `recurring_expenses`      | Reserved for commitments confirmed by hand. Not written: detection is derived              | `household_id`                                                          |
+| `insights`                | Findings worth the household's attention                                                   | `household_id`                                                          |
+| `monthly_reports`         | One structured report per household, month and currency                                    | `household_id`                                                          |
+| `ai_conversations`        | One conversation per member and channel, with its short-lived structured state             | `household_id`                                                          |
+| `ai_messages`             | Text of a conversation's messages                                                          | Through `conversation_id`                                               |
+| `webhook_events`          | Provider event identifiers already seen                                                    | None. Holds no financial or personal data                               |
+| `member_access_codes`     | The hash of each member's dashboard access code                                            | `household_id`                                                          |
+| `dashboard_sessions`      | Hashed session tokens with their expiry                                                    | `household_id`                                                          |
+| `proactive_notifications` | One row per household and stable event key, with its status and read mark                  | `household_id`                                                          |
+| `notification_deliveries` | One row per notification, member, channel and level, with attempts                         | `household_id`, composite key to `members`                              |
+| `evaluation_leases`       | Which process is running a proactive evaluation, and until when                            | None. Holds no financial or personal data                               |
+| `platform_admins`         | Members who may manage every household ([ADR-033](adr/ADR-033-platform-administration.md)) | Composite key to `members`                                              |
+| `platform_actions`        | Who did what to which household or member, as identifiers only                             | None. Read by platform admins only                                      |
 
 Every table has a UUID primary key and `created_at`. Mutable tables have `updated_at`.
 

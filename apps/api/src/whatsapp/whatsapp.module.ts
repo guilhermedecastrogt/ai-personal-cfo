@@ -4,6 +4,7 @@ import { HouseholdsModule } from '../households/households.module.js';
 import { InboundMessageDispatcher } from './inbound-message-dispatcher.js';
 import { InboundMessageProcessor } from './inbound-message-processor.js';
 import { WebhookEventsRepository } from './webhook-events.repository.js';
+import { WhatsAppIdentityService } from './whatsapp-identity.service.js';
 import { WhatsAppWebhookController } from './whatsapp-webhook.controller.js';
 import { WhatsAppWebhookService } from './whatsapp-webhook.service.js';
 
@@ -15,7 +16,8 @@ import { WhatsAppWebhookService } from './whatsapp-webhook.service.js';
     InboundMessageProcessor,
     InboundMessageDispatcher,
     WhatsAppWebhookService,
+    WhatsAppIdentityService,
   ],
-  exports: [InboundMessageDispatcher],
+  exports: [InboundMessageDispatcher, WhatsAppIdentityService],
 })
 export class WhatsAppModule {}

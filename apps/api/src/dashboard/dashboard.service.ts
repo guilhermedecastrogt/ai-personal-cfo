@@ -20,6 +20,7 @@ import {
 } from '../finance/domain/period/period.js';
 import type { RecurringCommitment } from '../finance/domain/recurring/recurring-summary.js';
 import type { RequestContext } from '../households/request-context.js';
+import { PlatformAccessService } from '../platform/platform-access.service.js';
 import { ProactiveCfoService } from '../proactive/proactive-cfo.service.js';
 import {
   TransactionsService,
@@ -125,13 +126,15 @@ export class DashboardService {
     private readonly directories: HouseholdDirectoryService,
     private readonly transactions: TransactionsService,
     private readonly proactive: ProactiveCfoService,
+    private readonly platformAccess: PlatformAccessService,
   ) {}
 
   async session(context: RequestContext, instant: Date): Promise<SessionView> {
-    const [profile, today, earliest] = await Promise.all([
+    const [profile, today, earliest, isPlatformAdmin] = await Promise.all([
       this.directories.profile(context.householdId),
       this.finance.currentDate(context.householdId, instant),
       this.transactions.earliestDate(context.householdId),
+      this.platformAccess.isPlatformAdmin(context),
     ]);
     if (profile === undefined) {
       throw new HouseholdNotFoundError();
@@ -144,6 +147,7 @@ export class DashboardService {
       today,
       months: listMonths(earliest, today, profile.locale),
       locale: profile.locale,
+      isPlatformAdmin,
     });
   }
 

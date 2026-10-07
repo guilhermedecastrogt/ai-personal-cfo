@@ -21,6 +21,8 @@ const EXPECTED_TABLES = [
   'members',
   'monthly_reports',
   'notification_deliveries',
+  'platform_actions',
+  'platform_admins',
   'proactive_notifications',
   'recurring_expenses',
   'transactions',

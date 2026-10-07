@@ -7,7 +7,7 @@ import {
   SECURITY_POLICY_TOKEN,
   type SecurityPolicy,
 } from '../security/security-policy.js';
-import { AuthRepository, type SessionOwner } from './auth.repository.js';
+import { AuthRepository, type MemberAccessState, type SessionOwner } from './auth.repository.js';
 import {
   hashPassword,
   MAXIMUM_PASSWORD_LENGTH,
@@ -59,8 +59,12 @@ export class AuthService {
     await this.repository.revokeAccess(householdId, memberId);
   }
 
-  async registerEmail(householdId: string, memberId: string, email: string): Promise<void> {
-    await this.repository.registerEmail(householdId, memberId, normalizeEmail(email));
+  registerEmail(householdId: string, memberId: string, email: string): Promise<boolean> {
+    return this.repository.registerEmail(householdId, memberId, normalizeEmail(email));
+  }
+
+  accessStates(householdId: string): Promise<MemberAccessState[]> {
+    return this.repository.listAccessStates(householdId);
   }
 
   async signIn(accessCode: string, instant: Date): Promise<IssuedSession | undefined> {

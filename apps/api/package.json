@@ -20,7 +20,8 @@
     "households:set-locale": "nest build && node --env-file-if-exists=.env dist/households/set-household-locale.js",
     "auth:register-email": "nest build && node --env-file-if-exists=.env dist/auth/register-email.js",
     "auth:revoke-access": "nest build && node --env-file-if-exists=.env dist/auth/revoke-access.js",
-    "auth:issue-access-code": "nest build && node --env-file-if-exists=.env dist/auth/issue-access-code.js"
+    "auth:issue-access-code": "nest build && node --env-file-if-exists=.env dist/auth/issue-access-code.js",
+    "platform:grant-admin": "nest build && node --env-file-if-exists=.env dist/platform/grant-platform-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

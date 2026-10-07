@@ -166,6 +166,7 @@ export const sessionSchema = z.object({
   timezone: z.string(),
   today: z.string(),
   months: z.array(monthOptionSchema),
+  isPlatformAdmin: z.boolean(),
 });
 
 export const overviewSchema = z.object({

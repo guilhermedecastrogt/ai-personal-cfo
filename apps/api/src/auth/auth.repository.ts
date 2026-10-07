@@ -11,6 +11,13 @@ export interface SessionOwner {
   readonly memberName: string;
 }
 
+export interface MemberAccessState {
+  readonly memberId: string;
+  readonly email: string | null;
+  readonly hasPassword: boolean;
+  readonly hasInvitation: boolean;
+}
+
 @Injectable()
 export class AuthRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
@@ -61,14 +68,55 @@ export class AuthRepository {
     });
   }
 
-  async registerEmail(householdId: string, memberId: string, email: string): Promise<void> {
-    await this.database
-      .insert(memberCredentials)
-      .values({ householdId, memberId, email })
-      .onConflictDoUpdate({
-        target: memberCredentials.memberId,
-        set: { email, updatedAt: new Date() },
+  async registerEmail(householdId: string, memberId: string, email: string): Promise<boolean> {
+    try {
+      await this.database
+        .insert(memberCredentials)
+        .values({ householdId, memberId, email })
+        .onConflictDoUpdate({
+          target: memberCredentials.memberId,
+          set: { email, updatedAt: new Date() },
+        });
+      return true;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async listAccessStates(householdId: string): Promise<MemberAccessState[]> {
+    const [credentials, codes] = await Promise.all([
+      this.database
+        .select({
+          memberId: memberCredentials.memberId,
+          email: memberCredentials.email,
+          passwordHash: memberCredentials.passwordHash,
+        })
+        .from(memberCredentials)
+        .where(eq(memberCredentials.householdId, householdId)),
+      this.database
+        .select({ memberId: memberAccessCodes.memberId })
+        .from(memberAccessCodes)
+        .where(eq(memberAccessCodes.householdId, householdId)),
+    ]);
+    const invited = new Set(codes.map((code) => code.memberId));
+    const states = new Map<string, MemberAccessState>();
+    for (const credential of credentials) {
+      states.set(credential.memberId, {
+        memberId: credential.memberId,
+        email: credential.email,
+        hasPassword: credential.passwordHash !== null,
+        hasInvitation: invited.has(credential.memberId),
       });
+    }
+    for (const memberId of invited) {
+      if (!states.has(memberId)) {
+        states.set(memberId, { memberId, email: null, hasPassword: false, hasInvitation: true });
+      }
+    }
+    return [...states.values()];
   }
 
   async findEmailOf(memberId: string): Promise<string | undefined> {

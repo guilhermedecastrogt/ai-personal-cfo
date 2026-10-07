@@ -10,17 +10,28 @@ Out of scope: a compromised host, a compromised database, a malicious operator, 
 
 ## Exposed surface
 
-| Surface                                | Who calls it   | Authentication          | Rate limit      |
-| -------------------------------------- | -------------- | ----------------------- | --------------- |
-| `POST /auth/sessions`                  | The web server | Access code in the body | 10 per minute   |
-| `DELETE /auth/sessions/current`        | The web server | Session token           | 240 per minute  |
-| `GET /dashboard/*`                     | The web server | Session token           | 240 per minute  |
-| `POST`, `PATCH`, `DELETE /dashboard/*` | The web server | Session token           | 30 per minute   |
-| `POST /webhooks/whatsapp`              | Kapso          | HMAC signature          | 600 per minute  |
-| `GET /health`, `GET /ready`            | The platform   | None                    | None            |
-| The Next.js application                | Browsers       | Session cookie          | Through the API |
+| Surface                                | Who calls it   | Authentication                    | Rate limit      |
+| -------------------------------------- | -------------- | --------------------------------- | --------------- |
+| `POST /auth/sessions`                  | The web server | Access code in the body           | 10 per minute   |
+| `DELETE /auth/sessions/current`        | The web server | Session token                     | 240 per minute  |
+| `GET /dashboard/*`                     | The web server | Session token                     | 240 per minute  |
+| `POST`, `PATCH`, `DELETE /dashboard/*` | The web server | Session token                     | 30 per minute   |
+| `GET /platform/*`                      | The web server | Session token of a platform admin | 240 per minute  |
+| `POST`, `PATCH`, `DELETE /platform/*`  | The web server | Session token of a platform admin | 30 per minute   |
+| `POST /webhooks/whatsapp`              | Kapso          | HMAC signature                    | 600 per minute  |
+| `GET /health`, `GET /ready`            | The platform   | None                              | None            |
+| The Next.js application                | Browsers       | Session cookie                    | Through the API |
 
-There are no other routes. Migrations, seeding, access codes and proactive evaluation are commands, not endpoints.
+There are no other routes. Migrations, seeding and proactive evaluation are commands, not endpoints. Access codes are issued by a command or by a platform admin.
+
+### Platform admins
+
+A member listed in `platform_admins` may manage every household: create one, add members, register emails, issue invitations, revoke access, register WhatsApp numbers and grant admin to others ([ADR-033](adr/ADR-033-platform-administration.md)). `PlatformAdminGuard` answers `403` to everyone else.
+
+- The platform routes return no amounts, and the platform module imports no financial code. An architecture test enforces both.
+- Each action is recorded in `platform_actions` with the actor, the action and the identifiers it touched, without names, emails or phone numbers.
+- The last admin cannot be revoked.
+- The first admin is granted with `platform/grant-platform-admin.ts` ([operations.md](operations.md#platform-admins)).
 
 ## Authentication
 

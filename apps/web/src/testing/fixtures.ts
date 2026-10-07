@@ -87,6 +87,7 @@ export const SESSION: SessionView = {
   currency: 'EUR',
   timezone: 'Europe/Dublin',
   today: '2026-10-20',
+  isPlatformAdmin: false,
   months: [
     { key: '2026-10', label: 'October 2026' },
     { key: '2026-09', label: 'September 2026' },

@@ -143,6 +143,17 @@ cfo run --rm --no-deps -v /path/to/household.local.json:/seed.json:ro -e SEED_DE
 
 Always pass `SEED_DEFINITION_FILE`. Without it the script loads the demo household, which does not belong in production. The format of the file is described in [database.md](database.md#seed-data).
 
+## Platform admins
+
+A platform admin manages households from the dashboard's administration area ([ADR-033](adr/ADR-033-platform-administration.md)). Grant the first one with a command; later ones can be granted from the dashboard.
+
+```sh
+cfo exec -e EMAIL="…" api node dist/platform/grant-platform-admin.js
+cfo exec -e HOUSEHOLD_NAME="…" -e MEMBER_NAME="…" -e EMAIL="…" api node dist/platform/grant-platform-admin.js
+```
+
+The command is idempotent and changes nothing when it finds no member. With `EMAIL`, it registers the email if the member has none. It prints an access code only when the member has neither a password nor a pending invitation. With `CREATE_IF_MISSING=true` it creates the household and member first, taking `CURRENCY`, `TIMEZONE` and `LOCALE` (defaults `BRL`, `America/Sao_Paulo`, `pt-BR`).
+
 ## Household language
 
 A household's dashboard, alerts and fixed replies follow its language, English by default. To switch one to Brazilian Portuguese:
