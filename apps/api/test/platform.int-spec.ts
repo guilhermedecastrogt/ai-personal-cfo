@@ -18,6 +18,8 @@ import {
 } from '../src/platform/platform.contracts.js';
 import { platformActions, platformAdmins } from '../src/platform/platform.schema.js';
 import { SECURITY_POLICY_TOKEN } from '../src/security/security-policy.js';
+import { FakeWhatsAppProvider } from '../src/whatsapp/testing/fake-whatsapp-provider.fixture.js';
+import { WHATSAPP_PROVIDER } from '../src/whatsapp/whatsapp-provider.js';
 import { RELAXED_SECURITY_POLICY, TEST_CONFIG } from './support/assistant-harness.js';
 import {
   createHouseholdFixture,
@@ -36,6 +38,7 @@ describe('platform administration', () => {
   let tenant: HouseholdFixture;
   let adminToken: string;
   let memberToken: string;
+  const whatsapp = new FakeWhatsAppProvider();
 
   async function tokenFor(householdId: string, memberId: string): Promise<string> {
     const code = await auth.issueAccessCode(householdId, memberId);
@@ -78,7 +81,9 @@ describe('platform administration', () => {
     testDatabase = await createTestDatabase();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(APP_CONFIG)
-      .useValue({ ...TEST_CONFIG, databaseUrl: testDatabase.url })
+      .useValue({ ...TEST_CONFIG, databaseUrl: testDatabase.url, welcomeTemplate: 'boas_vindas' })
+      .overrideProvider(WHATSAPP_PROVIDER)
+      .useValue(whatsapp)
       .overrideProvider(AI_PROVIDER)
       .useValue(new FakeAIProvider())
       .overrideProvider(SECURITY_POLICY_TOKEN)
@@ -354,10 +359,115 @@ describe('platform administration', () => {
         'WHATSAPP_IDENTITY_REMOVED',
         'ADMIN_GRANTED',
         'ADMIN_REVOKED',
+        'WELCOME_SENT',
       ]),
     );
     const text = JSON.stringify(recorded);
     expect(text).not.toMatch(/@|\+55|5511/);
     expect(names.some((name) => text.includes(name))).toBe(false);
+  });
+
+  describe('welcome on WhatsApp', () => {
+    beforeEach(() => {
+      whatsapp.templates.length = 0;
+      whatsapp.willSend();
+    });
+
+    it('welcomes the first person of a new household as soon as the household exists', async () => {
+      const response = await as(adminToken).post('/platform/households', {
+        name: 'Família Boas Vindas',
+        currency: 'BRL',
+        timezone: 'America/Sao_Paulo',
+        locale: 'pt-BR',
+        firstMember: 'Beatriz Souza',
+        phoneNumber: '+5511988880001',
+      });
+      const detail = householdDetailSchema.parse(
+        (await as(adminToken).get(`/platform/households/${(response.body as { key: string }).key}`))
+          .body,
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ welcome: 'SENT' });
+      expect(detail.members[0]?.whatsapp).toEqual([
+        expect.objectContaining({ phoneNumber: '+5511988880001' }),
+      ]);
+      expect(whatsapp.templates).toEqual([
+        {
+          to: '5511988880001',
+          name: 'boas_vindas',
+          language: 'pt_BR',
+          parameters: ['Beatriz'],
+        },
+      ]);
+    });
+
+    it('welcomes a person added with a number, in the household’s language', async () => {
+      const response = await as(adminToken).post(
+        `/platform/households/${operator.household.id}/members`,
+        { name: 'Second Operator', phoneNumber: '+353850000777' },
+      );
+
+      expect(response.body).toMatchObject({ welcome: 'SENT' });
+      expect(whatsapp.templates).toEqual([
+        expect.objectContaining({
+          to: '353850000777',
+          language: 'en',
+          parameters: ['Second'],
+        }),
+      ]);
+    });
+
+    it('adds a person without a number and welcomes nobody', async () => {
+      const response = await as(adminToken).post(
+        `/platform/households/${operator.household.id}/members`,
+        { name: 'No Phone', phoneNumber: '' },
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ welcome: 'NOT_REQUESTED' });
+      expect(whatsapp.templates).toEqual([]);
+    });
+
+    it('creates nothing when the number already belongs to someone', async () => {
+      const before = await testDatabase.database.$count(households);
+
+      const response = await as(adminToken).post('/platform/households', {
+        name: 'Duplicate',
+        currency: 'BRL',
+        timezone: 'America/Sao_Paulo',
+        locale: 'pt-BR',
+        firstMember: 'Someone',
+        phoneNumber: '+5511988880001',
+      });
+
+      expect(response.status).toBe(422);
+      expect(response.body).toEqual({ errors: [{ field: 'phoneNumber', code: 'DUPLICATE' }] });
+      expect(await testDatabase.database.$count(households)).toBe(before);
+      expect(whatsapp.templates).toEqual([]);
+    });
+
+    it('welcomes on a number added later, keeps the number when WhatsApp refuses, and resends on request', async () => {
+      const memberId = memberAt(operator, 0).id;
+      const base = `/platform/households/${operator.household.id}/members/${memberId}`;
+
+      whatsapp.willFailToSend('REJECTED');
+      const refused = await as(adminToken).post(`${base}/whatsapp`, {
+        phoneNumber: '+353850000778',
+      });
+      whatsapp.willSend();
+      const resent = await as(adminToken).post(`${base}/welcome`);
+      const missing = await as(adminToken).post(
+        `/platform/households/${operator.household.id}/members/${MISSING_KEY}/welcome`,
+      );
+
+      expect(refused.status).toBe(201);
+      expect(refused.body).toMatchObject({ welcome: 'FAILED' });
+      expect(resent.status).toBe(200);
+      expect(resent.body).toEqual({ welcome: 'SENT' });
+      expect(whatsapp.templates.map((template) => template.to)).toEqual(['353850000778']);
+      expect(missing.status).toBe(404);
+      expect((await as(memberToken).post(`${base}/welcome`)).status).toBe(403);
+    });
   });
 });

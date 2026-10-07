@@ -19,6 +19,7 @@ const TEST_CONFIG: AppConfig = {
   kapsoWebhookSecret: 'unused',
   kapsoPhoneNumberId: '000000000000000',
   kapsoApiBaseUrl: 'https://api.kapso.invalid/meta/whatsapp/v24.0',
+  welcomeTemplate: null,
   proactiveEvaluationEnabled: false,
   proactiveAiMessages: false,
   trustedProxyHops: 0,

@@ -18,10 +18,11 @@ import type { RequestContext } from '../households/request-context.js';
 import { RateLimit, RateLimitGuard } from '../security/rate-limit.guard.js';
 import { PlatformAdminGuard } from './platform-admin.guard.js';
 import type {
-  CreatedView,
   HouseholdDetailView,
   HouseholdsOverviewView,
   InvitationView,
+  RegistrationView,
+  WelcomeView,
 } from './platform.contracts.js';
 import {
   emailRequestSchema,
@@ -94,7 +95,7 @@ export class PlatformController {
   createHousehold(
     @CurrentContext() context: RequestContext,
     @Body() body: unknown,
-  ): Promise<CreatedView> {
+  ): Promise<RegistrationView> {
     return handled(newHouseholdRequestSchema, body, (request) =>
       this.platform.createHousehold(context, request),
     );
@@ -129,10 +130,10 @@ export class PlatformController {
     @CurrentContext() context: RequestContext,
     @Param('household') household: string,
     @Body() body: unknown,
-  ): Promise<CreatedView> {
+  ): Promise<RegistrationView> {
     const householdId = parseKey(household);
     return handled(newMemberRequestSchema, body, (request) =>
-      this.platform.addMember(context, householdId, request.name),
+      this.platform.addMember(context, householdId, request),
     );
   }
 
@@ -186,11 +187,24 @@ export class PlatformController {
     @Param('household') household: string,
     @Param('member') member: string,
     @Body() body: unknown,
-  ): Promise<CreatedView> {
+  ): Promise<RegistrationView> {
     const householdId = parseKey(household);
     const memberId = parseKey(member);
     return handled(whatsappIdentityRequestSchema, body, (request) =>
       this.platform.addWhatsAppIdentity(context, householdId, memberId, request),
+    );
+  }
+
+  @Post('households/:household/members/:member/welcome')
+  @RateLimit('DASHBOARD_WRITE')
+  @HttpCode(HttpStatus.OK)
+  async sendWelcome(
+    @CurrentContext() context: RequestContext,
+    @Param('household') household: string,
+    @Param('member') member: string,
+  ): Promise<WelcomeView> {
+    return completed(
+      await this.platform.sendWelcome(context, parseKey(household), parseKey(member)),
     );
   }
 

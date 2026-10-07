@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LOCALES } from '../i18n/locale.js';
+import { WELCOME_RESULTS } from '../whatsapp/welcome-result.js';
 
 export const PLATFORM_FIELD_ERROR_CODES = [
   'REQUIRED',
@@ -34,6 +35,7 @@ export const householdsOverviewSchema = z.object({
     locales: z.array(localeSchema),
     currencies: z.array(z.string()),
     defaultTimezone: z.string(),
+    welcomeEnabled: z.boolean(),
   }),
 });
 
@@ -56,10 +58,15 @@ export const householdDetailSchema = z.object({
   locale: localeSchema,
   createdOn: z.string(),
   members: z.array(memberAccessSchema),
-  options: z.object({ locales: z.array(localeSchema) }),
+  options: z.object({ locales: z.array(localeSchema), welcomeEnabled: z.boolean() }),
 });
 
-export const createdSchema = z.object({ key: z.string() });
+export const registrationSchema = z.object({
+  key: z.string(),
+  welcome: z.enum([...WELCOME_RESULTS, 'NOT_REQUESTED']),
+});
+
+export const welcomeSchema = z.object({ welcome: z.enum(WELCOME_RESULTS) });
 
 export const invitationSchema = z.object({
   member: z.string(),
@@ -73,5 +80,6 @@ export type HouseholdSummaryView = z.infer<typeof householdSummarySchema>;
 export type HouseholdsOverviewView = z.infer<typeof householdsOverviewSchema>;
 export type MemberAccessView = z.infer<typeof memberAccessSchema>;
 export type HouseholdDetailView = z.infer<typeof householdDetailSchema>;
-export type CreatedView = z.infer<typeof createdSchema>;
+export type RegistrationView = z.infer<typeof registrationSchema>;
+export type WelcomeView = z.infer<typeof welcomeSchema>;
 export type InvitationView = z.infer<typeof invitationSchema>;

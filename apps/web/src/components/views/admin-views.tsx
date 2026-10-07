@@ -4,6 +4,7 @@ import type {
   HouseholdDetailView,
   HouseholdsOverviewView,
   MemberAccessView,
+  RegistrationView,
 } from '@/lib/contracts';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionary';
 import {
@@ -15,6 +16,7 @@ import {
   NewHouseholdForm,
   RemoveWhatsAppButton,
   RevokeAccessButton,
+  WelcomeButton,
   WhatsAppForm,
 } from '../admin/admin-forms';
 import { Icon } from '../icons';
@@ -104,6 +106,7 @@ export function AdminHouseholdsView({
             currencies={data.options.currencies}
             locales={data.options.locales}
             defaultTimezone={data.options.defaultTimezone}
+            welcomeEnabled={data.options.welcomeEnabled}
             locale={locale}
           />
         </Panel>
@@ -115,11 +118,13 @@ export function AdminHouseholdsView({
 function MemberCard({
   member,
   household,
+  welcomeEnabled,
   locale,
   t,
 }: {
   readonly member: MemberAccessView;
   readonly household: string;
+  readonly welcomeEnabled: boolean;
   readonly locale: Locale;
   readonly t: Dictionary;
 }): ReactNode {
@@ -182,6 +187,9 @@ function MemberCard({
           name={member.name}
           locale={locale}
         />
+        {welcomeEnabled && member.whatsapp.length > 0 ? (
+          <WelcomeButton household={household} member={member.key} locale={locale} />
+        ) : null}
         <AdminToggle
           household={household}
           member={member.key}
@@ -203,10 +211,12 @@ function MemberCard({
 
 export function AdminHouseholdView({
   data,
+  welcome,
   locale,
   t,
 }: {
   readonly data: HouseholdDetailView;
+  readonly welcome?: RegistrationView['welcome'] | undefined;
   readonly locale: Locale;
   readonly t: Dictionary;
 }): ReactNode {
@@ -224,6 +234,16 @@ export function AdminHouseholdView({
         </p>
       </PageHeading>
       <div className="space-y-6">
+        {welcome === undefined || welcome === 'NOT_REQUESTED' ? null : (
+          <p
+            role="status"
+            className={`rounded-xl px-4 py-3 text-sm ${
+              welcome === 'SENT' ? 'bg-kept-soft text-kept' : 'bg-caution-soft text-caution'
+            }`}
+          >
+            {t.admin.welcomeResult[welcome]}
+          </p>
+        )}
         <Panel title={t.admin.members}>
           {data.members.length === 0 ? (
             <Empty>{t.admin.people(0)}</Empty>
@@ -234,6 +254,7 @@ export function AdminHouseholdView({
                   key={member.key}
                   member={member}
                   household={data.key}
+                  welcomeEnabled={data.options.welcomeEnabled}
                   locale={locale}
                   t={t}
                 />
@@ -241,7 +262,11 @@ export function AdminHouseholdView({
             </ul>
           )}
           <div className="mt-8 border-t border-line pt-6">
-            <AddMemberForm household={data.key} locale={locale} />
+            <AddMemberForm
+              household={data.key}
+              welcomeEnabled={data.options.welcomeEnabled}
+              locale={locale}
+            />
           </div>
         </Panel>
         <Panel title={t.admin.settings} note={t.admin.currencyFixed(data.currency)}>

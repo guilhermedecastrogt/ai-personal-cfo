@@ -193,16 +193,54 @@ Errors from Kapso, the model and the database are never included in a reply.
 
 ## Configuration
 
-| Variable                | Required | Default                                    | Purpose                                                        |
-| ----------------------- | -------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `KAPSO_API_KEY`         | Yes      |                                            | Project API key, sent as `X-API-Key`                           |
-| `KAPSO_WEBHOOK_SECRET`  | Yes      |                                            | Secret used to verify webhook signatures                       |
-| `KAPSO_PHONE_NUMBER_ID` | Yes      |                                            | The WhatsApp phone number identifier of the assistant's number |
-| `KAPSO_API_BASE_URL`    | No       | `https://api.kapso.ai/meta/whatsapp/v24.0` | Base of Kapso's WhatsApp API. Must be HTTPS                    |
+| Variable                    | Required | Default                                    | Purpose                                                         |
+| --------------------------- | -------- | ------------------------------------------ | --------------------------------------------------------------- |
+| `KAPSO_API_KEY`             | Yes      |                                            | Project API key, sent as `X-API-Key`                            |
+| `KAPSO_WEBHOOK_SECRET`      | Yes      |                                            | Secret used to verify webhook signatures                        |
+| `KAPSO_PHONE_NUMBER_ID`     | Yes      |                                            | The WhatsApp phone number identifier of the assistant's number  |
+| `KAPSO_API_BASE_URL`        | No       | `https://api.kapso.ai/meta/whatsapp/v24.0` | Base of Kapso's WhatsApp API. Must be HTTPS                     |
+| `WHATSAPP_WELCOME_TEMPLATE` | No       | Empty                                      | Name of the approved welcome template. Empty turns welcomes off |
 
 In Kapso, create a webhook for the phone number of kind "Kapso webhook", payload version v2, subscribed to `whatsapp.message.received`, pointing at `https://<host>/webhooks/whatsapp`. Its secret is `KAPSO_WEBHOOK_SECRET`.
 
 Each member's number is registered in `whatsapp_identities` with provider `kapso` and the number as digits, through the seed definition ([database.md](database.md)).
+
+## Welcome template
+
+A person registered by a platform admin is welcomed with an approved template as soon as their number is saved ([ADR-034](adr/ADR-034-whatsapp-welcome-template.md)). Register it in Kapso under one name, with a body in each language and a single variable, the person's first name:
+
+| Field    | Value                                         |
+| -------- | --------------------------------------------- |
+| Name     | `boas_vindas` (any lowercase name works)      |
+| Category | Utility                                       |
+| Language | Portuguese (BR), `pt_BR`, and English, `en`   |
+| Variable | `{{1}}`, the person's first name, such as Ana |
+
+Portuguese (BR):
+
+```text
+Olá, {{1}}! Eu sou o assessor financeiro da sua família aqui no WhatsApp.
+
+Comigo você registra gastos e receitas só mandando mensagem, como "gastei 45 no mercado", ou uma foto do recibo. Eu organizo tudo por categoria, acompanho orçamentos e metas e aviso quando algo merece atenção.
+
+Também respondo perguntas como "quanto gastamos com restaurantes este mês?".
+
+Para começar, é só me mandar o seu primeiro gasto.
+```
+
+English:
+
+```text
+Hi {{1}}! I'm your household's financial assistant here on WhatsApp.
+
+You can record spending and income just by messaging me, like "spent 45 at the supermarket", or by sending a photo of a receipt. I sort everything into categories, keep track of budgets and goals, and let you know when something needs attention.
+
+I also answer questions like "how much did we spend on restaurants this month?".
+
+To get started, just send me your first expense.
+```
+
+Once Meta approves it, set `WHATSAPP_WELCOME_TEMPLATE` to its name. A template Meta has not approved, or a name that does not match, makes the send fail; the number stays saved and the dashboard offers to send the welcome again.
 
 ## Local development and testing
 
@@ -245,4 +283,4 @@ To receive real webhooks on a development machine, expose the port through a tun
 - Only text and image messages are handled. Other types are ignored without a reply.
 - An event that fails or is interrupted is not retried automatically.
 - The per-sender queue is in memory, which is sufficient for one process.
-- Template messages and the 24-hour customer service window are not handled. Every reply answers a message just received, which is always inside the window.
+- The only template is the welcome. Replies answer a message just received, which is always inside the 24-hour window. Proactive notifications are still free-form and fail outside it.

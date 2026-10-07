@@ -15,6 +15,7 @@ jest.mock('@/app/(dashboard)/admin/actions', () => {
     removeWhatsApp: pending,
     revokeAccess: pending,
     saveHousehold: pending,
+    sendWelcome: pending,
   };
 });
 
@@ -75,6 +76,8 @@ describe('administration', () => {
     ).toBeInTheDocument();
     expect(within(first).getByRole('button', { name: 'Remove admin' })).toBeInTheDocument();
     expect(within(first).getByRole('button', { name: 'Revoke access' })).toBeInTheDocument();
+    expect(within(first).getByRole('button', { name: 'Send welcome' })).toBeInTheDocument();
+    expect(within(second).queryByRole('button', { name: 'Send welcome' })).not.toBeInTheDocument();
     expect(second).toHaveTextContent('Person TwoNo email · No dashboard access');
     expect(within(second).getByRole('button', { name: 'Make admin' })).toBeInTheDocument();
     expect(within(second).queryByRole('button', { name: 'Revoke access' })).not.toBeInTheDocument();
@@ -98,5 +101,36 @@ describe('administration', () => {
       'href',
       '/admin',
     );
+  });
+
+  it('offers WhatsApp when adding someone, and says whether the welcome will go out', () => {
+    render(<AdminHouseholdView data={ADMIN_HOUSEHOLD} locale="en" t={EN} />);
+
+    expect(screen.getByLabelText('WhatsApp (optional)')).toHaveAttribute('type', 'tel');
+    expect(
+      screen.getByText('With a number, the assistant introduces itself on WhatsApp right away.'),
+    ).toBeInTheDocument();
+  });
+
+  it('says when welcomes are not switched on, and offers no resend', () => {
+    render(
+      <AdminHouseholdView
+        data={{
+          ...ADMIN_HOUSEHOLD,
+          options: { ...ADMIN_HOUSEHOLD.options, welcomeEnabled: false },
+        }}
+        locale="en"
+        t={EN}
+      />,
+    );
+
+    expect(screen.getByText(/Automatic welcomes are not switched on yet/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send welcome' })).not.toBeInTheDocument();
+  });
+
+  it('reports the welcome of a household just created', () => {
+    render(<AdminHouseholdView data={ADMIN_HOUSEHOLD} welcome="FAILED" locale="pt-BR" t={PT_BR} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('o WhatsApp recusou as boas-vindas');
   });
 });

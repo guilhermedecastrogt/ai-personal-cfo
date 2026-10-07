@@ -30,6 +30,12 @@ const baseEnvironmentSchema = z.object({
   KAPSO_WEBHOOK_SECRET: z.string().min(1),
   KAPSO_PHONE_NUMBER_ID: z.string().regex(/^\d+$/),
   KAPSO_API_BASE_URL: z.url({ protocol: /^https$/ }).default(DEFAULT_KAPSO_API_BASE_URL),
+  WHATSAPP_WELCOME_TEMPLATE: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{0,512}$/)
+    .default('')
+    .transform((value) => (value === '' ? null : value)),
   PROACTIVE_EVALUATION_ENABLED: flag,
   PROACTIVE_AI_MESSAGES: flag,
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(MAXIMUM_PROXY_HOPS).default(0),

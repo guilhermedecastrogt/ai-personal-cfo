@@ -154,6 +154,16 @@ cfo exec -e HOUSEHOLD_NAME="…" -e MEMBER_NAME="…" -e EMAIL="…" api node di
 
 The command is idempotent and changes nothing when it finds no member. With `EMAIL`, it registers the email if the member has none. It prints an access code only when the member has neither a password nor a pending invitation. With `CREATE_IF_MISSING=true` it creates the household and member first, taking `CURRENCY`, `TIMEZONE` and `LOCALE` (defaults `BRL`, `America/Sao_Paulo`, `pt-BR`).
 
+## Welcome on WhatsApp
+
+New people get a welcome template on WhatsApp when an admin registers their number. Register the template in Kapso with the text in [whatsapp-integration.md](whatsapp-integration.md#welcome-template). After Meta approves it, add its name to the server's `.env` and redeploy:
+
+```sh
+WHATSAPP_WELCOME_TEMPLATE=boas_vindas
+```
+
+Until then, numbers are saved and no welcome is sent.
+
 ## Household language
 
 A household's dashboard, alerts and fixed replies follow its language, English by default. To switch one to Brazilian Portuguese:

@@ -5,22 +5,27 @@ import { HouseholdsRepository, type Household } from '../households/households.r
 import type { RequestContext } from '../households/request-context.js';
 import { LOCALES, localeOr } from '../i18n/locale.js';
 import { isSupportedCurrency } from '../money/money.js';
+import { MemberWelcomeService } from '../whatsapp/member-welcome.service.js';
+import type { WelcomeResult } from '../whatsapp/welcome-result.js';
 import { WhatsAppIdentityService } from '../whatsapp/whatsapp-identity.service.js';
 import { PlatformAdminsRepository, type PlatformAction } from './platform-admins.repository.js';
 import {
-  createdSchema,
   householdDetailSchema,
   householdsOverviewSchema,
   invitationSchema,
-  type CreatedView,
+  registrationSchema,
+  welcomeSchema,
   type HouseholdDetailView,
   type HouseholdsOverviewView,
   type InvitationView,
   type PlatformFieldError,
+  type RegistrationView,
+  type WelcomeView,
 } from './platform.contracts.js';
 import type {
   HouseholdSettingsRequest,
   NewHouseholdRequest,
+  NewMemberRequest,
   WhatsAppIdentityRequest,
 } from './platform-requests.js';
 
@@ -54,6 +59,7 @@ export class PlatformService {
     private readonly auth: AuthService,
     private readonly admins: PlatformAdminsRepository,
     private readonly whatsapp: WhatsAppIdentityService,
+    private readonly welcomes: MemberWelcomeService,
   ) {}
 
   async overview(actor: RequestContext): Promise<HouseholdsOverviewView> {
@@ -82,6 +88,7 @@ export class PlatformService {
         locales: LOCALES,
         currencies: COMMON_CURRENCIES.filter(isSupportedCurrency),
         defaultTimezone: DEFAULT_TIMEZONE,
+        welcomeEnabled: this.welcomes.isEnabled,
       },
     });
   }
@@ -124,19 +131,22 @@ export class PlatformService {
             .map((identity) => ({ key: identity.id, phoneNumber: identity.phoneNumber })),
         };
       }),
-      options: { locales: LOCALES },
+      options: { locales: LOCALES, welcomeEnabled: this.welcomes.isEnabled },
     });
   }
 
   async createHousehold(
     actor: RequestContext,
     request: NewHouseholdRequest,
-  ): Promise<PlatformOutcome<CreatedView>> {
+  ): Promise<PlatformOutcome<RegistrationView>> {
     if (!isSupportedCurrency(request.currency)) {
       return invalid('currency', 'UNKNOWN');
     }
     if (!isSupportedTimeZone(request.timezone)) {
       return invalid('timezone', 'UNKNOWN');
+    }
+    if (await this.isTaken(request.phoneNumber)) {
+      return invalid('phoneNumber', 'DUPLICATE');
     }
     const household = await this.households.createHouseholdWithMembers(
       {
@@ -148,7 +158,12 @@ export class PlatformService {
       [request.firstMember],
     );
     await this.record(actor, 'HOUSEHOLD_CREATED', household.id);
-    return done(createdSchema.parse({ key: household.id }));
+    const [member] = await this.households.listMembers(household.id);
+    const welcome =
+      member === undefined
+        ? 'NOT_REQUESTED'
+        : await this.connect(actor, household.id, member.id, request.phoneNumber);
+    return done(registrationSchema.parse({ key: household.id, welcome }));
   }
 
   async updateHousehold(
@@ -170,14 +185,18 @@ export class PlatformService {
   async addMember(
     actor: RequestContext,
     householdId: string,
-    name: string,
-  ): Promise<PlatformOutcome<CreatedView>> {
+    request: NewMemberRequest,
+  ): Promise<PlatformOutcome<RegistrationView>> {
     if ((await this.households.findHousehold(householdId)) === undefined) {
       return NOT_FOUND;
     }
-    const member = await this.households.addMember(householdId, name);
+    if (await this.isTaken(request.phoneNumber)) {
+      return invalid('phoneNumber', 'DUPLICATE');
+    }
+    const member = await this.households.addMember(householdId, request.name);
     await this.record(actor, 'MEMBER_ADDED', householdId, member.id);
-    return done(createdSchema.parse({ key: member.id }));
+    const welcome = await this.connect(actor, householdId, member.id, request.phoneNumber);
+    return done(registrationSchema.parse({ key: member.id, welcome }));
   }
 
   async registerEmail(
@@ -231,17 +250,36 @@ export class PlatformService {
     householdId: string,
     memberId: string,
     request: WhatsAppIdentityRequest,
-  ): Promise<PlatformOutcome<CreatedView>> {
+  ): Promise<PlatformOutcome<RegistrationView>> {
     const registration = await this.whatsapp.register(householdId, memberId, request.phoneNumber);
     switch (registration.status) {
       case 'UNKNOWN_MEMBER':
         return NOT_FOUND;
       case 'ALREADY_REGISTERED':
         return invalid('phoneNumber', 'DUPLICATE');
-      case 'REGISTERED':
+      case 'REGISTERED': {
         await this.record(actor, 'WHATSAPP_IDENTITY_ADDED', householdId, memberId);
-        return done(createdSchema.parse({ key: registration.identity.id }));
+        const welcome = await this.welcome(
+          actor,
+          householdId,
+          memberId,
+          registration.identity.externalUserId,
+        );
+        return done(registrationSchema.parse({ key: registration.identity.id, welcome }));
+      }
     }
+  }
+
+  async sendWelcome(
+    actor: RequestContext,
+    householdId: string,
+    memberId: string,
+  ): Promise<PlatformOutcome<WelcomeView>> {
+    if ((await this.households.findMember(householdId, memberId)) === undefined) {
+      return NOT_FOUND;
+    }
+    const welcome = await this.welcome(actor, householdId, memberId);
+    return done(welcomeSchema.parse({ welcome }));
   }
 
   async removeWhatsAppIdentity(
@@ -284,6 +322,40 @@ export class PlatformService {
     await this.admins.revoke(householdId, memberId);
     await this.record(actor, 'ADMIN_REVOKED', householdId, memberId);
     return done(undefined);
+  }
+
+  private async isTaken(phoneNumber: string | undefined): Promise<boolean> {
+    return phoneNumber !== undefined && (await this.whatsapp.isRegistered(phoneNumber));
+  }
+
+  private async connect(
+    actor: RequestContext,
+    householdId: string,
+    memberId: string,
+    phoneNumber: string | undefined,
+  ): Promise<WelcomeResult | 'NOT_REQUESTED'> {
+    if (phoneNumber === undefined) {
+      return 'NOT_REQUESTED';
+    }
+    const registration = await this.whatsapp.register(householdId, memberId, phoneNumber);
+    if (registration.status !== 'REGISTERED') {
+      return 'NO_NUMBER';
+    }
+    await this.record(actor, 'WHATSAPP_IDENTITY_ADDED', householdId, memberId);
+    return this.welcome(actor, householdId, memberId, registration.identity.externalUserId);
+  }
+
+  private async welcome(
+    actor: RequestContext,
+    householdId: string,
+    memberId: string,
+    address?: string,
+  ): Promise<WelcomeResult> {
+    const result = await this.welcomes.welcome(householdId, memberId, address);
+    if (result === 'SENT') {
+      await this.record(actor, 'WELCOME_SENT', householdId, memberId);
+    }
+    return result;
   }
 
   private record(

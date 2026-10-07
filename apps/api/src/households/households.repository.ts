@@ -157,6 +157,19 @@ export class HouseholdsRepository {
       .orderBy(asc(members.createdAt), asc(whatsappIdentities.createdAt));
   }
 
+  async isWhatsAppAddressTaken(provider: string, externalUserId: string): Promise<boolean> {
+    const [found] = await this.database
+      .select({ id: whatsappIdentities.id })
+      .from(whatsappIdentities)
+      .where(
+        and(
+          eq(whatsappIdentities.provider, provider),
+          eq(whatsappIdentities.externalUserId, externalUserId),
+        ),
+      );
+    return found !== undefined;
+  }
+
   async registerWhatsAppIdentity(
     householdId: string,
     identity: NewWhatsAppIdentity,

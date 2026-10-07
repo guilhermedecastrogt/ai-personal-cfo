@@ -828,6 +828,7 @@ export const ADMIN_HOUSEHOLDS: HouseholdsOverviewView = {
     locales: ['en', 'pt-BR'],
     currencies: ['BRL', 'EUR', 'USD'],
     defaultTimezone: 'America/Sao_Paulo',
+    welcomeEnabled: true,
   },
 };
 
@@ -860,5 +861,5 @@ export const ADMIN_HOUSEHOLD: HouseholdDetailView = {
       whatsapp: [],
     },
   ],
-  options: { locales: ['en', 'pt-BR'] },
+  options: { locales: ['en', 'pt-BR'], welcomeEnabled: true },
 };

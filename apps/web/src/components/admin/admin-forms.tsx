@@ -12,6 +12,7 @@ import {
   removeWhatsApp,
   revokeAccess,
   saveHousehold,
+  sendWelcome,
 } from '@/app/(dashboard)/admin/actions';
 import { INITIAL_ADMIN_STATE, type AdminState } from '@/lib/admin-state';
 import type { FieldErrorCode } from '@/lib/contracts';
@@ -85,6 +86,61 @@ function Problem({ state, t }: { readonly state: AdminState; readonly t: Diction
     <p role="alert" className="text-sm text-concern">
       {message}
     </p>
+  );
+}
+
+function WelcomeResult({
+  state,
+  t,
+}: {
+  readonly state: AdminState;
+  readonly t: Dictionary;
+}): ReactNode {
+  if (state.welcome === null || state.problem !== null) {
+    return null;
+  }
+  const ok = state.welcome === 'SENT' || state.welcome === 'NOT_REQUESTED';
+  return (
+    <p role="status" className={`text-sm ${ok ? 'text-kept' : 'text-caution'}`}>
+      {t.admin.welcomeResult[state.welcome]}
+    </p>
+  );
+}
+
+function PhoneInput({
+  id,
+  state,
+  welcomeEnabled,
+  t,
+}: {
+  readonly id: string;
+  readonly state: AdminState;
+  readonly welcomeEnabled: boolean;
+  readonly t: Dictionary;
+}): ReactNode {
+  return (
+    <>
+      <Label htmlFor={id}>{t.admin.whatsappOptional}</Label>
+      <input
+        id={id}
+        name="phoneNumber"
+        type="tel"
+        defaultValue={state.values.phoneNumber ?? ''}
+        placeholder="+5511999990000"
+        aria-invalid={state.errors.phoneNumber !== undefined}
+        aria-describedby={
+          state.errors.phoneNumber === undefined ? `${id}-hint` : 'phoneNumber-error'
+        }
+        className={`${INPUT} ${border(state, 'phoneNumber')}`}
+      />
+      {state.errors.phoneNumber === undefined ? (
+        <p id={`${id}-hint`} className="mt-1.5 text-sm text-muted">
+          {welcomeEnabled ? t.admin.welcomeHint : t.admin.welcomeOff}
+        </p>
+      ) : (
+        <FieldMessage state={state} field="phoneNumber" t={t} />
+      )}
+    </>
   );
 }
 
@@ -173,11 +229,13 @@ export function NewHouseholdForm({
   currencies,
   locales,
   defaultTimezone,
+  welcomeEnabled,
   locale,
 }: {
   readonly currencies: readonly string[];
   readonly locales: readonly Locale[];
   readonly defaultTimezone: string;
+  readonly welcomeEnabled: boolean;
   readonly locale: Locale;
 }): ReactNode {
   const t = dictionaryFor(locale);
@@ -209,6 +267,9 @@ export function NewHouseholdForm({
             className={`${INPUT} ${border(state, 'firstMember')}`}
           />
           <FieldMessage state={state} field="firstMember" t={t} />
+        </div>
+        <div className="sm:col-span-2">
+          <PhoneInput id="new-phone" state={state} welcomeEnabled={welcomeEnabled} t={t} />
         </div>
         <div>
           <Label htmlFor="new-currency">{t.admin.currency}</Label>
@@ -314,33 +375,41 @@ export function HouseholdSettingsForm({
 
 export function AddMemberForm({
   household,
+  welcomeEnabled,
   locale,
 }: {
   readonly household: string;
+  readonly welcomeEnabled: boolean;
   readonly locale: Locale;
 }): ReactNode {
   const t = dictionaryFor(locale);
   const [state, action, pending] = useActionState(addMember, INITIAL_ADMIN_STATE);
   return (
-    <form action={action} key={state.attempt} className="flex flex-wrap items-end gap-3" noValidate>
+    <form action={action} key={state.attempt} className="space-y-4" noValidate>
       <Hidden fields={{ household }} />
-      <div className="min-w-48 flex-1">
-        <Label htmlFor="member-name">{t.admin.memberName}</Label>
-        <input
-          id="member-name"
-          name="name"
-          defaultValue={state.values.name ?? ''}
-          maxLength={120}
-          aria-invalid={state.errors.name !== undefined}
-          className={`${INPUT} ${border(state, 'name')}`}
-        />
-        <FieldMessage state={state} field="name" t={t} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="member-name">{t.admin.memberName}</Label>
+          <input
+            id="member-name"
+            name="name"
+            defaultValue={state.values.name ?? ''}
+            maxLength={120}
+            aria-invalid={state.errors.name !== undefined}
+            className={`${INPUT} ${border(state, 'name')}`}
+          />
+          <FieldMessage state={state} field="name" t={t} />
+        </div>
+        <div>
+          <PhoneInput id="member-phone" state={state} welcomeEnabled={welcomeEnabled} t={t} />
+        </div>
       </div>
-      <button type="submit" disabled={pending} className={PRIMARY}>
-        {pending ? t.admin.adding : t.admin.addMember}
-      </button>
-      <div className="basis-full">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Problem state={state} t={t} />
+        <WelcomeResult state={state} t={t} />
+        <button type="submit" disabled={pending} className={PRIMARY}>
+          {pending ? t.admin.adding : t.admin.addMember}
+        </button>
       </div>
     </form>
   );
@@ -404,6 +473,7 @@ function InlineField({
       {state.problem !== null && state.problem !== 'INVALID' ? (
         <Problem state={state} t={t} />
       ) : null}
+      <WelcomeResult state={state} t={t} />
     </form>
   );
 }
@@ -538,6 +608,29 @@ export function InvitationForm({
         </div>
       )}
     </div>
+  );
+}
+
+export function WelcomeButton({
+  household,
+  member,
+  locale,
+}: {
+  readonly household: string;
+  readonly member: string;
+  readonly locale: Locale;
+}): ReactNode {
+  const t = dictionaryFor(locale);
+  const [state, action, pending] = useActionState(sendWelcome, INITIAL_ADMIN_STATE);
+  return (
+    <form action={action} className="space-y-2">
+      <Hidden fields={{ household, member }} />
+      <button type="submit" disabled={pending} className={SECONDARY}>
+        {pending ? t.admin.sendingWelcome : t.admin.sendWelcome}
+      </button>
+      <Problem state={state} t={t} />
+      <WelcomeResult state={state} t={t} />
+    </form>
   );
 }
 

@@ -174,6 +174,7 @@ describe('WhatsApp webhook', () => {
       kapsoWebhookSecret: KAPSO_TEST_SECRET,
       kapsoPhoneNumberId: KAPSO_TEST_PHONE_NUMBER_ID,
       kapsoApiBaseUrl: kapso.baseUrl,
+      welcomeTemplate: null,
       proactiveEvaluationEnabled: false,
       proactiveAiMessages: false,
       trustedProxyHops: 0,

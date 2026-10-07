@@ -37,3 +37,4 @@ Each record captures one significant decision: the context that forced it, what 
 | [031](ADR-031-corrections-in-the-chat.md)                     | Corrections and deletions are applied from the chat                                            | Accepted |
 | [032](ADR-032-goal-contributions.md)                          | Goals receive contributions linked to transactions                                             | Accepted |
 | [033](ADR-033-platform-administration.md)                     | Platform admins manage households without seeing inside them                                   | Accepted |
+| [034](ADR-034-whatsapp-welcome-template.md)                   | New members are welcomed on WhatsApp with an approved template                                 | Accepted |

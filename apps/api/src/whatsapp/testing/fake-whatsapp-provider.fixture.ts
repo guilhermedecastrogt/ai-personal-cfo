@@ -3,6 +3,7 @@ import {
   WhatsAppDeliveryError,
   type DeliveryFailure,
   type InboundMessage,
+  type OutboundTemplate,
   type OutboundText,
   type WebhookRequest,
   type WhatsAppProvider,
@@ -11,6 +12,7 @@ import {
 export class FakeWhatsAppProvider implements WhatsAppProvider {
   readonly name = 'fake';
   readonly sent: OutboundText[] = [];
+  readonly templates: OutboundTemplate[] = [];
   private failure: DeliveryFailure | undefined;
 
   willFailToSend(failure: DeliveryFailure): this {
@@ -40,6 +42,14 @@ export class FakeWhatsAppProvider implements WhatsAppProvider {
       return Promise.reject(new WhatsAppDeliveryError(this.failure));
     }
     this.sent.push(message);
+    return Promise.resolve();
+  }
+
+  sendTemplate(message: OutboundTemplate): Promise<void> {
+    if (this.failure !== undefined) {
+      return Promise.reject(new WhatsAppDeliveryError(this.failure));
+    }
+    this.templates.push(message);
     return Promise.resolve();
   }
 }

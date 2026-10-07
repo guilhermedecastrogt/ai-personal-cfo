@@ -46,10 +46,20 @@ describe('loadAppConfig', () => {
       kapsoWebhookSecret: 'kapso-secret',
       kapsoPhoneNumberId: '123456789012345',
       kapsoApiBaseUrl: 'https://api.kapso.ai/meta/whatsapp/v24.0',
+      welcomeTemplate: null,
       proactiveEvaluationEnabled: false,
       proactiveAiMessages: false,
       trustedProxyHops: 0,
     });
+  });
+
+  it('reads the welcome template name, and refuses one WhatsApp would not accept', () => {
+    expect(
+      loadAppConfig({ ...REQUIRED, WHATSAPP_WELCOME_TEMPLATE: ' boas_vindas ' }),
+    ).toMatchObject({ welcomeTemplate: 'boas_vindas' });
+    expect(() =>
+      loadAppConfig({ ...REQUIRED, WHATSAPP_WELCOME_TEMPLATE: 'Boas Vindas!' }),
+    ).toThrow();
   });
 
   it('reads every supported variable', () => {

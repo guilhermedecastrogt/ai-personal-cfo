@@ -47,11 +47,13 @@ describe('administration pages', () => {
     render(
       (await AdminHouseholdPage({
         params: Promise.resolve({ household: 'household key/other' }),
+        searchParams: Promise.resolve({ welcome: 'SENT' }),
       })) as ReactElement,
     );
 
     expect(apiFind).toHaveBeenCalledWith('/platform/households/household%20key%2Fother');
     expect(screen.getByRole('heading', { name: 'Other Household', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('Welcome sent on WhatsApp.')).toBeInTheDocument();
   });
 
   it('does not exist for anyone else, and asks the API nothing', async () => {

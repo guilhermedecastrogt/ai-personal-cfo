@@ -16,6 +16,10 @@ const timezone = z.string().trim().min(1).max(MAXIMUM_TIMEZONE_LENGTH);
 const locale = z.enum(LOCALES);
 const email = z.string().trim().pipe(z.email().max(MAXIMUM_EMAIL_LENGTH));
 const phoneNumber = z.string().trim().pipe(z.e164());
+const optionalPhoneNumber = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  phoneNumber.optional(),
+);
 
 export const newHouseholdRequestSchema = z.object({
   name,
@@ -23,11 +27,12 @@ export const newHouseholdRequestSchema = z.object({
   timezone,
   locale,
   firstMember: name,
+  phoneNumber: optionalPhoneNumber,
 });
 
 export const householdSettingsRequestSchema = z.object({ name, timezone, locale });
 
-export const newMemberRequestSchema = z.object({ name });
+export const newMemberRequestSchema = z.object({ name, phoneNumber: optionalPhoneNumber });
 
 export const emailRequestSchema = z.object({ email });
 

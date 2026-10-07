@@ -1,22 +1,32 @@
-import type { InvitationView } from './contracts';
+import type { InvitationView, RegistrationView } from './contracts';
 import { INITIAL_FORM_STATE, failedState, type FormState } from './form-state';
 
 export interface AdminState extends FormState {
   readonly done: number;
   readonly invitation: InvitationView | null;
+  readonly welcome: RegistrationView['welcome'] | null;
 }
 
-export const INITIAL_ADMIN_STATE: AdminState = { ...INITIAL_FORM_STATE, done: 0, invitation: null };
+export const INITIAL_ADMIN_STATE: AdminState = {
+  ...INITIAL_FORM_STATE,
+  done: 0,
+  invitation: null,
+  welcome: null,
+};
 
 export function succeeded(
   previous: AdminState,
-  invitation: InvitationView | null = null,
+  outcome: {
+    readonly invitation?: InvitationView;
+    readonly welcome?: RegistrationView['welcome'];
+  } = {},
 ): AdminState {
   return {
     ...INITIAL_FORM_STATE,
     attempt: previous.attempt + 1,
     done: previous.done + 1,
-    invitation,
+    invitation: outcome.invitation ?? null,
+    welcome: outcome.welcome ?? null,
   };
 }
 
@@ -25,5 +35,10 @@ export function failed(
   values: Readonly<Record<string, string>>,
   previous: AdminState,
 ): AdminState {
-  return { ...failedState(failure, values, previous), done: previous.done, invitation: null };
+  return {
+    ...failedState(failure, values, previous),
+    done: previous.done,
+    invitation: null,
+    welcome: null,
+  };
 }

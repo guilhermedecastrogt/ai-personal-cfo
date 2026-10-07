@@ -26,11 +26,19 @@ export interface OutboundText {
   readonly text: string;
 }
 
+export interface OutboundTemplate {
+  readonly to: string;
+  readonly name: string;
+  readonly language: string;
+  readonly parameters: readonly string[];
+}
+
 export interface WhatsAppProvider {
   readonly name: string;
   isAuthentic(request: WebhookRequest): boolean;
   parseWebhook(request: WebhookRequest): InboundMessage[];
   sendText(message: OutboundText): Promise<void>;
+  sendTemplate(message: OutboundTemplate): Promise<void>;
 }
 
 export class MalformedWebhookError extends Error {

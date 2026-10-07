@@ -1,5 +1,6 @@
 import { INITIAL_ADMIN_STATE } from '@/lib/admin-state';
 import {
+  addMember,
   addWhatsApp,
   changeAdmin,
   createHousehold,
@@ -8,6 +9,7 @@ import {
   removeWhatsApp,
   revokeAccess,
   saveHousehold,
+  sendWelcome,
 } from './actions';
 
 const redirect = jest.fn((path: string): never => {
@@ -59,6 +61,7 @@ function sent(): { url: string; method: string | undefined; body: unknown } {
 const HOUSEHOLD = {
   name: 'Família Nova',
   firstMember: 'Pessoa Um',
+  phoneNumber: '+5511999990001',
   currency: 'BRL',
   timezone: 'America/Sao_Paulo',
   locale: 'pt-BR',
@@ -70,11 +73,11 @@ describe('administration actions', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
   });
 
-  it('creates a household and opens it', async () => {
-    respond(201, { key: 'household-key' });
+  it('creates a household and opens it, saying whether the welcome went out', async () => {
+    respond(201, { key: 'household-key', welcome: 'SENT' });
 
     await expect(createHousehold(INITIAL_ADMIN_STATE, form(HOUSEHOLD))).rejects.toThrow(
-      'redirected to /admin/household-key',
+      'redirected to /admin/household-key?welcome=SENT',
     );
     expect(sent()).toEqual({
       url: 'http://localhost:3000/platform/households',
@@ -145,6 +148,34 @@ describe('administration actions', () => {
       method: 'POST',
     });
     expect(state.errors).toEqual({ phoneNumber: 'DUPLICATE' });
+  });
+
+  it('adds a person with a number and reports the welcome', async () => {
+    respond(201, { key: 'member-key', welcome: 'FAILED' });
+
+    const state = await addMember(
+      INITIAL_ADMIN_STATE,
+      form({ household: 'h', name: 'Pessoa Dois', phoneNumber: '+5511999990002' }),
+    );
+
+    expect(sent()).toEqual({
+      url: 'http://localhost:3000/platform/households/h/members',
+      method: 'POST',
+      body: { name: 'Pessoa Dois', phoneNumber: '+5511999990002' },
+    });
+    expect(state).toMatchObject({ problem: null, welcome: 'FAILED' });
+  });
+
+  it('sends the welcome again on request', async () => {
+    respond(200, { welcome: 'SENT' });
+
+    const state = await sendWelcome(INITIAL_ADMIN_STATE, form({ household: 'h', member: 'm' }));
+
+    expect(sent()).toMatchObject({
+      url: 'http://localhost:3000/platform/households/h/members/m/welcome',
+      method: 'POST',
+    });
+    expect(state.welcome).toBe('SENT');
   });
 
   it('hands the invitation code to the form once, and only on success', async () => {

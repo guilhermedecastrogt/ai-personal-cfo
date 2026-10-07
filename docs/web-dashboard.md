@@ -154,6 +154,7 @@ A platform admin sees **Administration** in the menu and opens `/admin` ([ADR-03
 
 - `/admin` lists every household with its currency, language, time zone, number of people and admins, and has a form to create one with its first person. The currency is chosen once.
 - `/admin/:key` shows each person with their email, WhatsApp numbers and access: password set, invitation not used yet, or none. From there an admin registers an email, adds or removes a number, issues an invitation, revokes access, grants or removes admin, adds a person, and changes the household's name, language and time zone.
+- Creating a household and adding a person take an optional WhatsApp number. With a number, the assistant's welcome template goes out at once, and the page says whether it was sent. A person with a number has **Send welcome** to send it again ([ADR-034](adr/ADR-034-whatsapp-welcome-template.md)).
 - An invitation code is returned by the server action and shown once on the page. It is not stored by the web application and never appears in a URL.
 - Nothing in the administration shows an amount. The views read `/platform/*`, which carries none.
 

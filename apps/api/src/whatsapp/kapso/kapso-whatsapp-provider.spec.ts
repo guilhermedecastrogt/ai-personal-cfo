@@ -276,6 +276,52 @@ describe('KapsoWhatsAppProvider', () => {
     });
   });
 
+  describe('sending a template', () => {
+    it('posts an approved template with its language and body parameters', async () => {
+      await provider().sendTemplate({
+        to: '5511999990001',
+        name: 'boas_vindas',
+        language: 'pt_BR',
+        parameters: ['Beatriz', 'Família Castro'],
+      });
+
+      expect(stub.requests).toEqual([
+        {
+          method: 'POST',
+          path: `/meta/whatsapp/v24.0/${KAPSO_TEST_PHONE_NUMBER_ID}/messages`,
+          apiKey: KAPSO_TEST_API_KEY,
+          body: {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: '5511999990001',
+            type: 'template',
+            template: {
+              name: 'boas_vindas',
+              language: { code: 'pt_BR' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: 'Beatriz' },
+                    { type: 'text', text: 'Família Castro' },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ]);
+    });
+
+    it('reports a template the provider refuses', async () => {
+      stub.sendStatus = 400;
+
+      await expect(
+        provider().sendTemplate({ to: '1', name: 'missing', language: 'en', parameters: [] }),
+      ).rejects.toMatchObject({ failure: 'REJECTED' });
+    });
+  });
+
   describe('sending text', () => {
     it('posts the message to the configured number with the API key', async () => {
       await provider().sendText({ to: '353850000001', text: 'Registado.' });

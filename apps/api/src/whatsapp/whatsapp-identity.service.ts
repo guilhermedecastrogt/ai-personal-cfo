@@ -23,6 +23,13 @@ export class WhatsAppIdentityService {
     private readonly households: HouseholdsRepository,
   ) {}
 
+  isRegistered(phoneNumber: string): Promise<boolean> {
+    return this.households.isWhatsAppAddressTaken(
+      this.provider.name,
+      externalUserIdOf(phoneNumber),
+    );
+  }
+
   async register(
     householdId: string,
     memberId: string,

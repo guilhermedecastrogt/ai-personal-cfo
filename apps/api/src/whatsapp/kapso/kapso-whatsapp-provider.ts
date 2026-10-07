@@ -5,6 +5,7 @@ import {
   type DeliveryFailure,
   type InboundContent,
   type InboundMessage,
+  type OutboundTemplate,
   type OutboundText,
   type WebhookRequest,
   type WhatsAppProvider,
@@ -67,6 +68,28 @@ export class KapsoWhatsAppProvider implements WhatsAppProvider {
       to: message.to,
       type: 'text',
       text: { body: message.text.slice(0, MAXIMUM_TEXT_LENGTH), preview_url: false },
+    });
+    if (!response.ok) {
+      throw new WhatsAppDeliveryError(failureOf(response.status));
+    }
+  }
+
+  async sendTemplate(message: OutboundTemplate): Promise<void> {
+    const response = await this.post(`${this.options.phoneNumberId}/messages`, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: message.to,
+      type: 'template',
+      template: {
+        name: message.name,
+        language: { code: message.language },
+        components: [
+          {
+            type: 'body',
+            parameters: message.parameters.map((text) => ({ type: 'text', text })),
+          },
+        ],
+      },
     });
     if (!response.ok) {
       throw new WhatsAppDeliveryError(failureOf(response.status));

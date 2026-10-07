@@ -48,4 +48,6 @@ export type {
   HouseholdsOverviewView,
   InvitationView,
   MemberAccessView,
+  RegistrationView,
+  WelcomeView,
 } from '@api/platform/platform.contracts';

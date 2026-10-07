@@ -14,6 +14,7 @@ export const PLATFORM_ACTIONS = [
   'WHATSAPP_IDENTITY_REMOVED',
   'ADMIN_GRANTED',
   'ADMIN_REVOKED',
+  'WELCOME_SENT',
 ] as const;
 
 export type PlatformAction = (typeof PLATFORM_ACTIONS)[number];
