@@ -127,6 +127,19 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
+const ADMIN_SECTION: Section = {
+  href: '/admin',
+  key: 'admin',
+  icon: 'shield',
+  group: 'household',
+  usesMonth: false,
+  primary: false,
+};
+
+function sectionsFor(session: SessionView): readonly Section[] {
+  return session.isPlatformAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS;
+}
+
 const GROUPS: readonly GroupKey[] = ['money', 'planning', 'insight', 'household'];
 
 function withMonth(section: Section, month: string | null): string {
@@ -240,12 +253,14 @@ function Rail({
   pathname,
   signOut,
   memberName,
+  sections,
 }: {
   readonly t: Dictionary;
   readonly month: string | null;
   readonly pathname: string;
   readonly signOut: () => Promise<void>;
   readonly memberName: string;
+  readonly sections: readonly Section[];
 }): ReactNode {
   const [tip, setTip] = useState<Tip>(HIDDEN_TIP);
   const show =
@@ -297,34 +312,36 @@ function Rail({
               aria-label={t.nav.groups[group]}
               className={`space-y-1 ${position === 0 ? '' : 'mt-2 border-t border-hero-ink/10 pt-2'}`}
             >
-              {SECTIONS.filter((section) => section.group === group).map((section) => {
-                const current = isCurrent(section, pathname);
-                return (
-                  <li key={section.href} className="relative flex justify-center">
-                    {current ? (
-                      <span
-                        aria-hidden="true"
-                        className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brass"
-                      />
-                    ) : null}
-                    <Link
-                      href={withMonth(section, month)}
-                      aria-current={current ? 'page' : undefined}
-                      {...tipped(t.nav[section.key])}
-                      className={`${item} ${
-                        current
-                          ? 'bg-hero-ink/10 text-hero-ink'
-                          : 'hover:bg-hero-ink/5 hover:text-hero-ink'
-                      }`}
-                    >
-                      <Icon
-                        name={section.icon}
-                        className="h-[19px] w-[19px] transition-transform duration-200 group-hover:-translate-y-px group-hover:scale-110"
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
+              {sections
+                .filter((section) => section.group === group)
+                .map((section) => {
+                  const current = isCurrent(section, pathname);
+                  return (
+                    <li key={section.href} className="relative flex justify-center">
+                      {current ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brass"
+                        />
+                      ) : null}
+                      <Link
+                        href={withMonth(section, month)}
+                        aria-current={current ? 'page' : undefined}
+                        {...tipped(t.nav[section.key])}
+                        className={`${item} ${
+                          current
+                            ? 'bg-hero-ink/10 text-hero-ink'
+                            : 'hover:bg-hero-ink/5 hover:text-hero-ink'
+                        }`}
+                      >
+                        <Icon
+                          name={section.icon}
+                          className="h-[19px] w-[19px] transition-transform duration-200 group-hover:-translate-y-px group-hover:scale-110"
+                        />
+                      </Link>
+                    </li>
+                  );
+                })}
             </ul>
           ))}
         </nav>
@@ -368,18 +385,20 @@ function MoreSheet({
   pathname,
   signOut,
   memberName,
+  sections,
 }: {
   readonly t: Dictionary;
   readonly month: string | null;
   readonly pathname: string;
   readonly signOut: () => Promise<void>;
   readonly memberName: string;
+  readonly sections: readonly Section[];
 }): ReactNode {
   const sheet = useRef<HTMLDialogElement>(null);
   const close = (): void => {
     sheet.current?.close();
   };
-  const secondary = SECTIONS.filter((section) => !section.primary);
+  const secondary = sections.filter((section) => !section.primary);
   const current = secondary.some((section) => isCurrent(section, pathname));
   return (
     <>
@@ -462,12 +481,14 @@ function BottomNav({
   pathname,
   signOut,
   memberName,
+  sections,
 }: {
   readonly t: Dictionary;
   readonly month: string | null;
   readonly pathname: string;
   readonly signOut: () => Promise<void>;
   readonly memberName: string;
+  readonly sections: readonly Section[];
 }): ReactNode {
   return (
     <nav
@@ -475,23 +496,25 @@ function BottomNav({
       className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur lg:hidden"
     >
       <ul className="mx-auto flex max-w-lg">
-        {SECTIONS.filter((section) => section.primary).map((section) => {
-          const current = isCurrent(section, pathname);
-          return (
-            <li key={section.href} className="flex flex-1">
-              <Link
-                href={withMonth(section, month)}
-                aria-current={current ? 'page' : undefined}
-                className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-medium ${
-                  current ? 'text-accent' : 'text-muted'
-                }`}
-              >
-                <Icon name={section.icon} className="h-[22px] w-[22px]" />
-                {t.nav[section.key]}
-              </Link>
-            </li>
-          );
-        })}
+        {sections
+          .filter((section) => section.primary)
+          .map((section) => {
+            const current = isCurrent(section, pathname);
+            return (
+              <li key={section.href} className="flex flex-1">
+                <Link
+                  href={withMonth(section, month)}
+                  aria-current={current ? 'page' : undefined}
+                  className={`flex flex-1 flex-col items-center gap-1 py-2 text-[0.6875rem] font-medium ${
+                    current ? 'text-accent' : 'text-muted'
+                  }`}
+                >
+                  <Icon name={section.icon} className="h-[22px] w-[22px]" />
+                  {t.nav[section.key]}
+                </Link>
+              </li>
+            );
+          })}
         <li className="flex flex-1">
           <MoreSheet
             t={t}
@@ -499,6 +522,7 @@ function BottomNav({
             pathname={pathname}
             signOut={signOut}
             memberName={memberName}
+            sections={sections}
           />
         </li>
       </ul>
@@ -518,10 +542,18 @@ export function Shell({
   const t = dictionaryFor(session.locale);
   const pathname = usePathname();
   const month = useSearchParams().get('month');
-  const usesMonth = SECTIONS.find((section) => isCurrent(section, pathname))?.usesMonth ?? true;
+  const sections = sectionsFor(session);
+  const usesMonth = sections.find((section) => isCurrent(section, pathname))?.usesMonth ?? true;
   return (
     <div className="lg:min-h-screen">
-      <Rail t={t} month={month} pathname={pathname} signOut={signOut} memberName={session.member} />
+      <Rail
+        t={t}
+        month={month}
+        pathname={pathname}
+        signOut={signOut}
+        memberName={session.member}
+        sections={sections}
+      />
       <div className="min-w-0 lg:pl-24">
         <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
@@ -545,6 +577,7 @@ export function Shell({
         pathname={pathname}
         signOut={signOut}
         memberName={session.member}
+        sections={sections}
       />
     </div>
   );

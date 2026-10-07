@@ -112,4 +112,25 @@ describe('floating rail', () => {
     expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Compare');
     expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('People');
   });
+
+  it('adds Administration for a platform admin only, in the rail and on phones', () => {
+    render(
+      <Shell session={{ ...SESSION, isPlatformAdmin: true }} signOut={() => Promise.resolve()}>
+        <p>Page</p>
+      </Shell>,
+    );
+
+    expect(within(rail()).getByRole('link', { name: 'Administration' })).toHaveAttribute(
+      'href',
+      '/admin',
+    );
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Administration');
+  });
+
+  it('leaves Administration out for everyone else', () => {
+    renderShell();
+
+    expect(within(rail()).queryByRole('link', { name: 'Administration' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { hidden: true })).not.toHaveTextContent('Administration');
+  });
 });

@@ -6,6 +6,8 @@ import type {
   Comparison,
   CompareView,
   EvolutionView,
+  HouseholdDetailView,
+  HouseholdsOverviewView,
   GoalEditView,
   MemberView,
   MembersView,
@@ -795,4 +797,68 @@ export const MEMBER: MemberView = {
       ],
     },
   ],
+};
+
+export const ADMIN_HOUSEHOLDS: HouseholdsOverviewView = {
+  households: [
+    {
+      key: 'household-key-own',
+      name: 'Demo Household',
+      currency: 'EUR',
+      timezone: 'Europe/Dublin',
+      locale: 'en',
+      memberCount: 3,
+      adminCount: 1,
+      isYours: true,
+      createdOn: '2026-05-01',
+    },
+    {
+      key: 'household-key-other',
+      name: 'Other Household',
+      currency: 'BRL',
+      timezone: 'America/Sao_Paulo',
+      locale: 'pt-BR',
+      memberCount: 1,
+      adminCount: 0,
+      isYours: false,
+      createdOn: '2026-10-07',
+    },
+  ],
+  options: {
+    locales: ['en', 'pt-BR'],
+    currencies: ['BRL', 'EUR', 'USD'],
+    defaultTimezone: 'America/Sao_Paulo',
+  },
+};
+
+export const ADMIN_HOUSEHOLD: HouseholdDetailView = {
+  key: 'household-key-other',
+  name: 'Other Household',
+  currency: 'BRL',
+  timezone: 'America/Sao_Paulo',
+  locale: 'pt-BR',
+  createdOn: '2026-10-07',
+  members: [
+    {
+      key: 'member-key-one',
+      name: 'Person One',
+      email: 'one@example.com',
+      hasPassword: true,
+      hasInvitation: false,
+      isPlatformAdmin: true,
+      isYou: false,
+      whatsapp: [{ key: 'identity-key-one', phoneNumber: '+5511999990001' }],
+    },
+    {
+      key: 'member-key-two',
+      name: 'Person Two',
+      email: null,
+      hasPassword: false,
+      hasInvitation: false,
+      isPlatformAdmin: false,
+      isYou: false,
+      whatsapp: [],
+    },
+  ],
+  options: { locales: ['en', 'pt-BR'] },
 };

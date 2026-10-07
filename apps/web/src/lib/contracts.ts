@@ -42,3 +42,10 @@ export type {
   StoppedRecurringView,
   TransactionsView,
 } from '@api/dashboard/dashboard.contracts';
+export type {
+  HouseholdDetailView,
+  HouseholdSummaryView,
+  HouseholdsOverviewView,
+  InvitationView,
+  MemberAccessView,
+} from '@api/platform/platform.contracts';

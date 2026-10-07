@@ -16,6 +16,7 @@ export type IconName =
   | 'members'
   | 'search'
   | 'download'
+  | 'shield'
   | 'more'
   | 'chevron-left'
   | 'chevron-right'
@@ -43,6 +44,7 @@ const PATHS: Record<IconName, string> = {
     'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20a6 6 0 0 1 12 0M16 4.6a3.5 3.5 0 0 1 0 6.3M21 20a6 6 0 0 0-3.6-5.5',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  shield: 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6zM9 12l2 2 4-4',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   'chevron-left': 'M15 5l-7 7 7 7',
   'chevron-right': 'M9 5l7 7-7 7',

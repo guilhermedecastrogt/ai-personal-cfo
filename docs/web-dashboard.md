@@ -148,6 +148,15 @@ The web application imports the TypeScript types of these schemas and nothing el
 | Transactions | History with text search, filters, a free period of up to a year, order and paging; a CSV download of the same selection; each transaction opens for editing or deletion |
 | Accounts     | Accounts, ownership, balances, totals per currency, members                                                                                                              |
 
+## Administration
+
+A platform admin sees **Administration** in the menu and opens `/admin` ([ADR-033](adr/ADR-033-platform-administration.md)). Everyone else gets the not-found page there, before any request reaches the API.
+
+- `/admin` lists every household with its currency, language, time zone, number of people and admins, and has a form to create one with its first person. The currency is chosen once.
+- `/admin/:key` shows each person with their email, WhatsApp numbers and access: password set, invitation not used yet, or none. From there an admin registers an email, adds or removes a number, issues an invitation, revokes access, grants or removes admin, adds a person, and changes the household's name, language and time zone.
+- An invitation code is returned by the server action and shown once on the page. It is not stored by the web application and never appears in a URL.
+- Nothing in the administration shows an amount. The views read `/platform/*`, which carries none.
+
 ## Editing
 
 - Each transaction card or row opens `/transactions/:key`, which comes back to the same page and filters on save. Budgets and goals have **New** and **Edit** actions on their pages.
