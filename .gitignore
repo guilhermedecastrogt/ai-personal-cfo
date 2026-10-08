@@ -31,3 +31,6 @@ tmp/
 
 infra/docker/.deployed-tag
 infra/docker/.previous-tag
+
+# Local editor workspaces
+docs/.obsidian/

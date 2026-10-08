@@ -5,3 +5,6 @@ coverage/
 package-lock.json
 apps/api/drizzle/
 apps/web/next-env.d.ts
+.claude/
+video/
+docs/.obsidian/
