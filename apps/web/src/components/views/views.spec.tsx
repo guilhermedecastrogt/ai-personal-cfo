@@ -108,6 +108,19 @@ describe('overview', () => {
     expect(panel('By member')).toHaveTextContent('Member C8.11%€180.00 spent');
   });
 
+  it('links every category and budget to the category page of the same month', () => {
+    render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
+
+    expect(within(panel('Where it went')).getByRole('link', { name: 'Food' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-food?month=2026-10',
+    );
+    expect(within(panel('Budgets')).getByRole('link', { name: 'Restaurants' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-restaurants?month=2026-10',
+    );
+  });
+
   it('links to the review of the same month', () => {
     render(<OverviewView evolution={EVOLUTION} t={EN} data={overview()} />);
 
@@ -187,6 +200,39 @@ describe('spending and income', () => {
     );
 
     expect(screen.getByText('No spending is recorded for October 2026.')).toBeInTheDocument();
+  });
+
+  it('lists each subcategory under its own parent, linked to its page, with its share of the parent', () => {
+    render(<SpendingView t={EN} data={SPENDING} />);
+    const categories = panel('By category');
+    const rows = within(categories).getAllByRole('listitem');
+
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'Housing€1,800.00 81.08%',
+      'Rent€1,800.00 100%',
+      'Food€420.00 18.92%',
+    ]);
+    expect(rows[1]).toHaveClass('border-l-2');
+    expect(within(categories).getByRole('link', { name: 'Rent' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-rent?month=2026-10',
+    );
+    expect(
+      within(categories).getByRole('meter', { name: 'Rent’s share of its category' }),
+    ).toHaveAttribute('aria-valuetext', '100%');
+  });
+
+  it('links risers, fallers and largest expenses to their category', () => {
+    render(<SpendingView t={EN} data={SPENDING} />);
+
+    expect(within(panel('Rose most')).getByRole('link', { name: 'Restaurants' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-restaurants?month=2026-10',
+    );
+    expect(within(panel('Largest expenses')).getByRole('link', { name: 'Rent' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-rent?month=2026-10',
+    );
   });
 
   it('shows income by source and member', () => {
@@ -511,8 +557,11 @@ describe('transactions', () => {
 
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveTextContent(
-      '2026-10-12BistroExpense · individualRestaurantsJoint AccountMember C€180.00',
+      '2026-10-12BistroExpense · individualFood › RestaurantsJoint AccountMember C€180.00',
     );
+    expect(
+      within(screen.getByRole('table')).getByRole('link', { name: 'Food › Restaurants' }),
+    ).toHaveAttribute('href', '/categories/category-key-restaurants?month=2026-10');
     expect(rows[2]).toHaveTextContent(
       '2026-10-02TransferTransfer—Joint Account → SavingsMember A€500.00',
     );
@@ -531,6 +580,14 @@ describe('transactions', () => {
     expect(screen.getByLabelText('Type')).toHaveValue('EXPENSE');
     expect(screen.getByLabelText('Member')).toHaveValue('member-key-a');
     expect(screen.getByLabelText('Category')).toHaveValue('');
+    expect(
+      within(screen.getByLabelText('Category'))
+        .getAllByRole('group')
+        .map((group) => [group.getAttribute('label'), group.textContent]),
+    ).toEqual([
+      ['Spending', 'FoodFood › Restaurants'],
+      ['Income', 'Salary'],
+    ]);
     expect(
       within(screen.getByLabelText('Account')).getByRole('option', { name: 'Joint Account' }),
     ).toBeInTheDocument();
@@ -613,6 +670,41 @@ describe('charts', () => {
     expect(ring).toHaveTextContent('Food18.92%€420.00');
     expect(slices[1]).toHaveAttribute('stroke-dasharray', '1892 10000');
     expect(slices[1]).toHaveAttribute('stroke-dashoffset', '-8108');
+    expect(within(ring).getByRole('link', { name: 'Food' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-food?month=2026-10',
+    );
+    expect(slices[1]?.closest('a')).toHaveAttribute(
+      'href',
+      '/categories/category-key-food?month=2026-10',
+    );
+  });
+
+  it('leaves the Others slice without a link', () => {
+    const [entry] = SPENDING.currencies;
+    const others = {
+      category: 'Others',
+      categoryKey: null,
+      isOther: true,
+      total: { minor: 100, text: '€1.00' },
+      share: { basisPoints: 100, text: '1%' },
+      offset: { basisPoints: 9900, text: '99%' },
+    };
+    render(
+      <SpendingView
+        t={EN}
+        data={{
+          ...SPENDING,
+          currencies:
+            entry === undefined ? [] : [{ ...entry, composition: [...entry.composition, others] }],
+        }}
+      />,
+    );
+
+    expect(
+      within(panel('Where it went')).queryByRole('link', { name: 'Others' }),
+    ).not.toBeInTheDocument();
+    expect(within(panel('Where it went')).getByText('Others')).toBeInTheDocument();
   });
 
   it('marks how far through the period a budget is and says whether spending keeps pace', () => {

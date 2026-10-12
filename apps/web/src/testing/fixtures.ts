@@ -3,6 +3,7 @@ import type {
   BudgetEditView,
   BudgetView,
   BudgetsView,
+  CategoryView,
   Comparison,
   CompareView,
   EvolutionView,
@@ -921,4 +922,72 @@ export const ADMIN_HOUSEHOLD: HouseholdDetailView = {
     },
   ],
   options: { locales: ['en', 'pt-BR'], welcomeEnabled: true },
+};
+
+const FOOD_MONTHS = [
+  ['2026-05', 'May 2026', 'May', '210.00', 21000, 5000],
+  ['2026-06', 'June 2026', 'Jun', '252.00', 25200, 6000],
+  ['2026-07', 'July 2026', 'Jul', '294.00', 29400, 7000],
+  ['2026-08', 'August 2026', 'Aug', '315.00', 31500, 7500],
+  ['2026-09', 'September 2026', 'Sep', '330.00', 33000, 7857],
+  ['2026-10', 'October 2026', 'Oct', '420.00', 42000, 10000],
+] as const;
+
+export const CATEGORY: CategoryView = {
+  month: OCTOBER,
+  category: {
+    key: 'category-key-food',
+    name: 'Food',
+    path: 'Food',
+    kind: 'EXPENSE',
+    parent: null,
+    children: [
+      { key: 'category-key-coffee', name: 'Coffee' },
+      { key: 'category-key-groceries', name: 'Groceries' },
+      { key: 'category-key-restaurants', name: 'Restaurants' },
+    ],
+  },
+  currencies: [
+    {
+      currency: 'EUR',
+      total: eur('420.00', 42000),
+      transactionCount: 3,
+      share: share('18.92%', 1892),
+      comparison: comparison('420.00', '330.00', 'INCREASE'),
+      previousPeriod: { start: '2026-09-01', end: '2026-09-20' },
+      subcategories: [
+        {
+          category: 'Groceries',
+          categoryKey: 'category-key-groceries',
+          parentKey: 'category-key-food',
+          isTopLevel: false,
+          total: eur('240.00', 24000),
+          share: share('10.81%', 1081),
+          shareOfParent: share('57.14%', 5714),
+        },
+        {
+          category: 'Restaurants',
+          categoryKey: 'category-key-restaurants',
+          parentKey: 'category-key-food',
+          isTopLevel: false,
+          total: eur('180.00', 18000),
+          share: share('8.11%', 811),
+          shareOfParent: share('42.86%', 4286),
+        },
+      ],
+      months: FOOD_MONTHS.map(([key, label, shortLabel, text, minor, bar]) => ({
+        key,
+        label,
+        shortLabel,
+        total: eur(text, minor),
+        bar: share(`${String(bar / 100)}%`, bar),
+      })),
+      byMember: [
+        { member: 'Member A', total: eur('240.00', 24000), share: share('57.14%', 5714) },
+        { member: 'Member C', total: eur('180.00', 18000), share: share('42.86%', 4286) },
+      ],
+      budgets: [{ ...RESTAURANTS_BUDGET, key: 'budget-key-restaurants' }],
+    },
+  ],
+  transactions: { total: 3, rows: TRANSACTIONS.transactions.slice(0, 1) },
 };

@@ -13,6 +13,8 @@ export type {
   ActiveRecurringView,
   BudgetView,
   BudgetsView,
+  CategoryRowView,
+  CategoryView,
   Comparison,
   CompareView,
   CompositionSliceView,
@@ -40,6 +42,7 @@ export type {
   SignalsView,
   SpendingView,
   StoppedRecurringView,
+  TransactionRowView,
   TransactionsView,
 } from '@api/dashboard/dashboard.contracts';
 export type {

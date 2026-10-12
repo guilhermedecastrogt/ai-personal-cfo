@@ -65,6 +65,7 @@ export function BudgetsView({
                 budgets={entry.budgets}
                 detailed
                 editHref={(key) => `/budgets/${key}?month=${data.month.key}`}
+                month={data.month.key}
                 t={t}
               />
             </Panel>

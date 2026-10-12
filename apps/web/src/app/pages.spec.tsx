@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import {
   ACCOUNTS,
+  CATEGORY,
   COMPARE,
   EVOLUTION,
   MEMBER,
@@ -14,6 +15,7 @@ import {
   overview,
 } from '@/testing/fixtures';
 import AccountsPage from './(dashboard)/accounts/page';
+import CategoryPage from './(dashboard)/categories/[key]/page';
 import ComparePage from './(dashboard)/compare/page';
 import MemberPage from './(dashboard)/members/[key]/page';
 import MembersPage from './(dashboard)/members/page';
@@ -275,5 +277,21 @@ describe('dashboard pages', () => {
 
     expect(apiFind).toHaveBeenCalledWith('/dashboard/members/member%20key%2Fb?month=2026-10');
     expect(screen.getByRole('heading', { name: 'Member B', level: 1 })).toBeInTheDocument();
+  });
+
+  it('opens one category through the not-found aware client, with the month', async () => {
+    apiFind.mockResolvedValue(CATEGORY);
+
+    render(
+      (await CategoryPage({
+        params: Promise.resolve({ key: 'category key/food' }),
+        searchParams: searchParams({ month: '2026-10' }),
+      })) as ReactElement,
+    );
+
+    expect(apiFind).toHaveBeenCalledWith(
+      '/dashboard/categories/category%20key%2Ffood?month=2026-10',
+    );
+    expect(screen.getByRole('heading', { name: 'Food', level: 1 })).toBeInTheDocument();
   });
 });

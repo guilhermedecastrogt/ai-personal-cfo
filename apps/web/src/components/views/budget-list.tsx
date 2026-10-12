@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { BudgetRowView, BudgetView } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import { percentOf } from '../charts';
-import { ActionLink, Badge, Figure, Meter, type Tone } from '../ui';
+import { ActionLink, Badge, CategoryLink, Figure, Meter, type Tone } from '../ui';
 
 type Pace = NonNullable<BudgetRowView['pace']>;
 
@@ -24,6 +24,7 @@ export function BudgetList({
   budgets,
   detailed = false,
   editHref,
+  month,
   t,
 }: {
   readonly budgets: readonly (BudgetView & {
@@ -32,6 +33,7 @@ export function BudgetList({
   })[];
   readonly detailed?: boolean;
   readonly editHref?: (key: string) => string;
+  readonly month?: string;
   readonly t: Dictionary;
 }): ReactNode {
   return (
@@ -43,7 +45,12 @@ export function BudgetList({
             <div className="mb-2 flex items-start gap-2">
               <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <span className="font-medium">
-                  {budget.category} <Badge tone={status.tone}>{status.label}</Badge>
+                  <CategoryLink
+                    name={budget.category}
+                    categoryKey={budget.categoryKey}
+                    month={month}
+                  />{' '}
+                  <Badge tone={status.tone}>{status.label}</Badge>
                 </span>
                 <span className="text-sm">
                   <Figure value={budget.spent} /> <span className="text-muted">{t.common.of}</span>{' '}

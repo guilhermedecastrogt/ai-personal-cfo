@@ -99,12 +99,14 @@ export function Meter({
   label,
   t,
   onHero = false,
+  thin = false,
 }: {
   readonly value: Ratio | null;
   readonly tone?: Tone;
   readonly label: string;
   readonly t: Dictionary;
   readonly onHero?: boolean;
+  readonly thin?: boolean;
 }): ReactNode {
   const filled = Math.min(Math.max(value?.basisPoints ?? 0, 0), FULL_SCALE_IN_BASIS_POINTS);
   return (
@@ -115,7 +117,7 @@ export function Meter({
       aria-valuemax={100}
       aria-valuenow={filled / BASIS_POINTS_PER_PERCENT}
       aria-valuetext={value?.text ?? t.common.notAvailable}
-      className={`h-1.5 w-full overflow-hidden rounded-full ${onHero ? 'bg-hero-ink/15' : 'bg-track'}`}
+      className={`${thin ? 'h-1' : 'h-1.5'} w-full overflow-hidden rounded-full ${onHero ? 'bg-hero-ink/15' : 'bg-track'}`}
     >
       <div
         className={`h-full rounded-full ${TONE_FILL[tone]}`}
@@ -293,6 +295,34 @@ export function ActionLink({
     >
       <Icon name={icon} className="h-[18px] w-[18px]" />
       {children}
+    </Link>
+  );
+}
+
+export function categoryHref(categoryKey: string, month: string | undefined): string {
+  const suffix = month === undefined ? '' : `?month=${month}`;
+  return `/categories/${encodeURIComponent(categoryKey)}${suffix}`;
+}
+
+export function CategoryLink({
+  name,
+  categoryKey,
+  month,
+  className = '',
+}: {
+  readonly name: string;
+  readonly categoryKey: string | null;
+  readonly month: string | undefined;
+  readonly className?: string;
+}): ReactNode {
+  return categoryKey === null ? (
+    <span className={className}>{name}</span>
+  ) : (
+    <Link
+      href={categoryHref(categoryKey, month)}
+      className={`${className} underline decoration-line decoration-dotted underline-offset-4 hover:decoration-brass hover:decoration-solid`}
+    >
+      {name}
     </Link>
   );
 }

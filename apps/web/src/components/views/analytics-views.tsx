@@ -10,18 +10,16 @@ import type { Dictionary } from '@/lib/i18n/dictionary';
 import { CompositionRing, PairBars } from '../charts';
 import { Icon } from '../icons';
 import {
+  CategoryLink,
   Change,
   CurrencySections,
   Empty,
-  Figure,
   Meter,
   PageHeading,
   Panel,
-  Row,
-  Rows,
   Stat,
 } from '../ui';
-import { Categories } from './flow-views';
+import { Categories, LargestExpenses } from './flow-views';
 
 function MonthSelect({
   name,
@@ -167,9 +165,14 @@ export function CompareView({
                 ) : (
                   <ul className="space-y-5">
                     {entry.categories.map((row) => (
-                      <li key={row.category}>
+                      <li key={row.categoryKey ?? row.category}>
                         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-sm">
-                          <span className="font-medium">{row.category}</span>
+                          <CategoryLink
+                            name={row.category}
+                            categoryKey={row.categoryKey}
+                            month={data.second.key}
+                            className="font-medium"
+                          />
                           <span className="text-xs">
                             <Change comparison={row.comparison} risingIsGood={false} t={t} />
                           </span>
@@ -301,29 +304,25 @@ export function MemberView({
                       slices={entry.composition}
                       total={entry.spending}
                       totalLabel={t.members.spending}
+                      month={data.month.key}
                       t={t}
                     />
                   </Panel>
                 )}
                 <div className="grid gap-6 lg:grid-cols-2">
                   <Panel title={t.members.categories}>
-                    <Categories rows={entry.byCategory} t={t} />
+                    <Categories rows={entry.byCategory} month={data.month.key} t={t} />
                   </Panel>
                   <Panel title={t.members.largest}>
                     {entry.largestExpenses.length === 0 ? (
                       <Empty>{t.flow.nothingRecorded}</Empty>
                     ) : (
-                      <Rows>
-                        {entry.largestExpenses.map((expense, position) => (
-                          <Row
-                            key={`${expense.date}-${String(position)}`}
-                            label={expense.merchant ?? expense.category}
-                            detail={`${t.date(expense.date)} · ${expense.category} · ${expense.account}`}
-                          >
-                            <Figure value={expense.amount} />
-                          </Row>
-                        ))}
-                      </Rows>
+                      <LargestExpenses
+                        rows={entry.largestExpenses}
+                        month={data.month.key}
+                        detailOf={(expense) => expense.account}
+                        t={t}
+                      />
                     )}
                   </Panel>
                 </div>

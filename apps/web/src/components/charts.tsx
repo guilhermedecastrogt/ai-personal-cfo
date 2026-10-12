@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react';
-import type { CompositionSliceView, EvolutionView, Money, Ratio } from '@/lib/contracts';
+import type {
+  CategoryView,
+  CompositionSliceView,
+  EvolutionView,
+  Money,
+  Ratio,
+} from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
-import { Figure } from './ui';
+import { CategoryLink, categoryHref, Figure } from './ui';
 
 const FULL_SCALE_IN_BASIS_POINTS = 10_000;
 const BASIS_POINTS_PER_PERCENT = 100;
@@ -19,6 +25,7 @@ const RING_CENTER = 59;
 const RING_VIEW_BOX = '0 0 118 118';
 
 type EvolutionMonth = EvolutionView['currencies'][number]['months'][number];
+type CategoryMonth = CategoryView['currencies'][number]['months'][number];
 
 export function percentOf(ratio: Ratio): string {
   const clamped = Math.min(Math.max(ratio.basisPoints, 0), FULL_SCALE_IN_BASIS_POINTS);
@@ -150,11 +157,13 @@ export function CompositionRing({
   slices,
   total,
   totalLabel,
+  month,
   t,
 }: {
   readonly slices: readonly CompositionSliceView[];
   readonly total: Money;
   readonly totalLabel: string;
+  readonly month: string;
   readonly t: Dictionary;
 }): ReactNode {
   return (
@@ -169,22 +178,35 @@ export function CompositionRing({
             stroke="var(--track)"
             strokeWidth={RING_WIDTH}
           />
-          {slices.map((slice, position) => (
-            <circle
-              key={slice.category}
-              data-slice={position}
-              cx={RING_CENTER}
-              cy={RING_CENTER}
-              r={RING_RADIUS}
-              fill="none"
-              stroke={colorOf(slice, position)}
-              strokeWidth={RING_WIDTH}
-              pathLength={FULL_SCALE_IN_BASIS_POINTS}
-              strokeDasharray={`${String(slice.share.basisPoints)} ${String(FULL_SCALE_IN_BASIS_POINTS)}`}
-              strokeDashoffset={`-${String(slice.offset.basisPoints)}`}
-              className="slice"
-            />
-          ))}
+          {slices.map((slice, position) => {
+            const arc = (
+              <circle
+                data-slice={position}
+                cx={RING_CENTER}
+                cy={RING_CENTER}
+                r={RING_RADIUS}
+                fill="none"
+                stroke={colorOf(slice, position)}
+                strokeWidth={RING_WIDTH}
+                pathLength={FULL_SCALE_IN_BASIS_POINTS}
+                strokeDasharray={`${String(slice.share.basisPoints)} ${String(FULL_SCALE_IN_BASIS_POINTS)}`}
+                strokeDashoffset={`-${String(slice.offset.basisPoints)}`}
+                className="slice"
+              />
+            );
+            return slice.categoryKey === null ? (
+              <g key={slice.category}>{arc}</g>
+            ) : (
+              <a
+                key={slice.category}
+                href={categoryHref(slice.categoryKey, month)}
+                tabIndex={-1}
+                className="cursor-pointer"
+              >
+                {arc}
+              </a>
+            );
+          })}
         </svg>
         <div className="absolute inset-0 grid place-items-center text-center">
           <div>
@@ -207,7 +229,12 @@ export function CompositionRing({
               className="h-2.5 w-2.5 shrink-0 translate-y-px rounded-full"
               style={{ background: colorOf(slice, position) }}
             />
-            <span className="min-w-0 flex-1 truncate">{slice.category}</span>
+            <CategoryLink
+              name={slice.category}
+              categoryKey={slice.categoryKey}
+              month={month}
+              className="min-w-0 flex-1 truncate"
+            />
             <span className="figure text-muted">{slice.share.text}</span>
             <span className="w-24 shrink-0 text-right">
               <Figure value={slice.total} />
@@ -251,6 +278,77 @@ export function PairBars({
           <Figure value={second.amount} />
         </span>
       </div>
+    </div>
+  );
+}
+
+export function MonthBars({
+  months,
+  tone,
+  caption,
+  t,
+}: {
+  readonly months: readonly CategoryMonth[];
+  readonly tone: 'brass' | 'kept';
+  readonly caption: string;
+  readonly t: Dictionary;
+}): ReactNode {
+  const fill = tone === 'kept' ? 'bg-kept' : 'bg-brass';
+  return (
+    <div>
+      <ol
+        aria-hidden="true"
+        className="evolution grid auto-cols-fr grid-flow-col gap-2 border-b border-line sm:gap-4"
+      >
+        {months.map((month, position) => (
+          <li key={month.key} className="relative flex flex-col items-stretch">
+            <div
+              className={`chart-tip pointer-events-none absolute bottom-full z-10 mb-2 w-max min-w-32 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs shadow-panel ${tipPlacement(position, months.length)}`}
+            >
+              <p className="mb-1 font-medium text-ink">{month.label}</p>
+              <Figure value={month.total} />
+            </div>
+            <div className="flex h-36 items-end justify-center">
+              <span
+                className={`bar w-full max-w-8 rounded-t-[4px] ${fill} ${
+                  position === months.length - 1 ? '' : 'opacity-60'
+                }`}
+                style={{ height: percentOf(month.bar) }}
+              />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <ol
+        aria-hidden="true"
+        className="mt-2 grid auto-cols-fr grid-flow-col gap-2 text-center text-[0.6875rem] text-muted sm:gap-4"
+      >
+        {months.map((month, position) => (
+          <li
+            key={month.key}
+            className={position === months.length - 1 ? 'font-semibold text-ink' : ''}
+          >
+            {month.shortLabel}
+          </li>
+        ))}
+      </ol>
+      <table className="sr-only-table">
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t.categories.month}</th>
+            <th scope="col">{t.categories.total}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {months.map((month) => (
+            <tr key={month.key}>
+              <th scope="row">{month.label}</th>
+              <td>{month.total.text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

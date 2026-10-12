@@ -4,12 +4,13 @@ import type {
   TransactionSort,
   AccountsView as Accounts,
   ReviewView as Review,
+  TransactionRowView,
   TransactionsView as Transactions,
 } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import type { TransactionQuery } from '@/lib/transaction-query';
 import { Icon } from '../icons';
-import { Badge, Empty, Figure, PageHeading, Panel, Row, Rows } from '../ui';
+import { Badge, CategoryLink, Empty, Figure, PageHeading, Panel, Row, Rows } from '../ui';
 
 const SORTS: readonly TransactionSort[] = ['date_desc', 'date_asc', 'amount_desc', 'amount_asc'];
 
@@ -79,7 +80,9 @@ export function ReviewView({
 
 export type { TransactionQuery };
 
-type TransactionRow = Transactions['transactions'][number];
+type TransactionRow = TransactionRowView;
+type CategoryOption = Transactions['filters']['categories'][number];
+const CATEGORY_KINDS: readonly CategoryOption['kind'][] = ['EXPENSE', 'INCOME'];
 
 function queryString(
   data: Transactions,
@@ -165,6 +168,40 @@ function Filter({
   );
 }
 
+function CategoryFilter({
+  selected,
+  options,
+  t,
+}: {
+  readonly selected: string | undefined;
+  readonly options: readonly CategoryOption[];
+  readonly t: Dictionary;
+}): ReactNode {
+  return (
+    <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+      <span className="eyebrow text-muted">{t.transactions.category}</span>
+      <select
+        name="category"
+        defaultValue={selected ?? ''}
+        className="h-10 w-full rounded-xl border border-line bg-surface px-3"
+      >
+        <option value="">{t.transactions.all}</option>
+        {CATEGORY_KINDS.map((kind) => (
+          <optgroup key={kind} label={t.categories.kinds[kind]}>
+            {options
+              .filter((option) => option.kind === kind)
+              .map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.name}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function describeTransaction(transaction: TransactionRow, t: Dictionary): string {
   return transaction.merchant ?? transaction.description ?? t.transactions.types[transaction.type];
 }
@@ -204,7 +241,7 @@ function TransactionCards({
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{describeTransaction(transaction, t)}</p>
               <p className="mt-0.5 truncate text-sm text-muted">
-                {transaction.category ?? kindOf(transaction, t)} · {transaction.member}
+                {transaction.categoryPath ?? kindOf(transaction, t)} · {transaction.member}
               </p>
               <p className="mt-0.5 truncate text-xs text-muted">
                 <span className="figure">{t.date(transaction.date)}</span> ·{' '}
@@ -226,19 +263,23 @@ function TransactionCards({
 }
 
 function TransactionTable({
-  data,
+  rows,
+  caption,
   listPath,
+  month,
   t,
 }: {
-  readonly data: Transactions;
+  readonly rows: readonly TransactionRow[];
+  readonly caption: string;
   readonly listPath: string;
+  readonly month: string;
   readonly t: Dictionary;
 }): ReactNode {
   const heading = 'eyebrow px-4 py-3 text-left text-muted';
   return (
     <div className="hidden overflow-hidden rounded-2xl border border-line bg-surface shadow-panel md:block">
       <table className="w-full text-left text-sm">
-        <caption className="sr-only">{t.transactions.caption(data.month.label)}</caption>
+        <caption className="sr-only">{caption}</caption>
         <thead className="border-b border-line">
           <tr>
             <th scope="col" className={heading}>
@@ -265,14 +306,20 @@ function TransactionTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {data.transactions.map((transaction) => (
+          {rows.map((transaction) => (
             <tr key={transaction.key} className="hover:bg-raised">
               <td className="figure px-4 py-3 text-muted">{t.date(transaction.date)}</td>
               <td className="px-4 py-3">
                 <span className="font-medium">{describeTransaction(transaction, t)}</span>
                 <span className="ml-2 text-muted">{kindOf(transaction, t)}</span>
               </td>
-              <td className="px-4 py-3">{transaction.category ?? '—'}</td>
+              <td className="px-4 py-3">
+                <CategoryLink
+                  name={transaction.categoryPath ?? '—'}
+                  categoryKey={transaction.categoryKey}
+                  month={month}
+                />
+              </td>
               <td className="px-4 py-3">{accountOf(transaction)}</td>
               <td className="px-4 py-3">{transaction.member}</td>
               <td className="px-4 py-3 text-right">
@@ -295,6 +342,27 @@ function TransactionTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+export function TransactionList({
+  rows,
+  caption,
+  listPath,
+  month,
+  t,
+}: {
+  readonly rows: readonly TransactionRow[];
+  readonly caption: string;
+  readonly listPath: string;
+  readonly month: string;
+  readonly t: Dictionary;
+}): ReactNode {
+  return (
+    <>
+      <TransactionCards rows={rows} listPath={listPath} t={t} />
+      <TransactionTable rows={rows} caption={caption} listPath={listPath} month={month} t={t} />
+    </>
   );
 }
 
@@ -373,13 +441,7 @@ export function TransactionsView({
               }))}
               t={t}
             />
-            <Filter
-              name="category"
-              label={t.transactions.category}
-              selected={query.category}
-              options={data.filters.categories}
-              t={t}
-            />
+            <CategoryFilter selected={query.category} options={data.filters.categories} t={t} />
             <Filter
               name="account"
               label={t.transactions.account}
@@ -447,14 +509,13 @@ export function TransactionsView({
       {data.transactions.length === 0 ? (
         <Empty>{searching ? t.search.noMatches : t.transactions.none(data.month.label)}</Empty>
       ) : (
-        <>
-          <TransactionCards
-            rows={data.transactions}
-            listPath={pageLink(data, query, data.page)}
-            t={t}
-          />
-          <TransactionTable data={data} listPath={pageLink(data, query, data.page)} t={t} />
-        </>
+        <TransactionList
+          rows={data.transactions}
+          caption={t.transactions.caption(data.month.label)}
+          listPath={pageLink(data, query, data.page)}
+          month={data.month.key}
+          t={t}
+        />
       )}
       <nav
         aria-label={t.transactions.pages}

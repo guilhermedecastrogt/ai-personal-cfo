@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { EvolutionView, OverviewView as Overview } from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
+  CategoryLink,
   Change,
   CurrencySections,
   Empty,
@@ -207,8 +208,14 @@ function CurrencyOverview({
             <Rows>
               {entry.topCategories.map((category) => (
                 <Row
-                  key={category.category}
-                  label={category.category}
+                  key={category.categoryKey ?? category.category}
+                  label={
+                    <CategoryLink
+                      name={category.category}
+                      categoryKey={category.categoryKey}
+                      month={data.month.key}
+                    />
+                  }
                   detail={<Share value={category.share} />}
                 >
                   <Figure value={category.total} />
@@ -221,7 +228,7 @@ function CurrencyOverview({
           {entry.budgets.length === 0 ? (
             <Empty>{t.overview.noBudgets}</Empty>
           ) : (
-            <BudgetList budgets={entry.budgets} t={t} />
+            <BudgetList budgets={entry.budgets} month={data.month.key} t={t} />
           )}
         </Panel>
       </div>

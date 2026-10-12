@@ -45,6 +45,15 @@ describe('compare', () => {
     expect(bars[1]).toHaveStyle({ width: '100%' });
   });
 
+  it('links each category to its page for the second month', () => {
+    render(<CompareView t={EN} data={COMPARE} />);
+
+    expect(within(panel('By category')).getByRole('link', { name: 'Food' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-food?month=2026-10',
+    );
+  });
+
   it('says when neither month has spending', () => {
     render(<CompareView t={EN} data={{ ...COMPARE, currencies: [] }} />);
 
@@ -79,6 +88,18 @@ describe('people', () => {
       'Bistro2026-10-12 · Restaurants · Joint Account€180.00',
     );
     expect(panel('Where it went')).toHaveTextContent('Food100%€180.00');
+  });
+
+  it('links the person’s categories and largest expenses to the category pages', () => {
+    render(<MemberView t={EN} data={MEMBER} />);
+
+    expect(within(panel('By category')).getByRole('link', { name: 'Food' })).toHaveAttribute(
+      'href',
+      '/categories/category-key-food?month=2026-10',
+    );
+    expect(
+      within(panel('Largest expenses')).getByRole('link', { name: 'Restaurants' }),
+    ).toHaveAttribute('href', '/categories/category-key-restaurants?month=2026-10');
   });
 
   it('says when a person has nothing in the month, in Portuguese too', () => {

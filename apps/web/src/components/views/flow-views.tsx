@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react';
-import type { Comparison, IncomeView as Income, SpendingView as Spending } from '@/lib/contracts';
+import type {
+  CategoryRowView,
+  Comparison,
+  IncomeView as Income,
+  SpendingView as Spending,
+} from '@/lib/contracts';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import {
+  CategoryLink,
   Change,
   CurrencySections,
   Empty,
@@ -15,14 +21,18 @@ import {
 } from '../ui';
 import { CompositionRing } from '../charts';
 
-type CategoryRow = Spending['currencies'][number]['byCategory'][number];
 type MemberRow = Spending['currencies'][number]['byMember'][number];
+type LargestExpense = Spending['currencies'][number]['largestExpenses'][number];
 
 export function Categories({
   rows,
+  month,
+  root,
   t,
 }: {
-  readonly rows: readonly CategoryRow[];
+  readonly rows: readonly CategoryRowView[];
+  readonly month: string;
+  readonly root?: string;
   readonly t: Dictionary;
 }): ReactNode {
   if (rows.length === 0) {
@@ -30,24 +40,71 @@ export function Categories({
   }
   return (
     <ul className="space-y-3.5">
-      {rows.map((row) => (
-        <li key={row.category} className={row.isTopLevel ? '' : 'pl-5 text-sm'}>
-          <div className="mb-1.5 flex items-baseline justify-between gap-4">
-            <span
-              className={`min-w-0 break-words ${row.isTopLevel ? 'font-medium' : 'text-muted'}`}
-            >
-              {row.category}
-            </span>
-            <span className="shrink-0">
-              <Figure value={row.total} /> <Share value={row.share} />
-            </span>
-          </div>
-          {row.isTopLevel ? (
-            <Meter value={row.share} label={t.flow.share(row.category)} t={t} />
-          ) : null}
-        </li>
-      ))}
+      {rows.map((row) => {
+        const lead = root === undefined ? row.isTopLevel : row.parentKey === root;
+        const share = lead && root === undefined ? row.share : row.shareOfParent;
+        return (
+          <li
+            key={row.categoryKey ?? row.category}
+            className={lead ? '' : 'ml-1.5 border-l-2 border-line pl-4 text-sm'}
+          >
+            <div className="mb-1.5 flex items-baseline justify-between gap-4">
+              <CategoryLink
+                name={row.category}
+                categoryKey={row.categoryKey}
+                month={month}
+                className={`min-w-0 break-words ${lead ? 'font-medium' : 'text-ink-soft'}`}
+              />
+              <span className="shrink-0">
+                <Figure value={row.total} /> <Share value={share} />
+              </span>
+            </div>
+            <Meter
+              value={share}
+              thin={!lead}
+              label={lead ? t.flow.share(row.category) : t.categories.shareOfParent(row.category)}
+              t={t}
+            />
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+export function LargestExpenses({
+  rows,
+  month,
+  detailOf,
+  t,
+}: {
+  readonly rows: readonly LargestExpense[];
+  readonly month: string;
+  readonly detailOf: (expense: LargestExpense) => string;
+  readonly t: Dictionary;
+}): ReactNode {
+  return (
+    <Rows>
+      {rows.map((expense, position) => (
+        <Row
+          key={`${expense.date}-${String(position)}`}
+          label={expense.merchant ?? expense.category}
+          detail={
+            <>
+              {t.date(expense.date)} ·{' '}
+              <CategoryLink
+                name={expense.category}
+                categoryKey={expense.categoryKey}
+                month={month}
+              />{' '}
+              · {detailOf(expense)}
+            </>
+          }
+        >
+          <Figure value={expense.amount} />
+        </Row>
+      ))}
+    </Rows>
   );
 }
 
@@ -97,10 +154,12 @@ function Total({
 function Changes({
   title,
   rows,
+  month,
   t,
 }: {
   readonly title: string;
   readonly rows: Spending['currencies'][number]['categoryIncreases'];
+  readonly month: string;
   readonly t: Dictionary;
 }): ReactNode {
   return (
@@ -110,7 +169,13 @@ function Changes({
       ) : (
         <Rows>
           {rows.map((row) => (
-            <Row key={row.category} label={row.category} detail={<Figure value={row.current} />}>
+            <Row
+              key={row.categoryKey ?? row.category}
+              label={
+                <CategoryLink name={row.category} categoryKey={row.categoryKey} month={month} />
+              }
+              detail={<Figure value={row.current} />}
+            >
               <Change comparison={row} risingIsGood={false} t={t} />
             </Row>
           ))}
@@ -150,13 +215,14 @@ export function SpendingView({
                     slices={entry.composition}
                     total={entry.total}
                     totalLabel={t.charts.spending}
+                    month={data.month.key}
                     t={t}
                   />
                 </Panel>
               )}
               <div className="grid gap-6 lg:grid-cols-2">
                 <Panel title={t.flow.byCategory}>
-                  <Categories rows={entry.byCategory} t={t} />
+                  <Categories rows={entry.byCategory} month={data.month.key} t={t} />
                 </Panel>
                 <div className="space-y-6">
                   <Panel title={t.flow.byMember}>
@@ -179,22 +245,27 @@ export function SpendingView({
               </div>
               {entry.comparison === null ? null : (
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <Changes title={t.flow.roseMost} rows={entry.categoryIncreases} t={t} />
-                  <Changes title={t.flow.fellMost} rows={entry.categoryDecreases} t={t} />
+                  <Changes
+                    title={t.flow.roseMost}
+                    rows={entry.categoryIncreases}
+                    month={data.month.key}
+                    t={t}
+                  />
+                  <Changes
+                    title={t.flow.fellMost}
+                    rows={entry.categoryDecreases}
+                    month={data.month.key}
+                    t={t}
+                  />
                 </div>
               )}
               <Panel title={t.flow.largestExpenses}>
-                <Rows>
-                  {entry.largestExpenses.map((expense, position) => (
-                    <Row
-                      key={`${expense.date}-${String(position)}`}
-                      label={expense.merchant ?? expense.category}
-                      detail={`${t.date(expense.date)} · ${expense.category} · ${expense.member}`}
-                    >
-                      <Figure value={expense.amount} />
-                    </Row>
-                  ))}
-                </Rows>
+                <LargestExpenses
+                  rows={entry.largestExpenses}
+                  month={data.month.key}
+                  detailOf={(expense) => expense.member}
+                  t={t}
+                />
               </Panel>
             </>
           )
@@ -230,7 +301,7 @@ export function IncomeView({
               />
               <div className="grid gap-6 lg:grid-cols-2">
                 <Panel title={t.flow.bySource}>
-                  <Categories rows={entry.byCategory} t={t} />
+                  <Categories rows={entry.byCategory} month={data.month.key} t={t} />
                 </Panel>
                 <Panel title={t.flow.byMember}>
                   <Members rows={entry.byMember} />
