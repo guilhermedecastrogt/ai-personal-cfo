@@ -16,9 +16,11 @@ import { categories } from '../src/categories/categories.schema.js';
 import { APP_CONFIG } from '../src/config/app-config.js';
 import { FinancialAssistant } from '../src/conversation/financial-assistant.service.js';
 import {
+  categorySchema,
   sessionSchema,
   signalsSchema,
   spendingSchema,
+  transactionsSchema,
 } from '../src/dashboard/dashboard.contracts.js';
 import { monthContaining } from '../src/finance/domain/period/period.js';
 import { households } from '../src/households/households.schema.js';
@@ -138,6 +140,25 @@ describe('a household that uses Brazilian Portuguese', () => {
       expect(eur?.total.text.replace(SPACES, ' ')).toBe('€ 1.826,98');
       expect(JSON.stringify(eur)).toContain('Restaurantes');
       expect(JSON.stringify(eur)).not.toContain('"Restaurants"');
+    });
+
+    it('names categories with their Portuguese path on transactions and on the category page', async () => {
+      const history = await view(transactionsSchema, '/dashboard/transactions');
+      const category = await view(
+        categorySchema,
+        `/dashboard/categories/${categoryIds.get('Restaurants') ?? ''}`,
+      );
+
+      expect(history.transactions[0]?.categoryPath).toBe('Alimentação › Restaurantes');
+      expect(history.filters.categories.map((option) => option.name)).toContain(
+        'Alimentação › Café',
+      );
+      expect(category.category).toMatchObject({
+        name: 'Restaurantes',
+        path: 'Alimentação › Restaurantes',
+        parent: { name: 'Alimentação' },
+      });
+      expect(category.currencies[0]?.months.at(-1)?.label).toMatch(/ de \d{4}$/);
     });
 
     it('describes signals in Portuguese', async () => {

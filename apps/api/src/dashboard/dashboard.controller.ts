@@ -28,6 +28,7 @@ import type { RequestContext } from '../households/request-context.js';
 import { TRANSACTION_SORTS, TRANSACTION_TYPES } from '../transactions/transaction-vocabulary.js';
 import { RECURRING_SORTS } from './dashboard.contracts.js';
 import type {
+  CategoryView,
   AccountsView,
   CompareView,
   EvolutionView,
@@ -321,6 +322,22 @@ export class DashboardController {
   @Get('members')
   members(@CurrentContext() context: RequestContext): Promise<MembersView> {
     return this.dashboard.members(context);
+  }
+
+  @Get('categories/:key')
+  async category(
+    @CurrentContext() context: RequestContext,
+    @Param('key') key: string,
+    @Query() query: unknown,
+  ): Promise<CategoryView> {
+    return found(
+      await this.dashboard.category(
+        context,
+        parseKey(key),
+        parseQuery(monthQuerySchema, query).month,
+        new Date(),
+      ),
+    );
   }
 
   @Get('members/:key')

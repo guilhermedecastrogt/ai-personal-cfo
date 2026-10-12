@@ -27,17 +27,24 @@ const memberAmountSchema = z.object({
   share: ratioSchema.nullable(),
 });
 
+const categoryReference = { category: z.string(), categoryKey: z.string().nullable() };
+
 const categoryAmountSchema = z.object({
-  category: z.string(),
-  isTopLevel: z.boolean(),
+  ...categoryReference,
   total: moneySchema,
   share: ratioSchema.nullable(),
 });
 
-const categoryChangeSchema = comparisonSchema.extend({ category: z.string() });
+const categoryRowSchema = categoryAmountSchema.extend({
+  parentKey: z.string().nullable(),
+  isTopLevel: z.boolean(),
+  shareOfParent: ratioSchema.nullable(),
+});
+
+const categoryChangeSchema = comparisonSchema.extend(categoryReference);
 
 const budgetSchema = z.object({
-  category: z.string(),
+  ...categoryReference,
   limit: moneySchema,
   spent: moneySchema,
   remaining: moneySchema,
@@ -185,7 +192,7 @@ export const overviewSchema = z.object({
           previousSavingsRate: ratioSchema.nullable(),
         })
         .nullable(),
-      topCategories: z.array(categoryAmountSchema.omit({ isTopLevel: true })),
+      topCategories: z.array(categoryAmountSchema),
       spendingByMember: z.array(
         z.object({
           member: z.string(),
@@ -208,13 +215,13 @@ const largestExpenseSchema = z.object({
   date: z.string(),
   amount: moneySchema,
   merchant: z.string().nullable(),
-  category: z.string(),
+  ...categoryReference,
   member: z.string(),
   account: z.string(),
 });
 
 const compositionSliceSchema = z.object({
-  category: z.string(),
+  ...categoryReference,
   isOther: z.boolean(),
   total: moneySchema,
   share: ratioSchema,
@@ -230,7 +237,7 @@ export const spendingSchema = z.object({
       transactionCount: z.number(),
       comparison: comparisonSchema.nullable(),
       previousPeriod: periodSchema.nullable(),
-      byCategory: z.array(categoryAmountSchema),
+      byCategory: z.array(categoryRowSchema),
       byMember: z.array(memberAmountSchema),
       byAccount: z.array(
         z.object({ account: z.string(), total: moneySchema, share: ratioSchema.nullable() }),
@@ -252,13 +259,33 @@ export const incomeSchema = z.object({
       transactionCount: z.number(),
       comparison: comparisonSchema.nullable(),
       previousPeriod: periodSchema.nullable(),
-      byCategory: z.array(categoryAmountSchema),
+      byCategory: z.array(categoryRowSchema),
       byMember: z.array(memberAmountSchema),
     }),
   ),
 });
 
 const optionSchema = z.object({ key: z.string(), name: z.string() });
+
+const categoryOptionSchema = optionSchema.extend({ kind: z.enum(['EXPENSE', 'INCOME']) });
+
+const transactionRowSchema = z.object({
+  key: z.string(),
+  date: z.string(),
+  type: z.enum(['EXPENSE', 'INCOME', 'TRANSFER']),
+  amount: moneySchema,
+  currency: z.string(),
+  merchant: z.string().nullable(),
+  description: z.string().nullable(),
+  category: z.string().nullable(),
+  categoryKey: z.string().nullable(),
+  categoryPath: z.string().nullable(),
+  account: z.string(),
+  transferAccount: z.string().nullable(),
+  member: z.string(),
+  expenseScope: z.enum(['HOUSEHOLD', 'INDIVIDUAL']),
+  source: z.string(),
+});
 
 export const budgetOptionsSchema = z.object({
   categories: z.array(optionSchema),
@@ -400,27 +427,11 @@ export const transactionsSchema = z.object({
   total: z.number(),
   filters: z.object({
     types: z.array(z.string()),
-    categories: z.array(optionSchema),
+    categories: z.array(categoryOptionSchema),
     accounts: z.array(optionSchema),
     members: z.array(optionSchema),
   }),
-  transactions: z.array(
-    z.object({
-      key: z.string(),
-      date: z.string(),
-      type: z.enum(['EXPENSE', 'INCOME', 'TRANSFER']),
-      amount: moneySchema,
-      currency: z.string(),
-      merchant: z.string().nullable(),
-      description: z.string().nullable(),
-      category: z.string().nullable(),
-      account: z.string(),
-      transferAccount: z.string().nullable(),
-      member: z.string(),
-      expenseScope: z.enum(['HOUSEHOLD', 'INDIVIDUAL']),
-      source: z.string(),
-    }),
-  ),
+  transactions: z.array(transactionRowSchema),
 });
 
 export const transactionEditSchema = z.object({
@@ -441,7 +452,7 @@ export const transactionEditSchema = z.object({
   options: z.object({
     members: z.array(optionSchema),
     accounts: z.array(optionSchema.extend({ currency: z.string() })),
-    categories: z.array(optionSchema.extend({ kind: z.enum(['EXPENSE', 'INCOME']) })),
+    categories: z.array(categoryOptionSchema),
   }),
 });
 
@@ -497,7 +508,7 @@ export const compareSchema = z.object({
       net: comparisonSchema,
       categories: z.array(
         z.object({
-          category: z.string(),
+          ...categoryReference,
           first: moneySchema,
           second: moneySchema,
           comparison: comparisonSchema,
@@ -525,10 +536,45 @@ export const memberSchema = z.object({
       shareOfHousehold: ratioSchema.nullable(),
       comparison: comparisonSchema,
       composition: z.array(compositionSliceSchema),
-      byCategory: z.array(categoryAmountSchema),
+      byCategory: z.array(categoryRowSchema),
       largestExpenses: z.array(largestExpenseSchema),
     }),
   ),
+});
+
+export const categorySchema = z.object({
+  month: monthSchema,
+  category: z.object({
+    key: z.string(),
+    name: z.string(),
+    path: z.string(),
+    kind: z.enum(['EXPENSE', 'INCOME']),
+    parent: optionSchema.nullable(),
+    children: z.array(optionSchema),
+  }),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      total: moneySchema,
+      transactionCount: z.number(),
+      share: ratioSchema.nullable(),
+      comparison: comparisonSchema,
+      previousPeriod: periodSchema,
+      subcategories: z.array(categoryRowSchema),
+      months: z.array(
+        z.object({
+          key: z.string(),
+          label: z.string(),
+          shortLabel: z.string(),
+          total: moneySchema,
+          bar: ratioSchema,
+        }),
+      ),
+      byMember: z.array(memberAmountSchema),
+      budgets: z.array(budgetSchema.extend({ key: z.string() })),
+    }),
+  ),
+  transactions: z.object({ total: z.number(), rows: z.array(transactionRowSchema) }),
 });
 
 export const accountsSchema = z.object({
@@ -572,6 +618,9 @@ export type EvolutionView = z.infer<typeof evolutionSchema>;
 export type CompareView = z.infer<typeof compareSchema>;
 export type MembersView = z.infer<typeof membersSchema>;
 export type MemberView = z.infer<typeof memberSchema>;
+export type CategoryView = z.infer<typeof categorySchema>;
+export type CategoryRowView = z.infer<typeof categoryRowSchema>;
+export type TransactionRowView = z.infer<typeof transactionRowSchema>;
 export type CompositionSliceView = z.infer<typeof compositionSliceSchema>;
 export type TransactionSort = TransactionsView['sort'];
 export type Comparison = z.infer<typeof comparisonSchema>;

@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.js';
 import { Injectable } from '@nestjs/common';
 import { CfoService, type CurrencyAnalysis, type MonthlyAnalysis } from '../cfo/cfo.service.js';
-import type { ReviewBudget } from '../cfo/analysis/monthly-review.js';
+import { reviewBudget, type ReviewBudget } from '../cfo/analysis/monthly-review.js';
 import { localeOf, presentResult, type NameDirectory } from '../cfo/context/result-description.js';
 import { describeFindings } from '../cfo/explanation/deterministic-narrative.js';
 import {
@@ -11,6 +11,11 @@ import {
 } from '../directory/household-directory.service.js';
 import { FinanceService, HouseholdNotFoundError } from '../finance/application/finance.service.js';
 import type { CompositionSlice } from '../finance/domain/analytics/category-composition.js';
+import {
+  arrangeByHierarchy,
+  type Arranged,
+} from '../finance/domain/categories/category-hierarchy.js';
+import { CategoryTree } from '../finance/domain/categories/category-tree.js';
 import {
   daysBetween,
   monthContaining,
@@ -24,6 +29,7 @@ import { PlatformAccessService } from '../platform/platform-access.service.js';
 import { ProactiveCfoService } from '../proactive/proactive-cfo.service.js';
 import {
   TransactionsService,
+  type Transaction,
   type TransactionSearch,
   type TransactionSort,
 } from '../transactions/transactions.service.js';
@@ -31,6 +37,7 @@ import { TRANSACTION_TYPES, type TransactionType } from '../transactions/transac
 import {
   accountsSchema,
   budgetsSchema,
+  categorySchema,
   compareSchema,
   evolutionSchema,
   memberSchema,
@@ -48,6 +55,7 @@ import {
   transactionsSchema,
   type AccountsView,
   type BudgetsView,
+  type CategoryView,
   type CompareView,
   type EvolutionView,
   type MemberView,
@@ -65,7 +73,12 @@ import {
   type SpendingView,
   type TransactionsView,
 } from './dashboard.contracts.js';
-import { budgetOptions, goalOptions } from './edit-options.js';
+import {
+  budgetOptions,
+  categoryFilterOptions,
+  categoryPaths,
+  goalOptions,
+} from './edit-options.js';
 import { describeMonth, listMonths, selectMonth, type SelectedMonth } from './month-selection.js';
 import { transactionsCsv } from './transactions-csv.js';
 import {
@@ -104,6 +117,8 @@ const MAXIMUM_EXPORTED_TRANSACTIONS = 5_000;
 export type EvolutionMonths = 6 | 12;
 
 const TRANSACTIONS_PER_PAGE = 50;
+const CATEGORY_HISTORY_MONTHS = 6;
+const CATEGORY_TRANSACTIONS = 20;
 
 type CommitmentOrder = (left: RecurringCommitment, right: RecurringCommitment) => number;
 
@@ -176,7 +191,7 @@ export class DashboardService {
                     previousSavingsRateBasisPoints:
                       review.comparison.previousSavingsRateBasisPoints,
                   },
-            topCategories: review.topCategories,
+            topCategories: review.topCategories.map(withCategoryKey),
             spendingByMember: review.byMember,
             budgets: review.budgets.map(budgetScopeIn(analysis.directory)),
             forecast: review.forecast,
@@ -196,7 +211,11 @@ export class DashboardService {
     monthKey: string | undefined,
     instant: Date,
   ): Promise<SpendingView> {
-    const { month, analysis } = await this.analyse(context, monthKey, instant);
+    const [{ month, analysis }, directory] = await Promise.all([
+      this.analyse(context, monthKey, instant),
+      this.directories.load(context.householdId),
+    ]);
+    const tree = new CategoryTree(directory.categories);
     const currencies = await Promise.all(
       analysis.analyses.map(async (currency) => {
         const { snapshot, review } = currency;
@@ -206,12 +225,12 @@ export class DashboardService {
         ]);
         return presentResult(
           {
-            ...flowOf(currency, 'spending'),
+            ...flowOf(currency, 'spending', tree),
             comparison: review.comparison?.expenses ?? null,
             byAccount: snapshot.spending.byAccount,
-            categoryIncreases: review.categoryIncreases,
-            categoryDecreases: review.categoryDecreases,
-            largestExpenses: largest.expenses,
+            categoryIncreases: review.categoryIncreases.map(withCategoryKey),
+            categoryDecreases: review.categoryDecreases.map(withCategoryKey),
+            largestExpenses: largest.expenses.map(withCategoryKey),
             composition: composition.map(sliceIn(localeOf(analysis.directory))),
           },
           analysis.directory,
@@ -226,12 +245,19 @@ export class DashboardService {
     monthKey: string | undefined,
     instant: Date,
   ): Promise<IncomeView> {
-    const { month, analysis } = await this.analyse(context, monthKey, instant);
+    const [{ month, analysis }, directory] = await Promise.all([
+      this.analyse(context, monthKey, instant),
+      this.directories.load(context.householdId),
+    ]);
+    const tree = new CategoryTree(directory.categories);
     return incomeSchema.parse({
       month,
       currencies: analysis.analyses.map((currency) =>
         presentResult(
-          { ...flowOf(currency, 'income'), comparison: currency.review.comparison?.income ?? null },
+          {
+            ...flowOf(currency, 'income', tree),
+            comparison: currency.review.comparison?.income ?? null,
+          },
           analysis.directory,
         ),
       ),
@@ -460,33 +486,11 @@ export class DashboardService {
       total: found.total,
       filters: {
         types: TRANSACTION_TYPES,
-        categories: directory.categories.map(toOption),
+        categories: categoryFilterOptions(directory),
         accounts: directory.accounts.map(toOption),
         members: directory.members.map(toOption),
       },
-      transactions: found.transactions.map((transaction) => ({
-        key: transaction.id,
-        ...(presentResult(
-          {
-            currency: transaction.currency,
-            date: transaction.transactionDate,
-            type: transaction.type,
-            amountMinor: transaction.amountMinor,
-            merchant: transaction.merchant,
-            description: transaction.description,
-            category:
-              transaction.categoryId === null
-                ? null
-                : (namesOf(directory).categories.get(transaction.categoryId) ?? null),
-            accountId: transaction.accountId,
-            transferAccountId: transaction.transferAccountId,
-            memberId: transaction.memberId,
-            expenseScope: transaction.expenseScope,
-            source: transaction.source,
-          },
-          namesOf(directory),
-        ) as Record<string, unknown>),
-      })),
+      transactions: found.transactions.map(transactionRowsIn(directory)),
     });
   }
 
@@ -578,6 +582,7 @@ export class DashboardService {
             net: comparison.net,
             categories: comparison.categories.map((category) => ({
               categoryId: category.categoryId,
+              categoryKey: category.categoryId,
               firstMinor: category.firstMinor,
               secondMinor: category.secondMinor,
               comparison: category.comparison,
@@ -616,9 +621,7 @@ export class DashboardService {
       month.period,
     );
     const names = namesOf(directory);
-    const topLevel = new Set(
-      directory.categories.filter((category) => category.parentId === null).map((c) => c.id),
-    );
+    const tree = new CategoryTree(directory.categories);
     return memberSchema.parse({
       month,
       member: toOption(member),
@@ -634,19 +637,93 @@ export class DashboardService {
             shareOfHouseholdBasisPoints: activity.shareOfHouseholdBasisPoints,
             comparison: activity.spendingComparison,
             composition: activity.composition.map(sliceIn(directory.locale)),
-            byCategory: activity.spending.byCategory.map(
-              ({ categoryId, totalMinor, shareBasisPoints }) => ({
-                categoryId,
-                isTopLevel: categoryId === null || topLevel.has(categoryId),
-                totalMinor,
-                shareBasisPoints,
-              }),
-            ),
-            largestExpenses: activity.largestExpenses,
+            byCategory: categoryRowsOf(activity.spending.byCategory, tree),
+            largestExpenses: activity.largestExpenses.map(withCategoryKey),
           },
           names,
         ),
       ),
+    });
+  }
+
+  async category(
+    context: RequestContext,
+    categoryKey: string,
+    monthKey: string | undefined,
+    instant: Date,
+  ): Promise<CategoryView | undefined> {
+    const [{ month }, directory] = await Promise.all([
+      this.monthOf(context, monthKey, instant),
+      this.directories.load(context.householdId),
+    ]);
+    const category = directory.categories.find((entry) => entry.id === categoryKey);
+    if (category === undefined) {
+      return undefined;
+    }
+    const tree = new CategoryTree(directory.categories);
+    const [activities, found] = await Promise.all([
+      this.finance.categoryActivity(
+        context.householdId,
+        category.id,
+        category.kind,
+        { start: month.period.start, end: month.asOf },
+        CATEGORY_HISTORY_MONTHS,
+      ),
+      this.transactions.search(context.householdId, {
+        period: month.period,
+        categoryIds: categoriesWithin(directory, category.id),
+        sort: 'date_desc',
+        limit: CATEGORY_TRANSACTIONS,
+        offset: 0,
+      }),
+    ]);
+    const names = namesOf(directory);
+    const parent = directory.categories.find((entry) => entry.id === category.parentId);
+    return categorySchema.parse({
+      month,
+      category: {
+        key: category.id,
+        name: category.name,
+        path: categoryPaths(directory).get(category.id) ?? category.name,
+        kind: category.kind,
+        parent: parent === undefined ? null : toOption(parent),
+        children: directory.categories
+          .filter((entry) => entry.parentId === category.id)
+          .map(toOption)
+          .sort((left, right) => left.name.localeCompare(right.name, directory.locale)),
+      },
+      currencies: activities.map((activity) =>
+        withRowExtras(
+          withRowExtras(
+            presentResult(
+              {
+                currency: activity.currency,
+                totalMinor: activity.totalMinor,
+                transactionCount: activity.transactionCount,
+                shareBasisPoints: activity.shareBasisPoints,
+                comparison: activity.comparison,
+                previousPeriod: activity.previousPeriod,
+                subcategories: categoryRowsFrom(activity.subcategories, tree),
+                months: activity.months.map(({ totalMinor, barBasisPoints }) => ({
+                  totalMinor,
+                  barBasisPoints,
+                })),
+                byMember: activity.byMember,
+                budgets: activity.budgets.map(reviewBudget).map(budgetScopeIn(names)),
+              },
+              names,
+            ),
+            'months',
+            activity.months.map((point) => ({ ...describeMonth(point.period, directory.locale) })),
+          ),
+          'budgets',
+          activity.budgets.map((budget) => ({ key: budget.budgetId })),
+        ),
+      ),
+      transactions: {
+        total: found.total,
+        rows: found.transactions.map(transactionRowsIn(directory)),
+      },
     });
   }
 
@@ -743,22 +820,87 @@ export class DashboardService {
   }
 }
 
-function flowOf({ snapshot, review }: CurrencyAnalysis, kind: 'spending' | 'income'): object {
+function flowOf(
+  { snapshot, review }: CurrencyAnalysis,
+  kind: 'spending' | 'income',
+  tree: CategoryTree,
+): object {
   const flow = snapshot[kind];
-  const topLevel = new Set(snapshot.topLevelCategoryIds);
   return {
     currency: snapshot.currency,
     totalMinor: flow.totalMinor,
     transactionCount: flow.transactionCount,
     previousPeriod: review.comparison?.previousPeriod ?? null,
-    byCategory: flow.byCategory.map(({ categoryId, totalMinor, shareBasisPoints }) => ({
-      categoryId,
-      isTopLevel: categoryId === null || topLevel.has(categoryId),
-      totalMinor,
-      shareBasisPoints,
-    })),
+    byCategory: categoryRowsOf(flow.byCategory, tree),
     byMember: flow.byMember,
   };
+}
+
+interface CategoryShare {
+  readonly categoryId: string | null;
+  readonly totalMinor: number;
+  readonly shareBasisPoints: number | null;
+}
+
+function categoryRowsOf(
+  rows: readonly CategoryShare[],
+  tree: CategoryTree,
+): Record<string, unknown>[] {
+  return categoryRowsFrom(arrangeByHierarchy(rows, tree), tree);
+}
+
+function categoryRowsFrom(
+  rows: readonly Arranged<CategoryShare>[],
+  tree: CategoryTree,
+): Record<string, unknown>[] {
+  return rows.map((row) => ({
+    categoryId: row.categoryId,
+    categoryKey: row.categoryId,
+    parentKey: row.parentId,
+    isTopLevel: tree.isTopLevel(row.categoryId),
+    totalMinor: row.totalMinor,
+    shareBasisPoints: row.shareBasisPoints,
+    shareOfParentBasisPoints: row.shareOfParentBasisPoints,
+  }));
+}
+
+function withCategoryKey<Row extends { readonly categoryId: string | null }>(
+  row: Row,
+): Row & { readonly categoryKey: string | null } {
+  return { ...row, categoryKey: row.categoryId };
+}
+
+function transactionRowsIn(
+  directory: HouseholdDirectory,
+): (transaction: Transaction) => Record<string, unknown> {
+  const names = namesOf(directory);
+  const paths = categoryPaths(directory);
+  return (transaction) => ({
+    key: transaction.id,
+    ...(presentResult(
+      {
+        currency: transaction.currency,
+        date: transaction.transactionDate,
+        type: transaction.type,
+        amountMinor: transaction.amountMinor,
+        merchant: transaction.merchant,
+        description: transaction.description,
+        category:
+          transaction.categoryId === null
+            ? null
+            : (names.categories.get(transaction.categoryId) ?? null),
+        categoryKey: transaction.categoryId,
+        categoryPath:
+          transaction.categoryId === null ? null : (paths.get(transaction.categoryId) ?? null),
+        accountId: transaction.accountId,
+        transferAccountId: transaction.transferAccountId,
+        memberId: transaction.memberId,
+        expenseScope: transaction.expenseScope,
+        source: transaction.source,
+      },
+      names,
+    ) as Record<string, unknown>),
+  });
 }
 
 function budgetScopeIn(
@@ -770,7 +912,9 @@ function budgetScopeIn(
 
 function withBudgetScope(budget: ReviewBudget, allSpending: string): Record<string, unknown> {
   const { categoryId, ...rest } = budget;
-  return categoryId === null ? { category: allSpending, ...rest } : { categoryId, ...rest };
+  return categoryId === null
+    ? { category: allSpending, categoryKey: null, ...rest }
+    : { categoryId, categoryKey: categoryId, ...rest };
 }
 
 function withRowKeys(presented: unknown, field: string, keys: readonly string[]): unknown {
@@ -799,8 +943,8 @@ const OTHER_CATEGORIES: Readonly<Record<Locale, string>> = {
 function sliceIn(locale: Locale): (slice: CompositionSlice) => Record<string, unknown> {
   return ({ categoryId, isOther, ...rest }) =>
     isOther
-      ? { category: OTHER_CATEGORIES[locale], isOther, ...rest }
-      : { categoryId, isOther, ...rest };
+      ? { category: OTHER_CATEGORIES[locale], categoryKey: null, isOther, ...rest }
+      : { categoryId, categoryKey: categoryId, isOther, ...rest };
 }
 
 const EXPORT_NAMES: Readonly<Record<Locale, string>> = {
@@ -858,9 +1002,8 @@ function categoriesWithin(
   if (key === undefined) {
     return undefined;
   }
-  const selected = directory.categories.filter(
-    (category) => category.id === key || category.parentId === key,
-  );
+  const tree = new CategoryTree(directory.categories);
+  const selected = directory.categories.filter((category) => tree.isWithin(category.id, key));
   return selected.length === 0 ? [UNMATCHED_KEY] : selected.map((category) => category.id);
 }
 

@@ -68,6 +68,7 @@ export function comparison(
 
 export const RESTAURANTS_BUDGET: BudgetView = {
   category: 'Restaurants',
+  categoryKey: 'category-key-restaurants',
   limit: eur('150.00', 15000),
   spent: eur('180.00', 18000),
   remaining: { minor: -3000, text: '-€30.00' },
@@ -116,8 +117,18 @@ export const EUR_OVERVIEW: OverviewEntry = {
     previousSavingsRate: share('29%', 2900),
   },
   topCategories: [
-    { category: 'Housing', total: eur('1,800.00', 180000), share: share('81.08%', 8108) },
-    { category: 'Food', total: eur('420.00', 42000), share: share('18.92%', 1892) },
+    {
+      category: 'Housing',
+      categoryKey: 'category-key-housing',
+      total: eur('1,800.00', 180000),
+      share: share('81.08%', 8108),
+    },
+    {
+      category: 'Food',
+      categoryKey: 'category-key-food',
+      total: eur('420.00', 42000),
+      share: share('18.92%', 1892),
+    },
   ],
   spendingByMember: [
     {
@@ -176,7 +187,12 @@ export const BRL_OVERVIEW: OverviewEntry = {
   balances: null,
   forecast: null,
   topCategories: [
-    { category: 'Food', total: { minor: 50000, text: 'R$500.00' }, share: share('100%', 10000) },
+    {
+      category: 'Food',
+      categoryKey: 'category-key-food',
+      total: { minor: 50000, text: 'R$500.00' },
+      share: share('100%', 10000),
+    },
   ],
   spendingByMember: [],
 };
@@ -215,24 +231,42 @@ export const SPENDING: SpendingView = {
       byCategory: [
         {
           category: 'Housing',
+          categoryKey: 'category-key-housing',
+          parentKey: null,
+          shareOfParent: null,
           isTopLevel: true,
           total: eur('1,800.00'),
           share: share('81.08%', 8108),
         },
         {
           category: 'Rent',
+          categoryKey: 'category-key-rent',
+          parentKey: 'category-key-housing',
+          shareOfParent: share('100%', 10000),
           isTopLevel: false,
           total: eur('1,800.00'),
           share: share('81.08%', 8108),
         },
-        { category: 'Food', isTopLevel: true, total: eur('420.00'), share: share('18.92%', 1892) },
+        {
+          category: 'Food',
+          categoryKey: 'category-key-food',
+          parentKey: null,
+          shareOfParent: null,
+          isTopLevel: true,
+          total: eur('420.00'),
+          share: share('18.92%', 1892),
+        },
       ],
       byMember: [{ member: 'Member A', total: eur('2,040.00'), share: share('91.89%', 9189) }],
       byAccount: [
         { account: 'Joint Account', total: eur('2,220.00'), share: share('100%', 10000) },
       ],
       categoryIncreases: [
-        { category: 'Restaurants', ...comparison('180.00', '90.00', 'INCREASE') },
+        {
+          category: 'Restaurants',
+          categoryKey: 'category-key-restaurants',
+          ...comparison('180.00', '90.00', 'INCREASE'),
+        },
       ],
       categoryDecreases: [],
       largestExpenses: [
@@ -241,6 +275,7 @@ export const SPENDING: SpendingView = {
           amount: eur('1,800.00', 180000),
           merchant: 'Landlord',
           category: 'Rent',
+          categoryKey: 'category-key-rent',
           member: 'Member A',
           account: 'Joint Account',
         },
@@ -248,6 +283,7 @@ export const SPENDING: SpendingView = {
       composition: [
         {
           category: 'Housing',
+          categoryKey: 'category-key-housing',
           isOther: false,
           total: eur('1,800.00', 180000),
           share: share('81.08%', 8108),
@@ -255,6 +291,7 @@ export const SPENDING: SpendingView = {
         },
         {
           category: 'Food',
+          categoryKey: 'category-key-food',
           isOther: false,
           total: eur('420.00', 42000),
           share: share('18.92%', 1892),
@@ -277,6 +314,9 @@ export const INCOME: IncomeView = {
       byCategory: [
         {
           category: 'Salary',
+          categoryKey: 'category-key-salary',
+          parentKey: null,
+          shareOfParent: null,
           isTopLevel: true,
           total: eur('3,000.00'),
           share: share('100%', 10000),
@@ -421,7 +461,11 @@ export const TRANSACTIONS: TransactionsView = {
   total: 61,
   filters: {
     types: ['EXPENSE', 'INCOME', 'TRANSFER'],
-    categories: [{ key: 'category-key-food', name: 'Food' }],
+    categories: [
+      { key: 'category-key-food', name: 'Food', kind: 'EXPENSE' },
+      { key: 'category-key-restaurants', name: 'Food › Restaurants', kind: 'EXPENSE' },
+      { key: 'category-key-salary', name: 'Salary', kind: 'INCOME' },
+    ],
     accounts: [{ key: 'account-key-joint', name: 'Joint Account' }],
     members: [{ key: 'member-key-a', name: 'Member A' }],
   },
@@ -435,6 +479,8 @@ export const TRANSACTIONS: TransactionsView = {
       merchant: 'Bistro',
       description: null,
       category: 'Restaurants',
+      categoryKey: 'category-key-restaurants',
+      categoryPath: 'Food › Restaurants',
       account: 'Joint Account',
       transferAccount: null,
       member: 'Member C',
@@ -450,6 +496,8 @@ export const TRANSACTIONS: TransactionsView = {
       merchant: null,
       description: null,
       category: null,
+      categoryKey: null,
+      categoryPath: null,
       account: 'Joint Account',
       transferAccount: 'Savings',
       member: 'Member A',
@@ -742,6 +790,7 @@ export const COMPARE: CompareView = {
       categories: [
         {
           category: 'Food',
+          categoryKey: 'category-key-food',
           first: eur('330.00'),
           second: eur('420.00'),
           comparison: comparison('420.00', '330.00', 'INCREASE'),
@@ -776,6 +825,7 @@ export const MEMBER: MemberView = {
       composition: [
         {
           category: 'Food',
+          categoryKey: 'category-key-food',
           isOther: false,
           total: eur('180.00', 18000),
           share: share('100%', 10000),
@@ -783,7 +833,15 @@ export const MEMBER: MemberView = {
         },
       ],
       byCategory: [
-        { category: 'Food', isTopLevel: true, total: eur('180.00'), share: share('100%', 10000) },
+        {
+          category: 'Food',
+          categoryKey: 'category-key-food',
+          parentKey: null,
+          shareOfParent: null,
+          isTopLevel: true,
+          total: eur('180.00'),
+          share: share('100%', 10000),
+        },
       ],
       largestExpenses: [
         {
@@ -791,6 +849,7 @@ export const MEMBER: MemberView = {
           amount: eur('180.00', 18000),
           merchant: 'Bistro',
           category: 'Restaurants',
+          categoryKey: 'category-key-restaurants',
           member: 'Member B',
           account: 'Joint Account',
         },

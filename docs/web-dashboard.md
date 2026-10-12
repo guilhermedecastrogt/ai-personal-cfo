@@ -61,27 +61,28 @@ The browser never talks to the API directly and never holds an identifier.
 
 All routes require a session. The views are `GET` and take an optional `month=YYYY-MM`, except the notification routes and the routes that change data.
 
-| Route                                     | Returns                                                                                                                                                                                 |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/dashboard/session`                      | Member and household names, currency, time zone, today, selectable months                                                                                                               |
-| `/dashboard/overview`                     | Totals, comparison, top categories, members, budgets, forecast, balances, findings                                                                                                      |
-| `/dashboard/spending`                     | Total, categories, members, accounts, biggest changes, largest expenses                                                                                                                 |
-| `/dashboard/income`                       | Total, sources, members, comparison                                                                                                                                                     |
-| `/dashboard/budgets`                      | Each budget with usage, status, projection and member attribution                                                                                                                       |
-| `/dashboard/goals`                        | Each goal with progress, remainder and state                                                                                                                                            |
-| `/dashboard/outlook`                      | Forecast, cash-flow outlook, budgets projected over, recurring commitments                                                                                                              |
-| `/dashboard/signals`                      | Insights and anomalies, described                                                                                                                                                       |
-| `/dashboard/review`                       | The monthly review narrative and whether it came from the model                                                                                                                         |
-| `/dashboard/transactions`                 | A page of transactions, with filters `type`, `category`, `account`, `member`, `q` (merchant or description), `from` and `to` (at most 366 days, replacing the month), `sort` and `page` |
-| `/dashboard/accounts`                     | Accounts with balances and ownership, totals per currency, members                                                                                                                      |
-| `/dashboard/recurring`                    | Recurring commitments per currency with totals, upcoming charges, price changes and stopped ones. Takes `sort`, not `month`                                                             |
-| `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month                                                                                           |
-| `/dashboard/evolution`                    | Income, spending and net for the last 6 or 12 months (`months=6\|12`), with bar heights in basis points of the largest month. Not tied to a month                                       |
-| `/dashboard/compare`                      | Two months side by side (`a`, `b`, defaulting to the previous and the current month): totals and top-level categories, with changes and bar widths                                      |
-| `/dashboard/members`                      | The household's members, to open one                                                                                                                                                    |
-| `/dashboard/members/:key`                 | One member's month: spending, income, share of the household's spending, change from the previous month, categories and largest expenses                                                |
-| `/dashboard/transactions/export`          | The same filters as the list, as a CSV file of at most 5 000 rows                                                                                                                       |
-| `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                                                                                                          |
+| Route                                     | Returns                                                                                                                                                                                       |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dashboard/session`                      | Member and household names, currency, time zone, today, selectable months                                                                                                                     |
+| `/dashboard/overview`                     | Totals, comparison, top categories, members, budgets, forecast, balances, findings                                                                                                            |
+| `/dashboard/spending`                     | Total, categories, members, accounts, biggest changes, largest expenses                                                                                                                       |
+| `/dashboard/income`                       | Total, sources, members, comparison                                                                                                                                                           |
+| `/dashboard/budgets`                      | Each budget with usage, status, projection and member attribution                                                                                                                             |
+| `/dashboard/goals`                        | Each goal with progress, remainder and state                                                                                                                                                  |
+| `/dashboard/outlook`                      | Forecast, cash-flow outlook, budgets projected over, recurring commitments                                                                                                                    |
+| `/dashboard/signals`                      | Insights and anomalies, described                                                                                                                                                             |
+| `/dashboard/review`                       | The monthly review narrative and whether it came from the model                                                                                                                               |
+| `/dashboard/transactions`                 | A page of transactions, with filters `type`, `category`, `account`, `member`, `q` (merchant or description), `from` and `to` (at most 366 days, replacing the month), `sort` and `page`       |
+| `/dashboard/accounts`                     | Accounts with balances and ownership, totals per currency, members                                                                                                                            |
+| `/dashboard/recurring`                    | Recurring commitments per currency with totals, upcoming charges, price changes and stopped ones. Takes `sort`, not `month`                                                                   |
+| `/dashboard/notifications`                | The household's recent proactive notifications with status and read mark. Not tied to a month                                                                                                 |
+| `/dashboard/evolution`                    | Income, spending and net for the last 6 or 12 months (`months=6\|12`), with bar heights in basis points of the largest month. Not tied to a month                                             |
+| `/dashboard/compare`                      | Two months side by side (`a`, `b`, defaulting to the previous and the current month): totals and top-level categories, with changes and bar widths                                            |
+| `/dashboard/members`                      | The household's members, to open one                                                                                                                                                          |
+| `/dashboard/members/:key`                 | One member's month: spending, income, share of the household's spending, change from the previous month, categories and largest expenses                                                      |
+| `/dashboard/categories/:key`              | One category's month: total, share of the month, change from the equivalent previous period, subcategories, the last 6 months, members, the budgets that cover it and its latest transactions |
+| `/dashboard/transactions/export`          | The same filters as the list, as a CSV file of at most 5 000 rows                                                                                                                             |
+| `POST /dashboard/notifications/:key/read` | Marks one notification as read                                                                                                                                                                |
 
 Routes that change data ([ADR-029](adr/ADR-029-dashboard-writes.md)):
 
@@ -112,8 +113,9 @@ Each response is a view written for the dashboard, defined as a Zod schema in `a
 
 - An amount is `{ minor, text }`: the exact integer and its formatted text, such as `€2,220.00`.
 - A ratio is `{ basisPoints, text }`, such as `82%`, or `null` when it does not exist.
-- Categories, accounts, members and goals appear by name.
-- Internal identifiers appear only as `key`: on filter and form options, and on transaction, budget and goal rows. The browser only sends a key back.
+- Categories, accounts, members and goals appear by name. A transaction also carries its category path, such as `Food › Coffee`.
+- Internal identifiers appear only as `key` or as a field ending in `Key` (`categoryKey`, `parentKey`): on filter and form options, on transaction, budget and goal rows, and on every category row so that it can link to its page. The browser only sends a key back.
+- Category rows come in tree order: each top-level category is followed by its own subcategories, sorted by total, with `parentKey` and the subcategory's share of its parent. Filtering transactions by a category includes all of its subcategories.
 
 The web application imports the TypeScript types of these schemas and nothing else from the backend.
 
@@ -135,7 +137,8 @@ The web application imports the TypeScript types of these schemas and nothing el
 | Page         | Shows                                                                                                                                                                    |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Overview     | The month in one line, income and spending over the last 6 or 12 months, comparison, findings, top categories, budgets, projection, balances, members                    |
-| Spending     | Total, a ring of the top categories, categories with subcategories, members, accounts, risers and fallers, largest expenses                                              |
+| Spending     | Total, a ring of the top categories, categories with their subcategories right below them, members, accounts, risers and fallers, largest expenses                       |
+| Category     | One category's month: total and change, the last 6 months, subcategories with their share of the category, members, the budgets that cover it, its latest transactions   |
 | Compare      | Any two months: totals with their change, and each category as a pair of bars                                                                                            |
 | People       | Each member's month: spending with its change, income, share of the household's spending, a category ring, categories, largest expenses                                  |
 | Income       | Total, sources, members                                                                                                                                                  |

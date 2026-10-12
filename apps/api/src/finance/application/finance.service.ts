@@ -27,6 +27,10 @@ import {
   composeByTopLevelCategory,
   type CompositionSlice,
 } from '../domain/analytics/category-composition.js';
+import {
+  describeCategoryActivity,
+  type CategoryActivity,
+} from '../domain/analytics/category-activity.js';
 import { compareMonths, type MonthComparison } from '../domain/analytics/month-comparison.js';
 import { buildMonthlySeries, type MonthlyCashFlow } from '../domain/analytics/monthly-series.js';
 import { CategoryTree } from '../domain/categories/category-tree.js';
@@ -122,6 +126,10 @@ export interface MemberActivity {
   readonly previousPeriod: DateRange;
   readonly composition: readonly CompositionSlice[];
   readonly largestExpenses: readonly ExpenseItem[];
+}
+
+export interface CategoryActivityWithBudgets extends CategoryActivity {
+  readonly budgets: readonly BudgetUsage[];
 }
 
 interface Scope {
@@ -332,6 +340,52 @@ export class FinanceService {
         activity.currency === scope.currency ||
         activity.spending.transactionCount > 0 ||
         activity.income.transactionCount > 0,
+    );
+  }
+
+  async categoryActivity(
+    householdId: string,
+    categoryId: string,
+    type: FlowType,
+    period: DateRange,
+    historyMonths: number,
+  ): Promise<CategoryActivityWithBudgets[]> {
+    const scope = await this.scopeOf(householdId);
+    const currencies = await this.currenciesOf(householdId, scope);
+    const previous = previousEquivalentRange(period);
+    const months = [
+      ...previousPeriods('MONTHLY', monthContaining(period.start), historyMonths - 1).reverse(),
+      monthContaining(period.start),
+    ];
+    const [entries, budgets] = await Promise.all([
+      this.ledger.findEntries(householdId, { period: span([previous, period, ...months]) }),
+      type === 'EXPENSE' ? this.budgets(householdId, period.end) : Promise.resolve([]),
+    ]);
+    const related = budgets.filter(
+      (budget) =>
+        budget.categoryId !== null &&
+        (scope.categories.isWithin(categoryId, budget.categoryId) ||
+          scope.categories.isWithin(budget.categoryId, categoryId)),
+    );
+    const activities = currencies.map((currency) => ({
+      ...describeCategoryActivity({
+        entries,
+        currency,
+        categoryId,
+        type,
+        period,
+        previousPeriod: previous,
+        months,
+        categories: scope.categories,
+      }),
+      budgets: related.filter((budget) => budget.currency === currency),
+    }));
+    return activities.filter(
+      (activity) =>
+        activity.currency === scope.currency ||
+        activity.transactionCount > 0 ||
+        activity.budgets.length > 0 ||
+        activity.months.some((month) => month.totalMinor > 0),
     );
   }
 

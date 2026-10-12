@@ -215,7 +215,7 @@ function categoryChanges(
     .slice(0, policy.review.categoryChanges);
 }
 
-function reviewBudget(usage: FinancialSnapshot['budgets'][number]): ReviewBudget {
+export function reviewBudget(usage: FinancialSnapshot['budgets'][number]): ReviewBudget {
   return {
     budgetId: usage.budgetId,
     categoryId: usage.categoryId,

@@ -1,6 +1,7 @@
 import { householdCurrencies } from '../accounts/household-currencies.js';
 import { BUDGET_PERIODS } from '../budgets/budget-vocabulary.js';
 import type { HouseholdDirectory } from '../directory/household-directory.service.js';
+import { CategoryTree } from '../finance/domain/categories/category-tree.js';
 import { GOAL_TYPES } from '../goals/goal-vocabulary.js';
 import type { BudgetOptions, GoalOptions, TransactionEditView } from './dashboard.contracts.js';
 
@@ -12,21 +13,57 @@ interface CategoryOption {
   readonly kind: 'EXPENSE' | 'INCOME';
 }
 
+export function categoryPaths(directory: HouseholdDirectory): Map<string, string> {
+  const lineages = categoryLineages(directory);
+  return new Map([...lineages].map(([id, names]) => [id, names.join(CATEGORY_PATH_SEPARATOR)]));
+}
+
 export function categoryOptions(directory: HouseholdDirectory): CategoryOption[] {
-  const names = new Map(directory.categories.map((category) => [category.id, category.name]));
+  const lineages = categoryLineages(directory);
+  const lineageOf = (id: string): readonly string[] => lineages.get(id) ?? [];
   return directory.categories
-    .map((category) => {
-      const parent = category.parentId === null ? undefined : names.get(category.parentId);
-      return {
-        key: category.id,
-        name:
-          parent === undefined
-            ? category.name
-            : `${parent}${CATEGORY_PATH_SEPARATOR}${category.name}`,
-        kind: category.kind,
-      };
-    })
-    .sort((left, right) => left.name.localeCompare(right.name, directory.locale));
+    .map((category) => ({
+      key: category.id,
+      name: lineageOf(category.id).join(CATEGORY_PATH_SEPARATOR),
+      kind: category.kind,
+    }))
+    .sort((left, right) => compareLineages(lineageOf(left.key), lineageOf(right.key), directory));
+}
+
+export function categoryFilterOptions(directory: HouseholdDirectory): CategoryOption[] {
+  const options = categoryOptions(directory);
+  return [
+    ...options.filter((option) => option.kind === 'EXPENSE'),
+    ...options.filter((option) => option.kind === 'INCOME'),
+  ];
+}
+
+function categoryLineages(directory: HouseholdDirectory): Map<string, string[]> {
+  const tree = new CategoryTree(directory.categories);
+  const names = new Map(directory.categories.map((category) => [category.id, category.name]));
+  return new Map(
+    directory.categories.map((category) => [
+      category.id,
+      tree
+        .lineageOf(category.id)
+        .reverse()
+        .map((id) => names.get(id) ?? ''),
+    ]),
+  );
+}
+
+function compareLineages(
+  left: readonly string[],
+  right: readonly string[],
+  directory: HouseholdDirectory,
+): number {
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    const order = (left[index] ?? '').localeCompare(right[index] ?? '', directory.locale);
+    if (order !== 0) {
+      return order;
+    }
+  }
+  return left.length - right.length;
 }
 
 export function currencyOptions(

@@ -15,6 +15,7 @@ import { APP_CONFIG } from '../src/config/app-config.js';
 import {
   accountsSchema,
   budgetsSchema,
+  categorySchema,
   goalsSchema,
   incomeSchema,
   outlookViewSchema,
@@ -61,7 +62,7 @@ function withoutKeys(value: unknown): unknown {
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(
       Object.entries(value)
-        .filter(([name]) => name !== 'key')
+        .filter(([name]) => name !== 'key' && !name.endsWith('Key'))
         .map(([name, entry]) => [name, withoutKeys(entry)]),
     );
   }
@@ -439,6 +440,7 @@ describe('dashboard API', () => {
         amount: { minor: 180000, text: '€1,800.00' },
         merchant: 'Landlord',
         category: 'Rent',
+        categoryKey: category('Rent'),
         member: memberAt(fixture, 0).name,
         account: 'Joint Account',
       });
@@ -622,6 +624,140 @@ describe('dashboard API', () => {
       ]);
       expect(byMember.transactions.map((row) => row.merchant)).toEqual(['Bistro']);
       expect(byAccount).toMatchObject({ total: 4, month: { key: keyOf(LAST_MONTH) } });
+      expect(inFood.transactions.map((row) => row.categoryPath).sort()).toEqual([
+        'Food › Groceries',
+        'Food › Restaurants',
+      ]);
+      expect(inFood.transactions.map((row) => row.categoryKey).sort()).toEqual(
+        [category('Groceries'), category('Restaurants')].sort(),
+      );
+    });
+
+    it('offers the category filter grouped by kind, each parent followed by its subcategories', async () => {
+      const options = (await view(transactionsSchema, '/dashboard/transactions', token)).filters
+        .categories;
+      const names = options.map((option) => option.name);
+      const firstIncome = options.findIndex((option) => option.kind === 'INCOME');
+
+      expect(options.slice(0, firstIncome).every((option) => option.kind === 'EXPENSE')).toBe(true);
+      expect(options.slice(firstIncome).every((option) => option.kind === 'INCOME')).toBe(true);
+      expect(names.indexOf('Food › Coffee')).toBe(names.indexOf('Food') + 1);
+      expect(names).toContain('Transport › Uber');
+    });
+
+    it('lists spending categories as a tree with each subcategory under its own parent', async () => {
+      const spending = await view(spendingSchema, '/dashboard/spending', token);
+      const rows = spending.currencies[0]?.byCategory ?? [];
+
+      expect(rows.map((row) => row.category)).toEqual([
+        'Housing',
+        'Rent',
+        'Food',
+        'Groceries',
+        'Restaurants',
+      ]);
+      expect(rows.map((row) => row.parentKey)).toEqual([
+        null,
+        category('Housing'),
+        null,
+        category('Food'),
+        category('Food'),
+      ]);
+      expect(rows[3]).toMatchObject({
+        categoryKey: category('Groceries'),
+        isTopLevel: false,
+        shareOfParent: { basisPoints: 5714 },
+      });
+    });
+
+    it('describes a category with its subcategories, months, members, budgets and transactions', async () => {
+      const food = await view(categorySchema, `/dashboard/categories/${category('Food')}`, token);
+      const [eur] = food.currencies;
+
+      expect(food.category).toMatchObject({
+        key: category('Food'),
+        name: 'Food',
+        path: 'Food',
+        kind: 'EXPENSE',
+        parent: null,
+      });
+      expect(food.category.children.map((child) => child.name)).toEqual([
+        'Coffee',
+        'Delivery',
+        'Groceries',
+        'Restaurants',
+      ]);
+      expect(eur).toMatchObject({
+        currency: 'EUR',
+        total: { minor: 42000, text: '€420.00' },
+        transactionCount: 2,
+        share: { basisPoints: 1892 },
+        comparison: { previous: { minor: 33000 }, direction: 'INCREASE' },
+      });
+      expect(eur?.subcategories).toEqual([
+        expect.objectContaining({
+          category: 'Groceries',
+          parentKey: category('Food'),
+          shareOfParent: { basisPoints: 5714, text: '57.14%' },
+        }),
+        expect.objectContaining({ category: 'Restaurants', parentKey: category('Food') }),
+      ]);
+      expect(eur?.months).toHaveLength(6);
+      expect(eur?.months.slice(-3).map((month) => [month.key, month.total.minor])).toEqual([
+        [keyOf(TWO_MONTHS_AGO), 24000],
+        [keyOf(LAST_MONTH), 33000],
+        [keyOf(THIS_MONTH), 42000],
+      ]);
+      expect(eur?.months.at(-1)?.bar).toEqual({ basisPoints: 10000, text: '100%' });
+      expect(eur?.byMember.map((member) => member.member)).toEqual([
+        memberAt(fixture, 0).name,
+        memberAt(fixture, 2).name,
+      ]);
+      expect(eur?.budgets.map((budget) => [budget.category, budget.categoryKey])).toEqual([
+        ['Restaurants', category('Restaurants')],
+      ]);
+      expect(eur?.budgets[0]?.key).toMatch(UUID);
+      expect(food.transactions.total).toBe(2);
+      expect(food.transactions.rows.map((row) => row.categoryPath).sort()).toEqual([
+        'Food › Groceries',
+        'Food › Restaurants',
+      ]);
+    });
+
+    it('describes a subcategory with its parent and the budgets that cover it', async () => {
+      const restaurants = await view(
+        categorySchema,
+        `/dashboard/categories/${category('Restaurants')}?month=${keyOf(LAST_MONTH)}`,
+        token,
+      );
+
+      expect(restaurants.month.key).toBe(keyOf(LAST_MONTH));
+      expect(restaurants.category).toMatchObject({
+        path: 'Food › Restaurants',
+        parent: { key: category('Food'), name: 'Food' },
+        children: [],
+      });
+      expect(restaurants.currencies[0]).toMatchObject({
+        total: { minor: 9000 },
+        subcategories: [],
+        budgets: [expect.objectContaining({ category: 'Restaurants' })],
+      });
+      expect(restaurants.transactions.rows.map((row) => row.merchant)).toEqual(['Bistro']);
+    });
+
+    it.each([
+      ['an unknown category', '00000000-0000-4000-8000-000000000000', 404],
+      ['a key that is not a category key', 'not-a-uuid', 404],
+    ])('answers %s with %d', async (_, key, status) => {
+      expect((await get(`/dashboard/categories/${key}`, token)).status).toBe(status);
+    });
+
+    it('rejects a category month in the future', async () => {
+      const future = addDays(THIS_MONTH.end, 1).slice(0, 7);
+
+      expect(
+        (await get(`/dashboard/categories/${category('Food')}?month=${future}`, token)).status,
+      ).toBe(400);
     });
 
     it.each(['type=REFUND', 'category=food', 'page=0', 'page=abc', 'member=1'])(
@@ -680,6 +816,11 @@ describe('dashboard API', () => {
         'signals',
         'review',
         'accounts',
+        'transactions',
+        'evolution',
+        'compare',
+        'members',
+        `categories/${category('Food')}`,
       ];
 
       for (const path of paths) {
@@ -755,6 +896,21 @@ describe('dashboard API', () => {
 
         expect(history).toMatchObject({ total: 0, transactions: [] });
       }
+    });
+
+    it('shows a category page with the figures of the household of the session only', async () => {
+      const food = await view(
+        categorySchema,
+        `/dashboard/categories/${category('Food')}`,
+        ownToken,
+      );
+      const everything = JSON.stringify(food);
+
+      expect(food.currencies[0]?.total).toEqual({ minor: 4200, text: '€42.00' });
+      expect(food.transactions.rows.map((row) => row.merchant)).toEqual(['Corner Shop']);
+      expect(everything).not.toContain('Bistro');
+      expect(everything).not.toContain('Lidl');
+      expect(everything).not.toContain(other.household.name);
     });
 
     it('gives each member of a household the same household view', async () => {
