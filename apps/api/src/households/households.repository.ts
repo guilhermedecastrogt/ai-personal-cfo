@@ -3,6 +3,7 @@ import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.js';
 import { requireRow } from '../database/require-row.js';
 import { households, members, whatsappIdentities } from './households.schema.js';
+import { equivalentAddresses } from './whatsapp-address.js';
 
 export type Household = typeof households.$inferSelect;
 export type Member = typeof members.$inferSelect;
@@ -164,9 +165,10 @@ export class HouseholdsRepository {
       .where(
         and(
           eq(whatsappIdentities.provider, provider),
-          eq(whatsappIdentities.externalUserId, externalUserId),
+          inArray(whatsappIdentities.externalUserId, [...equivalentAddresses(externalUserId)]),
         ),
-      );
+      )
+      .limit(1);
     return found !== undefined;
   }
 

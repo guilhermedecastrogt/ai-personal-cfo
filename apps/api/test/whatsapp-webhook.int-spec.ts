@@ -420,6 +420,26 @@ describe('WhatsApp webhook', () => {
     });
   });
 
+  describe('Brazilian mobile numbers', () => {
+    it('answers a member registered with the ninth digit when WhatsApp sends the number without it', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Ninth Digit', 1);
+      await households.registerWhatsAppIdentity(fixture.household.id, {
+        memberId: memberAt(fixture, 0).id,
+        provider: 'kapso',
+        externalUserId: '5511987650000',
+        phoneNumber: '+5511987650000',
+      });
+      const messageId = nextMessageId();
+      ai.willInterpretAs(questionInterpretation());
+
+      await deliver(kapsoTextEvent({ id: messageId, from: '551187650000' }, 'Quanto gastamos?'));
+
+      expect(await eventStatus(messageId)).toBe('PROCESSED');
+      expect(repliesTo('551187650000')).toHaveLength(1);
+      expect(repliesTo('5511987650000')).toEqual([]);
+    });
+  });
+
   describe('unknown senders', () => {
     it('acknowledges the event and does nothing else', async () => {
       const messageId = nextMessageId();

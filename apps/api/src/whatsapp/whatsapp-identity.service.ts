@@ -35,6 +35,9 @@ export class WhatsAppIdentityService {
     memberId: string,
     phoneNumber: string,
   ): Promise<IdentityRegistration> {
+    if (await this.isRegistered(phoneNumber)) {
+      return { status: 'ALREADY_REGISTERED' };
+    }
     try {
       const identity = await this.households.registerWhatsAppIdentity(householdId, {
         memberId,

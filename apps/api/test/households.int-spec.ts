@@ -140,6 +140,57 @@ describe('households and members', () => {
       expect((await resolver.resolve('kapso', 'two-phones-b'))?.memberId).toBe(member.id);
     });
 
+    it.each([
+      ['with the ninth digit, messaging in without it', '5511987650001', '551187650001'],
+      ['without the ninth digit, messaging in with it', '551187650002', '5511987650002'],
+    ])('resolves a Brazilian mobile number registered %s', async (_, registered, sender) => {
+      const fixture = await createHouseholdFixture(testDatabase.database, `Ninth ${sender}`, 1);
+      await repository.registerWhatsAppIdentity(fixture.household.id, {
+        memberId: memberAt(fixture, 0).id,
+        provider: 'kapso',
+        externalUserId: registered,
+        phoneNumber: `+${registered}`,
+      });
+
+      expect((await resolver.resolve('kapso', sender))?.memberId).toBe(memberAt(fixture, 0).id);
+      expect(await repository.isWhatsAppAddressTaken('kapso', sender)).toBe(true);
+    });
+
+    it('prefers the exact number when both forms of a Brazilian mobile are registered', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Both Forms', 2);
+      await repository.registerWhatsAppIdentity(fixture.household.id, {
+        memberId: memberAt(fixture, 0).id,
+        provider: 'kapso',
+        externalUserId: '5511987650003',
+        phoneNumber: '+5511987650003',
+      });
+      await repository.registerWhatsAppIdentity(fixture.household.id, {
+        memberId: memberAt(fixture, 1).id,
+        provider: 'kapso',
+        externalUserId: '551187650003',
+        phoneNumber: '+551187650003',
+      });
+
+      expect((await resolver.resolve('kapso', '5511987650003'))?.memberId).toBe(
+        memberAt(fixture, 0).id,
+      );
+      expect((await resolver.resolve('kapso', '551187650003'))?.memberId).toBe(
+        memberAt(fixture, 1).id,
+      );
+    });
+
+    it('does not resolve a Brazilian landline by adding a ninth digit', async () => {
+      const fixture = await createHouseholdFixture(testDatabase.database, 'Landline', 1);
+      await repository.registerWhatsAppIdentity(fixture.household.id, {
+        memberId: memberAt(fixture, 0).id,
+        provider: 'kapso',
+        externalUserId: '5562932345678',
+        phoneNumber: '+5562932345678',
+      });
+
+      expect(await resolver.resolve('kapso', '556232345678')).toBeUndefined();
+    });
+
     it('does not resolve an unregistered sender and creates nothing for it', async () => {
       const membersBefore = await testDatabase.database.$count(members);
 

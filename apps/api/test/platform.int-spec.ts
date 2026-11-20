@@ -429,7 +429,10 @@ describe('platform administration', () => {
       expect(whatsapp.templates).toEqual([]);
     });
 
-    it('creates nothing when the number already belongs to someone', async () => {
+    it.each([
+      ['already belongs to someone', '+5511988880001'],
+      ['is the same mobile written without the ninth digit', '+551188880001'],
+    ])('creates nothing when the number %s', async (_, phoneNumber) => {
       const before = await testDatabase.database.$count(households);
 
       const response = await as(adminToken).post('/platform/households', {
@@ -438,7 +441,7 @@ describe('platform administration', () => {
         timezone: 'America/Sao_Paulo',
         locale: 'pt-BR',
         firstMember: 'Someone',
-        phoneNumber: '+5511988880001',
+        phoneNumber,
       });
 
       expect(response.status).toBe(422);

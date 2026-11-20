@@ -134,6 +134,12 @@ flowchart LR
 
 The sender is resolved by lookup before anything else happens to the message ([ADR-007](adr/ADR-007-whatsapp-identity-resolution.md)). The lookup key is the provider name and the sender's number as digits, which is how identities are seeded.
 
+### Brazilian mobile numbers
+
+A Brazilian mobile number is written with a ninth digit after the area code, `55 11 9 8765 4321`, but WhatsApp identifies some accounts, usually older ones, by the form without it, `55 11 8765 4321`. A member registered with one form can therefore message in from the other.
+
+For a Brazilian mobile number, the lookup accepts both forms, and when both are registered the exact match wins. A number counts as already registered when either form is, so the same person cannot be registered twice. Replies go to the number exactly as WhatsApp sent it. Landlines and numbers from other countries are matched exactly. The rule is `equivalentAddresses` in `households/whatsapp-address.ts`.
+
 The resulting context, household and member, is the only source of identity for everything downstream. The payload is parsed with a schema that keeps six fields, so a `household_id`, `member_id` or `account_id` placed anywhere in a webhook is discarded before any application code sees it.
 
 ### Unknown senders
