@@ -932,7 +932,7 @@ describe('dashboard API', () => {
         .get(AccountsRepository)
         .create(fixture.household.id, { name: 'Reais', type: 'BANK', currency: 'BRL' });
       await record(fixture, 0, [
-        { amountMinor: 100000 },
+        { amountMinor: 100003 },
         { amountMinor: 50000, accountId: reais.id, currency: 'BRL' },
       ]);
       const token = await tokenFor(fixture);
@@ -944,12 +944,12 @@ describe('dashboard API', () => {
       expect(
         overview.currencies.map((entry) => [entry.currency, entry.totals.expenses.text]),
       ).toEqual([
-        ['EUR', '€1,000.00'],
+        ['EUR', '€1,000.03'],
         ['BRL', 'R$500.00'],
       ]);
-      expect(spending.currencies.map((entry) => entry.total.minor)).toEqual([100000, 50000]);
+      expect(spending.currencies.map((entry) => entry.total.minor)).toEqual([100003, 50000]);
       expect(accounts.totals.map((entry) => entry.currency)).toEqual(['BRL', 'EUR']);
-      expect(JSON.stringify([overview, spending, accounts])).not.toContain('150000');
+      expect(JSON.stringify([overview, spending, accounts])).not.toContain('150003');
     });
 
     it('describes an empty household without inventing figures', async () => {
